@@ -43,3 +43,37 @@ class AlertResponse(BaseModel):
     direction: str
     alert_type: str
     created_at: datetime
+
+
+class MonitoredCompetitionCreate(BaseModel):
+    competition_name: str
+    country: Optional[str] = None
+    provider: str = "odds_api_io"
+    provider_league_slug: Optional[str] = None
+    is_active: bool = True
+
+
+class MonitoredCompetitionResponse(BaseModel):
+    id: int
+    competition_name: str
+    country: Optional[str] = None
+    provider: str
+    provider_league_slug: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+
+class NotificationRecipientCreate(BaseModel):
+    channel: str
+    recipient_value: str
+    label: Optional[str] = None
+    is_active: bool = True
+
+
+class NotificationRecipientResponse(BaseModel):
+    id: int
+    channel: str
+    recipient_value: str
+    label: Optional[str] = None
+    is_active: bool
+    created_at: datetime

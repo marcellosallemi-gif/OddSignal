@@ -143,7 +143,12 @@ class OddsApiIoProvider:
         )
         return "{}/odds/multi?{}".format(self.base_url, query)
 
-    def get_events(self, limit: Optional[int] = None, bookmaker: Optional[str] = None):
+    def get_events(
+        self,
+        limit: Optional[int] = None,
+        bookmaker: Optional[str] = None,
+        league: Optional[str] = None,
+    ):
         params = {
             "sport": self.sport,
             "status": self.status,
@@ -153,6 +158,9 @@ class OddsApiIoProvider:
 
         if bookmaker:
             params["bookmaker"] = bookmaker
+
+        if league:
+            params["league"] = league
 
         return self._get("/events", params=params)
 
@@ -165,9 +173,25 @@ class OddsApiIoProvider:
             },
         )
 
-    def get_sample(self, limit: Optional[int] = None):
+    def get_sample(
+        self,
+        limit: Optional[int] = None,
+        league_slugs: Optional[List[str]] = None,
+    ):
         first_bookmaker = self.bookmakers.split(",")[0].strip()
-        events = self.get_events(limit=limit, bookmaker=first_bookmaker)
+
+        events = []
+        if league_slugs:
+            for league_slug in league_slugs:
+                events.extend(
+                    self.get_events(
+                        limit=limit,
+                        bookmaker=first_bookmaker,
+                        league=league_slug,
+                    )
+                )
+        else:
+            events = self.get_events(limit=limit, bookmaker=first_bookmaker)
 
         normalized_events = [self.normalize_event(event) for event in events]
         odds = []
@@ -184,6 +208,7 @@ class OddsApiIoProvider:
                 for bookmaker in self.bookmakers.split(",")
                 if bookmaker.strip()
             ],
+            "league_slugs": league_slugs or [],
             "events_count": len(normalized_events),
             "odds_count": len(odds),
             "events": normalized_events,

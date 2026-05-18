@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
-from app.models import Alert, Competition, Event, OddsSnapshot, Team
+from app.models import Alert, Competition, Event, MonitoredCompetition, OddsSnapshot, Team
 from app.services.alert_engine import evaluate_alert
 from app.services.odds_api_io_provider import OddsApiIoProvider
 from app.services.telegram_notifier import send_telegram_alert
@@ -37,12 +37,23 @@ def _get_alert_deduplication_minutes() -> int:
     return value
 
 
-def _get_or_create_competition(db, name: str) -> Competition:
+def _get_or_create_competition(
+    db,
+    name: str,
+    provider_league_slug: str = None,
+) -> Competition:
     competition = db.query(Competition).filter(Competition.name == name).first()
     if competition:
+        if provider_league_slug and not competition.provider_league_slug:
+            competition.provider_league_slug = provider_league_slug
+            db.flush()
         return competition
 
-    competition = Competition(name=name, country="Unknown")
+    competition = Competition(
+        name=name,
+        country="Unknown",
+        provider_league_slug=provider_league_slug,
+    )
     db.add(competition)
     db.flush()
     return competition
@@ -63,6 +74,7 @@ def _get_or_create_event(db, event_data: Dict) -> Event:
     competition = _get_or_create_competition(
         db,
         event_data.get("league_name") or "Unknown competition",
+        event_data.get("league_slug"),
     )
     home_team = _get_or_create_team(db, event_data.get("home_team") or "Unknown home")
     away_team = _get_or_create_team(db, event_data.get("away_team") or "Unknown away")
@@ -123,6 +135,31 @@ def _is_monitored_market(odd_data: Dict) -> bool:
     return market_name in allowed_markets
 
 
+def _get_active_monitored_competitions(db):
+    return (
+        db.query(MonitoredCompetition)
+        .filter(MonitoredCompetition.is_active.is_(True))
+        .all()
+    )
+
+
+def _get_active_monitored_competition_names(active_competitions) -> set:
+    return {item.competition_name for item in active_competitions}
+
+
+def _get_active_provider_league_slugs(active_competitions) -> list:
+    return [
+        item.provider_league_slug
+        for item in active_competitions
+        if item.provider_league_slug
+    ]
+
+
+def _is_monitored_competition(event_data: Dict, active_competitions: set) -> bool:
+    league_name = event_data.get("league_name")
+    return league_name in active_competitions
+
+
 def _find_previous_snapshot(db, event_id: int, odd_data: Dict) -> Optional[OddsSnapshot]:
     return (
         db.query(OddsSnapshot)
@@ -166,11 +203,24 @@ def _recent_alert_exists(
 
 
 def ingest_odds_sample(db, limit: int = 3) -> Dict:
+    active_competitions = _get_active_monitored_competitions(db)
+    active_competition_names = _get_active_monitored_competition_names(active_competitions)
+    active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
+
     provider = OddsApiIoProvider()
-    sample = provider.get_sample(limit=limit)
+    sample = provider.get_sample(
+        limit=limit,
+        league_slugs=active_provider_league_slugs,
+    )
 
     events_by_provider_id = {}
+    ignored_events = 0
+
     for event_data in sample["events"]:
+        if not _is_monitored_competition(event_data, active_competition_names):
+            ignored_events += 1
+            continue
+
         event = _get_or_create_event(db, event_data)
         events_by_provider_id[event_data["provider_event_id"]] = event
 
@@ -259,6 +309,9 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     return {
         "provider": sample["provider"],
         "events_received": sample["events_count"],
+        "events_ignored": ignored_events,
+        "active_competitions_count": len(active_competitions),
+        "active_provider_league_slugs_count": len(active_provider_league_slugs),
         "odds_received": sample["odds_count"],
         "odds_ignored": ignored_odds,
         "snapshots_inserted": inserted_snapshots,

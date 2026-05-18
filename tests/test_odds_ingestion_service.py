@@ -2,8 +2,25 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import Alert, OddsSnapshot
+from datetime import datetime
+
+from app.models import Alert, MonitoredCompetition, OddsSnapshot
 from app.services import odds_ingestion_service
+
+
+
+
+def add_monitored_competition(db, competition_name="Test League"):
+    item = MonitoredCompetition(
+        competition_name=competition_name,
+        country="Test",
+        provider="odds_api_io",
+        is_active=True,
+        created_at=datetime.utcnow(),
+    )
+    db.add(item)
+    db.commit()
+    return item
 
 
 def make_test_db(tmp_path):
@@ -24,7 +41,7 @@ def make_test_db(tmp_path):
 class FakeProvider:
     odds_decimal = 1.80
 
-    def get_sample(self, limit=3):
+    def get_sample(self, limit=3, league_slugs=None):
         return {
             "provider": "odds_api_io",
             "sport": "football",
@@ -68,6 +85,7 @@ def test_ingestion_inserts_first_snapshot_without_alert(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
     try:
+        add_monitored_competition(db)
         FakeProvider.odds_decimal = 1.80
         monkeypatch.setattr(
             odds_ingestion_service,
@@ -89,6 +107,7 @@ def test_ingestion_creates_standard_alert_on_eligible_variation(monkeypatch, tmp
     db = make_test_db(tmp_path)
 
     try:
+        add_monitored_competition(db)
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
@@ -118,6 +137,7 @@ def test_ingestion_skips_recent_duplicate_alert(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
     try:
+        add_monitored_competition(db)
         monkeypatch.setenv("ALERT_DEDUPLICATION_MINUTES", "30")
         monkeypatch.setattr(
             odds_ingestion_service,
@@ -143,7 +163,7 @@ def test_ingestion_skips_recent_duplicate_alert(monkeypatch, tmp_path):
 
 
 class FakeProviderWithIgnoredMarket:
-    def get_sample(self, limit=3):
+    def get_sample(self, limit=3, league_slugs=None):
         return {
             "provider": "odds_api_io",
             "sport": "football",
@@ -200,6 +220,7 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
     try:
+        add_monitored_competition(db)
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
@@ -215,5 +236,26 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
 
         snapshot = db.query(OddsSnapshot).first()
         assert snapshot.market == "ML"
+    finally:
+        db.close()
+
+
+def test_ingestion_ignores_unmonitored_competitions(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda: FakeProvider(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["active_competitions_count"] == 0
+        assert result["events_received"] == 1
+        assert result["events_ignored"] == 1
+        assert result["snapshots_inserted"] == 0
+        assert db.query(OddsSnapshot).count() == 0
     finally:
         db.close()

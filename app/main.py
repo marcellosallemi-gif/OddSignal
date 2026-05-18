@@ -7,6 +7,7 @@ from app.database import Base, SessionLocal, engine
 from app.models import Competition, Event, OddsSnapshot, Team
 from app.runtime import load_environment, run_runtime_migrations, should_seed_demo_data
 from app.routers.alerts import router as alerts_router
+from app.routers.configuration import router as configuration_router
 from app.routers.events import router as events_router
 from app.routers.health import router as health_router
 from app.routers.odds import router as odds_router
@@ -165,6 +166,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Football Odds Monitor", lifespan=lifespan)
 app.include_router(health_router)
+app.include_router(configuration_router)
 app.include_router(events_router)
 app.include_router(odds_router)
 app.include_router(odds_provider_router)

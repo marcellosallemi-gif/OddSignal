@@ -13,6 +13,37 @@ ODDS_SNAPSHOT_METADATA_COLUMNS = {
 }
 
 
+COMPETITION_METADATA_COLUMNS = {
+    "provider_league_slug": "VARCHAR",
+}
+
+
+
+
+CREATE_MONITORED_COMPETITIONS_SQL = """
+CREATE TABLE IF NOT EXISTS monitored_competitions (
+    id INTEGER PRIMARY KEY,
+    competition_name VARCHAR NOT NULL UNIQUE,
+    country VARCHAR,
+    provider VARCHAR NOT NULL DEFAULT 'odds_api_io',
+    provider_league_slug VARCHAR,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+)
+"""
+
+
+CREATE_NOTIFICATION_RECIPIENTS_SQL = """
+CREATE TABLE IF NOT EXISTS notification_recipients (
+    id INTEGER PRIMARY KEY,
+    channel VARCHAR NOT NULL,
+    recipient_value VARCHAR NOT NULL,
+    label VARCHAR,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+)
+"""
+
 CREATE_NOTIFICATION_LOGS_SQL = """
 CREATE TABLE IF NOT EXISTS notification_logs (
     id INTEGER PRIMARY KEY,
@@ -61,13 +92,37 @@ def run_runtime_migrations() -> dict:
                 )
                 added_columns.append(column_name)
 
+        competition_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(competitions)").fetchall()
+        }
+
+        for column_name, column_type in COMPETITION_METADATA_COLUMNS.items():
+            if column_name not in competition_columns:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE competitions ADD COLUMN {column_name} {column_type}"
+                )
+
         conn.exec_driver_sql(CREATE_NOTIFICATION_LOGS_SQL)
+        conn.exec_driver_sql(CREATE_MONITORED_COMPETITIONS_SQL)
+        monitored_competition_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(monitored_competitions)").fetchall()
+        }
+        if "provider_league_slug" not in monitored_competition_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE monitored_competitions ADD COLUMN provider_league_slug VARCHAR"
+            )
+
+        conn.exec_driver_sql(CREATE_NOTIFICATION_RECIPIENTS_SQL)
         conn.commit()
 
     return {
         "status": "ok",
         "added_odds_snapshot_columns": added_columns,
         "notification_logs": "ready",
+        "monitored_competitions": "ready",
+        "notification_recipients": "ready",
     }
 
 

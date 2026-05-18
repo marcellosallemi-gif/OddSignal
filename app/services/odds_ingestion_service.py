@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
@@ -174,11 +175,15 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         snapshot = OddsSnapshot(
             event_id=event.id,
             provider=odd_data["provider"],
+            provider_event_id=odd_data.get("provider_event_id"),
             bookmaker=odd_data["bookmaker"],
             market=_market_key(odd_data),
             selection=odd_data["selection"],
+            line=odd_data.get("line"),
             odds_decimal=odd_data["odds_decimal"],
+            provider_updated_at=_parse_datetime(odd_data.get("updated_at")),
             captured_at=captured_at,
+            raw_payload=json.dumps(odd_data.get("raw") or {}, ensure_ascii=False),
         )
         db.add(snapshot)
         inserted_snapshots += 1

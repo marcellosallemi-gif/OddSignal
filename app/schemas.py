@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -18,10 +19,13 @@ class OddsResponse(BaseModel):
     event: str
     competition: str
     provider: str
+    provider_event_id: Optional[str] = None
     bookmaker: str
     market: str
     selection: str
+    line: Optional[float] = None
     odds_decimal: float
+    provider_updated_at: Optional[datetime] = None
     captured_at: datetime
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -63,11 +63,15 @@ class OddsSnapshot(Base):
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     provider = Column(String, nullable=False)
+    provider_event_id = Column(String, nullable=True)
     bookmaker = Column(String, nullable=False)
     market = Column(String, nullable=False)
     selection = Column(String, nullable=False)
+    line = Column(Float, nullable=True)
     odds_decimal = Column(Float, nullable=False)
+    provider_updated_at = Column(DateTime, nullable=True)
     captured_at = Column(DateTime, nullable=False)
+    raw_payload = Column(Text, nullable=True)
 
     event = relationship("Event", back_populates="odds_snapshots")
 

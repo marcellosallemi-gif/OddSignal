@@ -49,10 +49,13 @@ def get_odds(
             ),
             "competition": snapshot.event.competition.name,
             "provider": snapshot.provider,
+            "provider_event_id": snapshot.provider_event_id,
             "bookmaker": snapshot.bookmaker,
             "market": snapshot.market,
             "selection": snapshot.selection,
+            "line": snapshot.line,
             "odds_decimal": snapshot.odds_decimal,
+            "provider_updated_at": snapshot.provider_updated_at,
             "captured_at": snapshot.captured_at,
         }
         for snapshot in odds_snapshots

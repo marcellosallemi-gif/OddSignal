@@ -290,17 +290,32 @@ async function saveRecipient() {
 
 async function loadRecipients() {
   const data = await api("/configuration/notification-recipients");
-  let html = "<table><thead><tr><th>Canale</th><th>Destinatario</th><th>Etichetta</th><th>Stato</th></tr></thead><tbody>";
+  let html = "<table><thead><tr><th>Canale</th><th>Destinatario</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
+    const active = item.is_active ? "Attivo" : "Non attivo";
+    const badgeClass = item.is_active ? "badge ok" : "badge";
     html += `<tr>
       <td>${escapeHtml(item.channel)}</td>
       <td>${escapeHtml(item.recipient_value)}</td>
       <td>${escapeHtml(item.label)}</td>
-      <td>${item.is_active ? "Attivo" : "Non attivo"}</td>
+      <td><span class="${badgeClass}">${active}</span></td>
+      <td>
+        <button onclick="toggleRecipient(${item.id}, true)">Attiva</button>
+        <button onclick="toggleRecipient(${item.id}, false)">Disattiva</button>
+      </td>
     </tr>`;
   }
   html += "</tbody></table>";
   document.getElementById("recipients").innerHTML = html;
+}
+
+async function toggleRecipient(recipientId, isActive) {
+  await api(`/configuration/notification-recipients/${recipientId}/toggle?is_active=${isActive}`, {
+    method: "PATCH"
+  });
+
+  await loadRecipients();
+  await loadStatus();
 }
 
 async function loadAlerts() {

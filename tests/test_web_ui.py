@@ -16,3 +16,4 @@ def test_web_home_returns_html_page():
     assert "Salva impostazioni alert" in response.text
     assert "Campionati disponibili" in response.text
     assert "Destinatari notifiche" in response.text
+    assert "toggleRecipient" in response.text

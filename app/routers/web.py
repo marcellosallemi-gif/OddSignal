@@ -100,6 +100,13 @@ def web_home():
   </section>
 
   <section>
+    <h2>Controllo quote manuale</h2>
+    <p class="muted">Esegue subito un controllo quote sui campionati attivi. Utile per testare senza terminale.</p>
+    <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
+    <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
+  </section>
+
+  <section>
     <h2>Campionati disponibili</h2>
     <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
     <button onclick="loadCompetitions()">Aggiorna campionati</button>
@@ -153,6 +160,25 @@ function escapeHtml(value) {
 async function loadStatus() {
   const data = await api("/system/status");
   document.getElementById("system-status").textContent = JSON.stringify(data, null, 2);
+}
+
+async function runManualOddsCheck() {
+  const resultBox = document.getElementById("manual-odds-check-result");
+  resultBox.textContent = "Controllo in corso...";
+
+  try {
+    const data = await api("/api/odds-provider/ingest-sample?limit=1", {
+      method: "POST"
+    });
+
+    resultBox.textContent = JSON.stringify(data, null, 2);
+
+    await loadStatus();
+    await loadAlerts();
+    await loadNotificationLogs();
+  } catch (error) {
+    resultBox.textContent = "Errore controllo quote: " + error.message;
+  }
 }
 
 async function loadCompetitions() {

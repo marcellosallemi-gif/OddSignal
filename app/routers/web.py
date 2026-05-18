@@ -107,6 +107,18 @@ def web_home():
   </section>
 
   <section>
+    <h2>Impostazioni alert</h2>
+    <p class="muted">Configura le soglie senza modificare il file .env.</p>
+    <input id="alert-min-percent" type="number" step="0.01" placeholder="Min %">
+    <input id="alert-max-percent" type="number" step="0.01" placeholder="Max %">
+    <input id="alert-critical-percent" type="number" step="0.01" placeholder="Critico %">
+    <input id="alert-deduplication-minutes" type="number" step="1" placeholder="Dedup minuti">
+    <button class="primary" onclick="saveAlertSettings()">Salva impostazioni alert</button>
+    <button onclick="loadAlertSettings()">Ricarica impostazioni</button>
+    <pre id="alert-settings-result">Caricamento...</pre>
+  </section>
+
+  <section>
     <h2>Campionati disponibili</h2>
     <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
     <button onclick="loadCompetitions()">Aggiorna campionati</button>
@@ -178,6 +190,38 @@ async function runManualOddsCheck() {
     await loadNotificationLogs();
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
+  }
+}
+
+async function loadAlertSettings() {
+  const data = await api("/configuration/alert-settings");
+
+  document.getElementById("alert-min-percent").value = data.min_percent;
+  document.getElementById("alert-max-percent").value = data.max_percent;
+  document.getElementById("alert-critical-percent").value = data.critical_percent;
+  document.getElementById("alert-deduplication-minutes").value = data.deduplication_minutes;
+  document.getElementById("alert-settings-result").textContent = JSON.stringify(data, null, 2);
+}
+
+async function saveAlertSettings() {
+  const payload = {
+    min_percent: Number(document.getElementById("alert-min-percent").value),
+    max_percent: Number(document.getElementById("alert-max-percent").value),
+    critical_percent: Number(document.getElementById("alert-critical-percent").value),
+    deduplication_minutes: Number(document.getElementById("alert-deduplication-minutes").value)
+  };
+
+  try {
+    const data = await api("/configuration/alert-settings", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById("alert-settings-result").textContent = JSON.stringify(data, null, 2);
+    await loadStatus();
+  } catch (error) {
+    document.getElementById("alert-settings-result").textContent = "Errore impostazioni alert: " + error.message;
   }
 }
 
@@ -293,6 +337,7 @@ async function loadNotificationLogs() {
 }
 
 loadStatus();
+loadAlertSettings();
 loadCompetitions();
 loadRecipients();
 loadAlerts();

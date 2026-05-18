@@ -195,3 +195,32 @@ def toggle_notification_recipient(
     db.refresh(item)
 
     return item
+
+
+from app.schemas import AlertSettingResponse, AlertSettingUpdate
+from app.services.alert_settings_service import (
+    get_or_create_alert_settings,
+    update_alert_settings,
+)
+
+
+@router.get("/alert-settings", response_model=AlertSettingResponse)
+def get_alert_settings(db: Session = Depends(get_db)):
+    return get_or_create_alert_settings(db)
+
+
+@router.put("/alert-settings", response_model=AlertSettingResponse)
+def put_alert_settings(
+    payload: AlertSettingUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_alert_settings(
+            db=db,
+            min_percent=payload.min_percent,
+            max_percent=payload.max_percent,
+            critical_percent=payload.critical_percent,
+            deduplication_minutes=payload.deduplication_minutes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

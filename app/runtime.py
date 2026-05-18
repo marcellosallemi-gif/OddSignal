@@ -33,6 +33,19 @@ CREATE TABLE IF NOT EXISTS monitored_competitions (
 """
 
 
+
+
+CREATE_ALERT_SETTINGS_SQL = """
+CREATE TABLE IF NOT EXISTS alert_settings (
+    id INTEGER PRIMARY KEY,
+    min_percent FLOAT NOT NULL DEFAULT 8.0,
+    max_percent FLOAT NOT NULL DEFAULT 15.0,
+    critical_percent FLOAT NOT NULL DEFAULT 15.0,
+    deduplication_minutes INTEGER NOT NULL DEFAULT 30,
+    created_at DATETIME NOT NULL
+)
+"""
+
 CREATE_NOTIFICATION_RECIPIENTS_SQL = """
 CREATE TABLE IF NOT EXISTS notification_recipients (
     id INTEGER PRIMARY KEY,
@@ -115,6 +128,25 @@ def run_runtime_migrations() -> dict:
             )
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_RECIPIENTS_SQL)
+        conn.exec_driver_sql(CREATE_ALERT_SETTINGS_SQL)
+
+        existing_alert_settings = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM alert_settings"
+        ).scalar()
+        if existing_alert_settings == 0:
+            conn.exec_driver_sql(
+                """
+                INSERT INTO alert_settings (
+                    min_percent,
+                    max_percent,
+                    critical_percent,
+                    deduplication_minutes,
+                    created_at
+                )
+                VALUES (8.0, 15.0, 15.0, 30, CURRENT_TIMESTAMP)
+                """
+            )
+
         conn.commit()
 
     return {
@@ -123,6 +155,7 @@ def run_runtime_migrations() -> dict:
         "notification_logs": "ready",
         "monitored_competitions": "ready",
         "notification_recipients": "ready",
+        "alert_settings": "ready",
     }
 
 

@@ -77,3 +77,19 @@ class NotificationRecipientResponse(BaseModel):
     label: Optional[str] = None
     is_active: bool
     created_at: datetime
+
+
+class AlertSettingUpdate(BaseModel):
+    min_percent: float
+    max_percent: float
+    critical_percent: float
+    deduplication_minutes: int
+
+
+class AlertSettingResponse(BaseModel):
+    id: int
+    min_percent: float
+    max_percent: float
+    critical_percent: float
+    deduplication_minutes: int
+    created_at: datetime

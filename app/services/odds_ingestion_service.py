@@ -5,6 +5,7 @@ from typing import Dict, Optional
 
 from app.models import Alert, Competition, Event, MonitoredCompetition, OddsSnapshot, Team
 from app.services.alert_engine import evaluate_alert
+from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.odds_api_io_provider import OddsApiIoProvider
 from app.services.telegram_notifier import send_telegram_alert
 from app.services.variation_engine import calculate_variation
@@ -224,6 +225,8 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         event = _get_or_create_event(db, event_data)
         events_by_provider_id[event_data["provider_event_id"]] = event
 
+    alert_settings = get_or_create_alert_settings(db)
+
     inserted_snapshots = 0
     unchanged_snapshots = 0
     created_alerts = 0
@@ -270,7 +273,12 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
                 previous_snapshot.odds_decimal,
                 odd_data["odds_decimal"],
             )
-            alert_result = evaluate_alert(variation)
+            alert_result = evaluate_alert(
+                variation,
+                min_percent=alert_settings.min_percent,
+                max_percent=alert_settings.max_percent,
+                critical_percent=alert_settings.critical_percent,
+            )
 
             if alert_result:
                 if _recent_alert_exists(
@@ -319,4 +327,10 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "alerts_created": created_alerts,
         "duplicate_alerts_skipped": skipped_duplicate_alerts,
         "notification_logs_created": notification_logs_created,
+        "alert_settings": {
+            "min_percent": alert_settings.min_percent,
+            "max_percent": alert_settings.max_percent,
+            "critical_percent": alert_settings.critical_percent,
+            "deduplication_minutes": alert_settings.deduplication_minutes,
+        },
     }

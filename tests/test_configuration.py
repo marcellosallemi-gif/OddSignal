@@ -92,3 +92,56 @@ def test_notification_recipient_upsert_prevents_duplicates():
     assert second_data["id"] == first_data["id"]
     assert second_data["label"] == "Updated Label"
     assert second_data["is_active"] is False
+
+
+def test_get_alert_settings():
+    with TestClient(app) as client:
+        response = client.get("/configuration/alert-settings")
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "min_percent" in data
+    assert "max_percent" in data
+    assert "critical_percent" in data
+    assert "deduplication_minutes" in data
+
+
+def test_update_alert_settings():
+    payload = {
+        "min_percent": 8,
+        "max_percent": 15,
+        "critical_percent": 15,
+        "deduplication_minutes": 30,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/alert-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["min_percent"] == 8
+    assert data["max_percent"] == 15
+    assert data["critical_percent"] == 15
+    assert data["deduplication_minutes"] == 30
+
+
+def test_update_alert_settings_rejects_invalid_range():
+    payload = {
+        "min_percent": 15,
+        "max_percent": 8,
+        "critical_percent": 15,
+        "deduplication_minutes": 30,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/alert-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 400

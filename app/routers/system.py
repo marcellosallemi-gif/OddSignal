@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Alert, Event, NotificationLog, OddsSnapshot
 from app.services.telegram_notifier import is_telegram_configured
+from app.services.alert_settings_service import get_or_create_alert_settings
 
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -19,6 +20,8 @@ def get_system_status(db: Session = Depends(get_db)):
         if bookmaker.strip()
     ]
 
+    alert_settings = get_or_create_alert_settings(db)
+
     return {
         "provider": os.getenv("ODDS_PROVIDER", "unknown"),
         "sport": os.getenv("ODDS_API_SPORT", "unknown"),
@@ -29,9 +32,10 @@ def get_system_status(db: Session = Depends(get_db)):
             "event_limit": int(os.getenv("ODDS_SCHEDULER_EVENT_LIMIT", "1")),
         },
         "alerts": {
-            "min_percent": float(os.getenv("ALERT_MIN_PERCENT", "8")),
-            "max_percent": float(os.getenv("ALERT_MAX_PERCENT", "15")),
-            "deduplication_minutes": int(os.getenv("ALERT_DEDUPLICATION_MINUTES", "30")),
+            "min_percent": alert_settings.min_percent,
+            "max_percent": alert_settings.max_percent,
+            "critical_percent": alert_settings.critical_percent,
+            "deduplication_minutes": alert_settings.deduplication_minutes,
         },
         "telegram": {
             "configured": is_telegram_configured(),

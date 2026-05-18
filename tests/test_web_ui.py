@@ -12,5 +12,7 @@ def test_web_home_returns_html_page():
     assert "Calcolo Quote - MVP" in response.text
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
+    assert "Impostazioni alert" in response.text
+    assert "Salva impostazioni alert" in response.text
     assert "Campionati disponibili" in response.text
     assert "Destinatari notifiche" in response.text

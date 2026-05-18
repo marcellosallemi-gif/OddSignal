@@ -137,3 +137,13 @@ class NotificationRecipient(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False)
 
+
+class AlertSetting(Base):
+    __tablename__ = "alert_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    min_percent = Column(Float, nullable=False, default=8.0)
+    max_percent = Column(Float, nullable=False, default=15.0)
+    critical_percent = Column(Float, nullable=False, default=15.0)
+    deduplication_minutes = Column(Integer, nullable=False, default=30)
+    created_at = Column(DateTime, nullable=False)

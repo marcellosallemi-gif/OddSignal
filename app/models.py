@@ -1,0 +1,91 @@
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
+class Competition(Base):
+    __tablename__ = "competitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    country = Column(String, nullable=False)
+
+    events = relationship("Event", back_populates="competition")
+
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+
+    home_events = relationship(
+        "Event",
+        foreign_keys="Event.home_team_id",
+        back_populates="home_team",
+    )
+    away_events = relationship(
+        "Event",
+        foreign_keys="Event.away_team_id",
+        back_populates="away_team",
+    )
+
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    competition_id = Column(Integer, ForeignKey("competitions.id"), nullable=False)
+    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False)
+
+    competition = relationship("Competition", back_populates="events")
+    home_team = relationship(
+        "Team",
+        foreign_keys=[home_team_id],
+        back_populates="home_events",
+    )
+    away_team = relationship(
+        "Team",
+        foreign_keys=[away_team_id],
+        back_populates="away_events",
+    )
+    odds_snapshots = relationship("OddsSnapshot", back_populates="event")
+    alerts = relationship("Alert", back_populates="event")
+
+
+class OddsSnapshot(Base):
+    __tablename__ = "odds_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    provider = Column(String, nullable=False)
+    bookmaker = Column(String, nullable=False)
+    market = Column(String, nullable=False)
+    selection = Column(String, nullable=False)
+    odds_decimal = Column(Float, nullable=False)
+    captured_at = Column(DateTime, nullable=False)
+
+    event = relationship("Event", back_populates="odds_snapshots")
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    provider = Column(String, nullable=False)
+    bookmaker = Column(String, nullable=False)
+    market = Column(String, nullable=False)
+    selection = Column(String, nullable=False)
+    previous_odds = Column(Float, nullable=False)
+    current_odds = Column(Float, nullable=False)
+    variation_percent = Column(Float, nullable=False)
+    direction = Column(String, nullable=False)
+    alert_type = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+
+    event = relationship("Event", back_populates="alerts")

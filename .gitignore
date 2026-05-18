@@ -1,0 +1,13 @@
+.env
+.venv
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+logs/
+data/
+*.log
+uvicorn.log
+uvicorn.pid

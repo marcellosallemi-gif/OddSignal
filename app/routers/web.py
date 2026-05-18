@@ -96,6 +96,7 @@ def web_home():
   <section>
     <h2>Stato sistema</h2>
     <button onclick="loadStatus()">Aggiorna stato</button>
+    <div id="scheduler-status"></div>
     <pre id="system-status">Caricamento...</pre>
   </section>
 
@@ -171,6 +172,28 @@ function escapeHtml(value) {
 
 async function loadStatus() {
   const data = await api("/system/status");
+
+  const scheduler = data.scheduler || {};
+  const schedulerEnabled = scheduler.enabled === true;
+  const schedulerHtml = `
+    <p>
+      <strong>Scheduler automatico:</strong>
+      <span class="${schedulerEnabled ? "badge ok" : "badge warn"}">
+        ${schedulerEnabled ? "Attivo" : "Spento"}
+      </span>
+    </p>
+    <p class="muted">
+      Intervallo polling: ${escapeHtml(scheduler.poll_interval_seconds)} secondi |
+      Eventi per ciclo: ${escapeHtml(scheduler.event_limit)}
+    </p>
+    <p class="muted">
+      ${schedulerEnabled
+        ? "Il sistema può eseguire controlli automatici secondo la configurazione."
+        : "Lo scheduler è spento: usa il controllo quote manuale oppure abilitalo da .env e riavvia il server."}
+    </p>
+  `;
+
+  document.getElementById("scheduler-status").innerHTML = schedulerHtml;
   document.getElementById("system-status").textContent = JSON.stringify(data, null, 2);
 }
 

@@ -55,6 +55,7 @@ class Event(Base):
     )
     odds_snapshots = relationship("OddsSnapshot", back_populates="event")
     alerts = relationship("Alert", back_populates="event")
+    notification_logs = relationship("NotificationLog", back_populates="event")
 
 
 class OddsSnapshot(Base):
@@ -93,3 +94,21 @@ class Alert(Base):
     created_at = Column(DateTime, nullable=False)
 
     event = relationship("Event", back_populates="alerts")
+    notification_logs = relationship("NotificationLog", back_populates="alert")
+
+
+class NotificationLog(Base):
+    __tablename__ = "notification_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alert_id = Column(Integer, ForeignKey("alerts.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    channel = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    recipient = Column(String, nullable=True)
+    message = Column(Text, nullable=False)
+    error_message = Column(Text, nullable=True)
+    sent_at = Column(DateTime, nullable=False)
+
+    alert = relationship("Alert", back_populates="notification_logs")
+    event = relationship("Event", back_populates="notification_logs")

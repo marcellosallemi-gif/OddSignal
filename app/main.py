@@ -10,6 +10,7 @@ from app.routers.events import router as events_router
 from app.routers.health import router as health_router
 from app.routers.odds import router as odds_router
 from app.routers.odds_provider import router as odds_provider_router
+from app.routers.notification_logs import router as notification_logs_router
 from app.services.mock_odds_provider import MockOddsProvider
 from app.services.odds_scheduler import odds_scheduler
 
@@ -162,3 +163,4 @@ app.include_router(events_router)
 app.include_router(odds_router)
 app.include_router(odds_provider_router)
 app.include_router(alerts_router)
+app.include_router(notification_logs_router)

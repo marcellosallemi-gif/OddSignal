@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from app.models import Alert, Competition, Event, OddsSnapshot, Team
 from app.services.alert_engine import evaluate_alert
 from app.services.odds_api_io_provider import OddsApiIoProvider
+from app.services.telegram_notifier import send_telegram_alert
 from app.services.variation_engine import calculate_variation
 
 
@@ -158,6 +159,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     unchanged_snapshots = 0
     created_alerts = 0
     skipped_duplicate_alerts = 0
+    notification_logs_created = 0
 
     captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -220,7 +222,12 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
                     created_at=captured_at,
                 )
                 db.add(alert)
+                db.flush()
+
+                send_telegram_alert(db=db, alert=alert)
+
                 created_alerts += 1
+                notification_logs_created += 1
 
     db.commit()
 
@@ -232,4 +239,5 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "snapshots_unchanged": unchanged_snapshots,
         "alerts_created": created_alerts,
         "duplicate_alerts_skipped": skipped_duplicate_alerts,
+        "notification_logs_created": notification_logs_created,
     }

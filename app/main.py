@@ -5,13 +5,14 @@ from fastapi import FastAPI
 
 from app.database import Base, SessionLocal, engine
 from app.models import Competition, Event, OddsSnapshot, Team
-from app.runtime import run_runtime_migrations, should_seed_demo_data
+from app.runtime import load_environment, run_runtime_migrations, should_seed_demo_data
 from app.routers.alerts import router as alerts_router
 from app.routers.events import router as events_router
 from app.routers.health import router as health_router
 from app.routers.odds import router as odds_router
 from app.routers.odds_provider import router as odds_provider_router
 from app.routers.notification_logs import router as notification_logs_router
+from app.routers.system import router as system_router
 from app.services.mock_odds_provider import MockOddsProvider
 from app.services.odds_scheduler import odds_scheduler
 
@@ -153,6 +154,7 @@ def init_db():
 
 @asynccontextmanager
 async def lifespan(app):
+    load_environment()
     init_db()
     await odds_scheduler.start()
     try:
@@ -168,3 +170,4 @@ app.include_router(odds_router)
 app.include_router(odds_provider_router)
 app.include_router(alerts_router)
 app.include_router(notification_logs_router)
+app.include_router(system_router)

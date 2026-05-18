@@ -1,5 +1,7 @@
 import os
 
+from dotenv import load_dotenv
+
 from app.database import engine
 
 
@@ -27,6 +29,11 @@ CREATE TABLE IF NOT EXISTS notification_logs (
 )
 """
 
+
+
+
+def load_environment():
+    load_dotenv()
 
 def _is_sqlite() -> bool:
     return engine.url.drivername.startswith("sqlite")

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.database import Base, SessionLocal, engine
 from app.models import Competition, Event, OddsSnapshot, Team
+from app.runtime import run_runtime_migrations, should_seed_demo_data
 from app.routers.alerts import router as alerts_router
 from app.routers.events import router as events_router
 from app.routers.health import router as health_router
@@ -144,7 +145,10 @@ def seed_mock_odds(db):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-    seed_initial_data()
+    run_runtime_migrations()
+
+    if should_seed_demo_data():
+        seed_initial_data()
 
 
 @asynccontextmanager

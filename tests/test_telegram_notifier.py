@@ -4,8 +4,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import Alert, Competition, Event, NotificationLog, Team
-from app.services.telegram_notifier import build_alert_message, send_telegram_alert
+from app.models import (
+    Alert,
+    Competition,
+    Event,
+    NotificationLog,
+    NotificationRecipient,
+    Team,
+)
+from app.services.telegram_notifier import (
+    build_alert_message,
+    get_active_telegram_recipients,
+    send_telegram_alert,
+)
 
 
 def make_test_db(tmp_path):
@@ -63,6 +74,20 @@ def create_alert(db):
     return alert
 
 
+def create_telegram_recipient(db, recipient_value="123456789", is_active=True):
+    recipient = NotificationRecipient(
+        channel="telegram",
+        recipient_value=recipient_value,
+        label="Test Telegram",
+        is_active=is_active,
+        created_at=datetime.utcnow(),
+    )
+    db.add(recipient)
+    db.commit()
+    db.refresh(recipient)
+    return recipient
+
+
 def test_build_alert_message_contains_core_details(tmp_path):
     db = make_test_db(tmp_path)
 
@@ -80,11 +105,50 @@ def test_build_alert_message_contains_core_details(tmp_path):
         db.close()
 
 
-def test_send_telegram_alert_skips_when_not_configured(monkeypatch, tmp_path):
+def test_get_active_telegram_recipients_reads_database(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+        create_telegram_recipient(db, recipient_value="111")
+        create_telegram_recipient(db, recipient_value="222", is_active=False)
+
+        recipients = get_active_telegram_recipients(db)
+
+        assert recipients == ["111"]
+    finally:
+        db.close()
+
+
+def test_send_telegram_alert_skips_when_bot_token_missing(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
     try:
         monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+        monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+
+        create_telegram_recipient(db)
+        alert = create_alert(db)
+        result = send_telegram_alert(db=db, alert=alert)
+        db.commit()
+
+        log = db.query(NotificationLog).first()
+
+        assert result["status"] == "skipped"
+        assert result["logs_created"] == 1
+        assert log is not None
+        assert log.status == "skipped"
+        assert log.channel == "telegram"
+        assert "Telegram bot token is not configured" in log.error_message
+    finally:
+        db.close()
+
+
+def test_send_telegram_alert_skips_when_no_active_recipients(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "dummy-token")
         monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
 
         alert = create_alert(db)
@@ -94,9 +158,10 @@ def test_send_telegram_alert_skips_when_not_configured(monkeypatch, tmp_path):
         log = db.query(NotificationLog).first()
 
         assert result["status"] == "skipped"
+        assert result["logs_created"] == 1
         assert log is not None
         assert log.status == "skipped"
         assert log.channel == "telegram"
-        assert "Telegram is not configured" in log.error_message
+        assert "No active Telegram recipients configured" in log.error_message
     finally:
         db.close()

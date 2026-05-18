@@ -145,6 +145,22 @@ def create_notification_recipient(
             detail="Unsupported channel. Use 'telegram' or 'phone'.",
         )
 
+    existing = (
+        db.query(NotificationRecipient)
+        .filter(
+            NotificationRecipient.channel == payload.channel,
+            NotificationRecipient.recipient_value == payload.recipient_value,
+        )
+        .first()
+    )
+
+    if existing:
+        existing.label = payload.label
+        existing.is_active = payload.is_active
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     item = NotificationRecipient(
         channel=payload.channel,
         recipient_value=payload.recipient_value,

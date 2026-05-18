@@ -1,10 +1,10 @@
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 
-from app.models import Alert, NotificationLog
+from app.models import Alert, NotificationLog, NotificationRecipient
 
 
 def _utc_now_naive():
@@ -12,7 +12,26 @@ def _utc_now_naive():
 
 
 def is_telegram_configured() -> bool:
-    return bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"))
+    return bool(os.getenv("TELEGRAM_BOT_TOKEN"))
+
+
+def get_active_telegram_recipients(db) -> List[str]:
+    recipients = [
+        item.recipient_value
+        for item in db.query(NotificationRecipient)
+        .filter(
+            NotificationRecipient.channel == "telegram",
+            NotificationRecipient.is_active.is_(True),
+        )
+        .all()
+        if item.recipient_value
+    ]
+
+    fallback_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if fallback_chat_id and fallback_chat_id not in recipients:
+        recipients.append(fallback_chat_id)
+
+    return recipients
 
 
 def build_alert_message(alert: Alert) -> str:
@@ -25,17 +44,17 @@ def build_alert_message(alert: Alert) -> str:
     direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
 
     return (
-        "Alert quote calcio\\n"
-        "\\n"
-        f"Tipo: {alert.alert_type}\\n"
-        f"Evento: {home_team} vs {away_team}\\n"
-        f"Competizione: {competition}\\n"
-        f"Bookmaker: {alert.bookmaker}\\n"
-        f"Mercato: {alert.market}\\n"
-        f"Selezione: {alert.selection}\\n"
-        f"Variazione: {alert.variation_percent}% ({direction_label})\\n"
-        f"Quota precedente: {alert.previous_odds}\\n"
-        f"Quota attuale: {alert.current_odds}\\n"
+        "Alert quote calcio\n"
+        "\n"
+        f"Tipo: {alert.alert_type}\n"
+        f"Evento: {home_team} vs {away_team}\n"
+        f"Competizione: {competition}\n"
+        f"Bookmaker: {alert.bookmaker}\n"
+        f"Mercato: {alert.market}\n"
+        f"Selezione: {alert.selection}\n"
+        f"Variazione: {alert.variation_percent}% ({direction_label})\n"
+        f"Quota precedente: {alert.previous_odds}\n"
+        f"Quota attuale: {alert.current_odds}\n"
         f"Provider: {alert.provider}"
     )
 
@@ -63,30 +82,16 @@ def save_notification_log(
     return log
 
 
-def send_telegram_alert(db, alert: Alert):
-    message = build_alert_message(alert)
-
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
-    if not bot_token or not chat_id:
-        save_notification_log(
-            db=db,
-            alert=alert,
-            status="skipped",
-            recipient=chat_id,
-            message=message,
-            error_message="Telegram is not configured.",
-        )
-        return {
-            "status": "skipped",
-            "channel": "telegram",
-            "reason": "Telegram is not configured.",
-        }
-
+def _send_single_telegram_message(
+    db,
+    alert: Alert,
+    bot_token: str,
+    recipient: str,
+    message: str,
+):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
-        "chat_id": chat_id,
+        "chat_id": recipient,
         "text": message,
         "disable_web_page_preview": True,
     }
@@ -99,13 +104,13 @@ def send_telegram_alert(db, alert: Alert):
             db=db,
             alert=alert,
             status="failed",
-            recipient=chat_id,
+            recipient=recipient,
             message=message,
             error_message=str(exc),
         )
         return {
             "status": "failed",
-            "channel": "telegram",
+            "recipient": recipient,
             "error": str(exc),
         }
 
@@ -114,13 +119,13 @@ def send_telegram_alert(db, alert: Alert):
             db=db,
             alert=alert,
             status="failed",
-            recipient=chat_id,
+            recipient=recipient,
             message=message,
             error_message=response.text[:500],
         )
         return {
             "status": "failed",
-            "channel": "telegram",
+            "recipient": recipient,
             "http_status": response.status_code,
             "error": response.text[:500],
         }
@@ -129,12 +134,70 @@ def send_telegram_alert(db, alert: Alert):
         db=db,
         alert=alert,
         status="sent",
-        recipient=chat_id,
+        recipient=recipient,
         message=message,
         error_message=None,
     )
 
     return {
         "status": "sent",
+        "recipient": recipient,
+    }
+
+
+def send_telegram_alert(db, alert: Alert):
+    message = build_alert_message(alert)
+
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        save_notification_log(
+            db=db,
+            alert=alert,
+            status="skipped",
+            recipient=None,
+            message=message,
+            error_message="Telegram bot token is not configured.",
+        )
+        return {
+            "status": "skipped",
+            "channel": "telegram",
+            "logs_created": 1,
+            "reason": "Telegram bot token is not configured.",
+        }
+
+    recipients = get_active_telegram_recipients(db)
+    if not recipients:
+        save_notification_log(
+            db=db,
+            alert=alert,
+            status="skipped",
+            recipient=None,
+            message=message,
+            error_message="No active Telegram recipients configured.",
+        )
+        return {
+            "status": "skipped",
+            "channel": "telegram",
+            "logs_created": 1,
+            "reason": "No active Telegram recipients configured.",
+        }
+
+    results = [
+        _send_single_telegram_message(
+            db=db,
+            alert=alert,
+            bot_token=bot_token,
+            recipient=recipient,
+            message=message,
+        )
+        for recipient in recipients
+    ]
+
+    return {
+        "status": "completed",
         "channel": "telegram",
+        "logs_created": len(results),
+        "sent": len([item for item in results if item["status"] == "sent"]),
+        "failed": len([item for item in results if item["status"] == "failed"]),
+        "results": results,
     }

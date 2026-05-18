@@ -2,16 +2,22 @@
 
 ## Stato attuale
 
-Provider demo: Odds-API.io  
-Sport: football  
-Bookmaker: Stake, Sbobet  
-Scheduler: disattivato di default  
-Polling consigliato: 300 secondi  
-Eventi per ciclo scheduler: 1  
+Provider demo: Odds-API.io
+Sport: football
+Bookmaker: Stake, Sbobet
+Scheduler: disattivato di default
+Polling consigliato: 300 secondi
+Eventi per ciclo scheduler: 1
 
 Il sistema usa Odds-API.io solo come fonte dati. Non piazza scommesse, non usa scraping e non interagisce con account bookmaker.
 
 ## Variabili .env
+
+APP_NAME=Calcolo Quote
+APP_ENV=local
+APP_DEBUG=true
+
+DATABASE_URL=sqlite:///./football_odds_monitor.db
 
 ODDS_PROVIDER=odds_api_io
 ODDS_API_KEY=your_api_key
@@ -20,6 +26,8 @@ ODDS_API_SPORT=football
 ODDS_API_STATUS=pending
 ODDS_API_BOOKMAKERS=Stake,Sbobet
 ODDS_API_EVENT_LIMIT=10
+ODDS_API_LEAGUES=
+ODDS_API_MARKETS=1X2,Goal/No Goal,Over/Under 2.5
 
 ALERT_MIN_PERCENT=8
 ALERT_MAX_PERCENT=15
@@ -28,6 +36,18 @@ ALERT_DEDUPLICATION_MINUTES=30
 ODDS_SCHEDULER_ENABLED=0
 ODDS_POLL_INTERVAL_SECONDS=300
 ODDS_SCHEDULER_EVENT_LIMIT=1
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+
+## Migrazioni locali
+
+Se il database esiste gia, eseguire:
+
+python3 scripts/migrate_add_odds_snapshot_metadata.py
+python3 scripts/migrate_create_notification_logs.py
+
+Le migrazioni sono idempotenti.
 
 ## Endpoint utili
 
@@ -59,6 +79,10 @@ Alert critici:
 
 curl "http://127.0.0.1:8001/alerts?provider=odds_api_io&alert_type=critical_alert&limit=20"
 
+Log notifiche:
+
+curl "http://127.0.0.1:8001/notification-logs?limit=20"
+
 ## Logica alert
 
 Formula:
@@ -73,7 +97,7 @@ Regole:
 
 ## Deduplicazione
 
-Evita alert ripetuti entro ALERT_DEDUPLICATION_MINUTES sulla stessa combinazione:
+La deduplicazione evita alert ripetuti entro ALERT_DEDUPLICATION_MINUTES sulla stessa combinazione:
 
 - evento
 - provider
@@ -82,7 +106,29 @@ Evita alert ripetuti entro ALERT_DEDUPLICATION_MINUTES sulla stessa combinazione
 - selezione
 - tipo alert
 
-La direzione non viene usata per deduplicare, così si evitano alert ping-pong.
+La direzione non viene usata per deduplicare, cosi si evitano alert ping-pong.
+
+## Telegram
+
+Se TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID non sono configurati, il sistema non invia notifiche e salva un log skipped.
+
+Se Telegram e configurato correttamente, salva status=sent.
+In caso di errore HTTP o rete, salva status=failed.
+
+## Scheduler
+
+Lo scheduler e spento di default:
+
+ODDS_SCHEDULER_ENABLED=0
+
+Per abilitarlo:
+
+ODDS_SCHEDULER_ENABLED=1
+
+Per il piano gratuito non scendere sotto:
+
+ODDS_POLL_INTERVAL_SECONDS=300
+ODDS_SCHEDULER_EVENT_LIMIT=1
 
 ## Test
 
@@ -94,9 +140,13 @@ Test ingestion:
 
 pytest tests/test_odds_ingestion_service.py
 
-## Note
+Test Telegram:
 
-- Lo slug calcio è football.
+pytest tests/test_telegram_notifier.py
+
+## Note operative
+
+- Lo slug calcio e football.
 - Il bookmaker asiatico va scritto Sbobet, non SBOBET.
 - Il primo ciclo salva snapshot ma non crea alert.
 - Gli alert possono nascere dal secondo ciclo.

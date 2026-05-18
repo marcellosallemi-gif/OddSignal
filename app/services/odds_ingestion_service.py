@@ -104,6 +104,25 @@ def _market_key(odd_data: Dict) -> str:
     return "{} {}".format(market_name, line)
 
 
+def _is_monitored_market(odd_data: Dict) -> bool:
+    market_name = odd_data.get("market_name") or ""
+
+    if "HT" in market_name:
+        return False
+
+    if market_name.startswith("Team Total"):
+        return False
+
+    allowed_markets = {
+        "ML",
+        "Totals",
+        "Both Teams To Score",
+        "Spread",
+    }
+
+    return market_name in allowed_markets
+
+
 def _find_previous_snapshot(db, event_id: int, odd_data: Dict) -> Optional[OddsSnapshot]:
     return (
         db.query(OddsSnapshot)
@@ -163,7 +182,13 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
 
     captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    ignored_odds = 0
+
     for odd_data in sample["odds"]:
+        if not _is_monitored_market(odd_data):
+            ignored_odds += 1
+            continue
+
         event = events_by_provider_id.get(odd_data["provider_event_id"])
         if not event:
             continue
@@ -235,6 +260,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "provider": sample["provider"],
         "events_received": sample["events_count"],
         "odds_received": sample["odds_count"],
+        "odds_ignored": ignored_odds,
         "snapshots_inserted": inserted_snapshots,
         "snapshots_unchanged": unchanged_snapshots,
         "alerts_created": created_alerts,

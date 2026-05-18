@@ -140,3 +140,80 @@ def test_ingestion_skips_recent_duplicate_alert(monkeypatch, tmp_path):
         assert db.query(Alert).count() == 1
     finally:
         db.close()
+
+
+class FakeProviderWithIgnoredMarket:
+    def get_sample(self, limit=3):
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 2,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-ignored",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-ignored",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "ML",
+                    "selection": "home",
+                    "line": None,
+                    "odds_decimal": 1.80,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-ignored",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Team Total Home",
+                    "selection": "over",
+                    "line": 0.5,
+                    "odds_decimal": 1.50,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+            ],
+        }
+
+
+def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda: FakeProviderWithIgnoredMarket(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 2
+        assert result["odds_ignored"] == 1
+        assert result["snapshots_inserted"] == 1
+        assert db.query(OddsSnapshot).count() == 1
+
+        snapshot = db.query(OddsSnapshot).first()
+        assert snapshot.market == "ML"
+    finally:
+        db.close()

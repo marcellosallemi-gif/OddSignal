@@ -23,6 +23,9 @@ curl "http://127.0.0.1:8001/system/status"
 3. Mercati MVP.
 4. Notifiche Telegram.
 5. Alert recenti.
+   - usare il filtro Solo cali notificabili per vedere cosa può partire su Telegram;
+   - usare Aumenti non notificati per mostrare cosa resta solo nello storico;
+   - usare Critici per isolare i cali oltre soglia critica.
 6. Log notifiche.
 7. Automazione scheduler.
 

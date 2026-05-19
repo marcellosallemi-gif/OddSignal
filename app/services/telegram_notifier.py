@@ -34,6 +34,29 @@ def get_active_telegram_recipients(db) -> List[str]:
     return recipients
 
 
+def readable_market_label(market_name: str) -> str:
+    if not market_name:
+        return "Mercato non specificato"
+
+    market_name = str(market_name)
+
+    if market_name == "ML":
+        return "1X2"
+
+    if market_name.startswith("Totals"):
+        suffix = market_name.replace("Totals", "", 1).strip()
+        return "Over/Under" + (f" {suffix}" if suffix else "")
+
+    if market_name.startswith("Both Teams To Score"):
+        return "Goal/No Goal"
+
+    if market_name.startswith("Spread"):
+        suffix = market_name.replace("Spread", "", 1).strip()
+        return "Handicap" + (f" {suffix}" if suffix else "")
+
+    return market_name
+
+
 def build_alert_message(alert: Alert) -> str:
     event = alert.event
     competition = event.competition.name if event and event.competition else "Unknown competition"
@@ -50,7 +73,7 @@ def build_alert_message(alert: Alert) -> str:
         f"Evento: {home_team} vs {away_team}\n"
         f"Competizione: {competition}\n"
         f"Bookmaker: {alert.bookmaker}\n"
-        f"Mercato: {alert.market}\n"
+        f"Mercato: {readable_market_label(alert.market)}\n"
         f"Selezione: {alert.selection}\n"
         f"Variazione: {alert.variation_percent}% ({direction_label})\n"
         f"Quota precedente: {alert.previous_odds}\n"
@@ -106,7 +129,7 @@ def build_alerts_summary_message(alerts: List[Alert], max_items: int = 50) -> st
                 f"Evento: {event_label}",
                 f"Tipo: {alert.alert_type}{severity_label}",
                 f"Bookmaker: {alert.bookmaker}",
-                f"Mercato: {alert.market}",
+                f"Mercato: {readable_market_label(alert.market)}",
                 f"Selezione: {alert.selection}",
                 f"Variazione: {alert.variation_percent}% ({direction_label})",
                 f"Quota precedente: {alert.previous_odds}",

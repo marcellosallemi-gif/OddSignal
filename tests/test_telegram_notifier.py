@@ -99,7 +99,8 @@ def test_build_alert_message_contains_core_details(tmp_path):
         assert "Inter vs Milan" in message
         assert "Serie A" in message
         assert "Stake" in message
-        assert "ML" in message
+        assert "1X2" in message
+        assert "ML" not in message
         assert "11.11%" in message
     finally:
         db.close()
@@ -224,3 +225,13 @@ def test_build_alerts_summary_message_contains_all_alerts(tmp_path):
         assert "Apri la dashboard" not in message
     finally:
         db.close()
+
+
+def test_readable_market_label_maps_provider_markets_to_user_labels():
+    from app.services.telegram_notifier import readable_market_label
+
+    assert readable_market_label("ML") == "1X2"
+    assert readable_market_label("Totals") == "Over/Under"
+    assert readable_market_label("Both Teams To Score") == "Goal/No Goal"
+    assert readable_market_label("Spread -1.75") == "Handicap -1.75"
+    assert readable_market_label("Exact Score") == "Exact Score"

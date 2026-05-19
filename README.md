@@ -95,6 +95,34 @@ Esclusi:
 - Team Total
 
 
+## Piano API provider
+
+La dashboard include una sezione “Piano API provider” per configurare i limiti operativi del piano Odds-API.io senza modificare il codice.
+
+Preset disponibili:
+
+- Free: 100 richieste/ora, 2 bookmaker
+- 5000/h: 5000 richieste/ora
+- Illimitato: nessun blocco interno richieste/ora lato software
+- Custom: valori manuali
+
+Il software calcola una stima prudenziale delle richieste orarie usando:
+
+- campionati attivi mappati;
+- frequenza scheduler;
+- eventi per ciclo.
+
+La stima serve per capire se la configurazione è compatibile con il piano API impostato.
+
+Esempio prudente per piano Free:
+
+- 1 campionato mappato attivo;
+- 1 evento per ciclo;
+- refresh ogni 300 secondi;
+- stima circa 24 richieste/ora.
+
+Il limite del piano provider non va aggirato: va configurato correttamente in base al piano acquistato.
+
 ## Scheduler automatico
 
 Lo scheduler è configurabile da dashboard e API.

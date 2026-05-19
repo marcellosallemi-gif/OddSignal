@@ -27,7 +27,11 @@ curl "http://127.0.0.1:8001/system/status"
    - usare Aumenti non notificati per mostrare cosa resta solo nello storico;
    - usare Critici per isolare i cali oltre soglia critica.
 6. Log notifiche.
-7. Automazione scheduler.
+7. Piano API provider.
+   - verificare preset attivo: Free, 5000/h, Illimitato o Custom;
+   - controllare la stima richieste/ora;
+   - verificare che la configurazione non superi il limite impostato.
+8. Automazione scheduler.
 
 ## Regole demo
 

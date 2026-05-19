@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services.odds_api_io_provider import OddsApiIoProvider
+from app.services.odds_api_io_provider import OddsApiIoProvider, classify_provider_error
 from app.services.odds_ingestion_service import ingest_odds_sample
 
 
@@ -45,13 +45,5 @@ def ingest_provider_sample(
     try:
         return ingest_odds_sample(db=db, limit=limit)
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": "provider_error",
-                "message": (
-                    "Controllo quote non completato. Verifica provider, "
-                    "campionati attivi e disponibilita eventi."
-                ),
-            },
-        ) from exc
+        status_code, detail = classify_provider_error(exc)
+        raise HTTPException(status_code=status_code, detail=detail) from exc

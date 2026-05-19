@@ -17,7 +17,7 @@ from app.schemas import (
     NotificationRecipientCreate,
     NotificationRecipientResponse,
 )
-from app.services.odds_api_io_provider import OddsApiIoProvider
+from app.services.odds_api_io_provider import OddsApiIoProvider, classify_provider_error
 
 
 router = APIRouter(prefix="/configuration", tags=["configuration"])
@@ -69,16 +69,8 @@ def refresh_provider_competitions(
         )
         events = [provider.normalize_event(event) for event in provider_events]
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": "provider_error",
-                "message": (
-                    "Impossibile aggiornare i campionati dal provider. "
-                    "Verifica configurazione Odds-API.io e disponibilita eventi."
-                ),
-            },
-        ) from exc
+        status_code, detail = classify_provider_error(exc)
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
     competitions_by_name = {}
     for event in events:

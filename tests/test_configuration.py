@@ -39,6 +39,13 @@ class FailingProviderCompetitionRefresh:
         raise RuntimeError("League not found")
 
 
+class RateLimitProviderCompetitionRefresh:
+    bookmakers = "Stake,Sbobet"
+
+    def get_events(self, limit=10, bookmaker=None):
+        raise RuntimeError("Odds-API.io rate limit reached.")
+
+
 def test_configuration_available_competitions_returns_list():
     with TestClient(app) as client:
         response = client.get("/configuration/available-competitions")
@@ -107,7 +114,25 @@ def test_refresh_provider_competitions_upserts_available_competition(monkeypatch
     assert refreshed_competition["provider_league_slug"] == "provider-test-league"
 
 
-def test_refresh_provider_competitions_returns_502_on_provider_error(monkeypatch):
+
+
+def test_refresh_provider_competitions_returns_429_on_rate_limit(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setattr(
+        configuration,
+        "OddsApiIoProvider",
+        lambda: RateLimitProviderCompetitionRefresh(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/provider-competitions/refresh?limit=10")
+
+    assert response.status_code == 429
+    assert response.json()["detail"]["error"] == "provider_rate_limit"
+
+
+def test_refresh_provider_competitions_returns_404_on_league_not_found(monkeypatch):
     from app.routers import configuration
 
     monkeypatch.setattr(
@@ -119,9 +144,9 @@ def test_refresh_provider_competitions_returns_502_on_provider_error(monkeypatch
     with TestClient(app) as client:
         response = client.post("/configuration/provider-competitions/refresh?limit=10")
 
-    assert response.status_code == 502
-    assert response.json()["detail"]["error"] == "provider_error"
-    assert "Impossibile aggiornare" in response.json()["detail"]["message"]
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "provider_league_not_found"
+    assert "Campionato non trovato" in response.json()["detail"]["message"]
 
 
 def test_get_monitored_markets_returns_list():

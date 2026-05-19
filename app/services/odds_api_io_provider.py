@@ -297,3 +297,53 @@ class OddsApiIoProvider:
             )
 
         return normalized
+
+
+
+def classify_provider_error(exc: RuntimeError):
+    message = str(exc)
+    normalized = message.lower()
+
+    if "rate limit" in normalized:
+        return 429, {
+            "error": "provider_rate_limit",
+            "message": (
+                "Rate limit Odds-API.io raggiunto. Attendi il reset del limite orario "
+                "oppure riduci frequenza scheduler, eventi per ciclo o chiamate manuali."
+            ),
+            "provider_message": message,
+        }
+
+    if "api key" in normalized and ("missing" in normalized or "invalid" in normalized or "unauthorized" in normalized):
+        return 401, {
+            "error": "provider_auth_error",
+            "message": "API key Odds-API.io mancante, non valida o non autorizzata.",
+            "provider_message": message,
+        }
+
+    if "timeout" in normalized:
+        return 504, {
+            "error": "provider_timeout",
+            "message": "Timeout durante la chiamata a Odds-API.io. Riprova più tardi.",
+            "provider_message": message,
+        }
+
+    if "request error" in normalized:
+        return 502, {
+            "error": "provider_network_error",
+            "message": "Errore di rete durante la chiamata a Odds-API.io.",
+            "provider_message": message,
+        }
+
+    if "league not found" in normalized or "http error 404" in normalized:
+        return 404, {
+            "error": "provider_league_not_found",
+            "message": "Campionato non trovato dal provider. Verifica provider_league_slug o disponibilità eventi.",
+            "provider_message": message,
+        }
+
+    return 502, {
+        "error": "provider_error",
+        "message": "Errore provider Odds-API.io non classificato.",
+        "provider_message": message,
+    }

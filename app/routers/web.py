@@ -402,17 +402,16 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Notifiche Telegram</h2>
-        <p class="muted">Inserisci uno o più Chat ID Telegram per ricevere gli alert quote. Le notifiche vengono inviate solo ai destinatari attivi.</p>
+        <p class="muted">Collega il tuo account Telegram al bot e ricevi gli alert direttamente in chat.</p>
       </div>
     </div>
+    <div class="info-box">
+      <strong>Come collegare Telegram</strong>
+      <p class="muted">Apri il bot Telegram configurato per il software, premi Start o invia un messaggio, poi clicca “Rileva account Telegram”.</p>
+      <p class="muted">Il codice tecnico della chat viene salvato automaticamente e non deve essere inserito manualmente.</p>
+    </div>
     <div class="form-grid">
-      <label>Chat ID Telegram
-        <input id="recipient-value" placeholder="es. 877063309">
-      </label>
-      <label>Etichetta
-        <input id="recipient-label" placeholder="es. Amministratore">
-      </label>
-      <button class="primary" onclick="saveRecipient()">Salva destinatario Telegram</button>
+      <button class="primary" onclick="syncTelegramRecipients()">Rileva account Telegram</button>
       <button onclick="loadRecipients()">Aggiorna Telegram</button>
     </div>
     <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
@@ -855,36 +854,33 @@ async function toggleMonitoredMarket(marketId, isActive) {
   }
 }
 
-async function saveRecipient() {
-  const value = document.getElementById("recipient-value").value.trim();
-  const label = document.getElementById("recipient-label").value.trim();
-
-  if (!value) {
-    setFeedback("recipients-feedback", "Inserisci il Chat ID Telegram.", "error");
-    return;
-  }
-
-  setFeedback("recipients-feedback", "Salvataggio destinatario Telegram...", "");
+async function syncTelegramRecipients() {
+  setFeedback("recipients-feedback", "Rilevamento account Telegram in corso...", "");
 
   try {
-    await api("/configuration/notification-recipients", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        channel: "telegram",
-        recipient_value: value,
-        label: label || null,
-        is_active: true
-      })
+    const data = await api("/configuration/telegram-recipients/sync", {
+      method: "POST"
     });
 
-    document.getElementById("recipient-value").value = "";
-    document.getElementById("recipient-label").value = "";
     await loadRecipients();
-    setFeedback("recipients-feedback", "Destinatario Telegram salvato.", "success");
     await loadStatus();
+
+    if (data.synced_count === 0) {
+      setFeedback(
+        "recipients-feedback",
+        "Nessun account rilevato. Apri il bot Telegram, premi Start e riprova.",
+        "error"
+      );
+      return;
+    }
+
+    setFeedback(
+      "recipients-feedback",
+      `Account Telegram rilevati: ${data.synced_count}.`,
+      "success"
+    );
   } catch (error) {
-    setFeedback("recipients-feedback", "Destinatario Telegram non salvato: " + error.message, "error");
+    setFeedback("recipients-feedback", "Rilevamento Telegram non completato: " + error.message, "error");
   }
 }
 
@@ -898,11 +894,11 @@ async function loadRecipients() {
 
   if (telegramRecipients.length === 0) {
     document.getElementById("recipients-table").innerHTML = "<p class='muted'>Nessun destinatario Telegram configurato.</p>";
-    setFeedback("recipients-feedback", "Aggiungi almeno un Chat ID Telegram per ricevere alert.", "");
+    setFeedback("recipients-feedback", "Apri il bot Telegram, premi Start e clicca Rileva account Telegram.", "");
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Chat ID Telegram</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Account Telegram</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of telegramRecipients) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
@@ -910,8 +906,7 @@ async function loadRecipients() {
     const nextState = item.is_active ? "false" : "true";
 
     html += `<tr>
-      <td>${escapeHtml(item.recipient_value)}</td>
-      <td>${escapeHtml(item.label || "Telegram")}</td>
+      <td><strong>${escapeHtml(item.label || "Telegram")}</strong><br><span class="secondary-text">ID tecnico salvato automaticamente</span></td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
         <button class="compact ${item.is_active ? "" : "primary"}" onclick="toggleRecipient(${item.id}, ${nextState})">${actionLabel}</button>

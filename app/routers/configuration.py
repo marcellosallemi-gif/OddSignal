@@ -1,5 +1,8 @@
+import os
 from datetime import datetime, timezone
 from typing import List
+
+import httpx
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -311,6 +314,117 @@ def create_notification_recipient(
     db.refresh(item)
 
     return item
+
+
+def _telegram_label_from_chat(chat):
+    first_name = chat.get("first_name") or ""
+    last_name = chat.get("last_name") or ""
+    username = chat.get("username")
+
+    full_name = " ".join([part for part in [first_name, last_name] if part]).strip()
+
+    if full_name and username:
+        return f"{full_name} (@{username})"
+
+    if username:
+        return f"@{username}"
+
+    if full_name:
+        return full_name
+
+    return "Account Telegram"
+
+
+@router.post("/telegram-recipients/sync")
+def sync_telegram_recipients(db: Session = Depends(get_db)):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "telegram_not_configured",
+                "message": "Configura TELEGRAM_BOT_TOKEN prima di rilevare account Telegram.",
+            },
+        )
+
+    try:
+        response = httpx.get(
+            f"https://api.telegram.org/bot{bot_token}/getUpdates",
+            timeout=15,
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "telegram_request_failed",
+                "message": "Impossibile contattare Telegram. Riprova tra poco.",
+            },
+        ) from exc
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "telegram_api_error",
+                "message": "Telegram ha rifiutato la richiesta. Verifica il token del bot.",
+            },
+        )
+
+    payload = response.json()
+    synced = []
+
+    for update in payload.get("result", []):
+        message = update.get("message") or {}
+        chat = message.get("chat") or {}
+
+        if chat.get("type") != "private":
+            continue
+
+        chat_id = chat.get("id")
+        if chat_id is None:
+            continue
+
+        recipient_value = str(chat_id)
+        label = _telegram_label_from_chat(chat)
+
+        existing = (
+            db.query(NotificationRecipient)
+            .filter(
+                NotificationRecipient.channel == "telegram",
+                NotificationRecipient.recipient_value == recipient_value,
+            )
+            .first()
+        )
+
+        if existing:
+            existing.label = label
+            existing.is_active = True
+            recipient = existing
+        else:
+            recipient = NotificationRecipient(
+                channel="telegram",
+                recipient_value=recipient_value,
+                label=label,
+                is_active=True,
+                created_at=_utc_now_naive(),
+            )
+            db.add(recipient)
+
+        db.flush()
+        synced.append(
+            {
+                "id": recipient.id,
+                "label": label,
+                "is_active": recipient.is_active,
+            }
+        )
+
+    db.commit()
+
+    return {
+        "synced_count": len(synced),
+        "recipients": synced,
+    }
 
 
 @router.patch(

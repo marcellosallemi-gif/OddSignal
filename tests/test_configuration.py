@@ -280,3 +280,54 @@ def test_update_alert_settings_rejects_invalid_range():
         )
 
     assert response.status_code == 400
+
+
+class FakeTelegramResponse:
+    status_code = 200
+
+    def json(self):
+        return {
+            "ok": True,
+            "result": [
+                {
+                    "message": {
+                        "chat": {
+                            "id": 987654321,
+                            "type": "private",
+                            "first_name": "Mario",
+                            "last_name": "Rossi",
+                            "username": "mariorossi",
+                        }
+                    }
+                }
+            ],
+        }
+
+
+def test_sync_telegram_recipients_detects_private_chat(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr(
+        configuration.httpx,
+        "get",
+        lambda *args, **kwargs: FakeTelegramResponse(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/telegram-recipients/sync")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["synced_count"] == 1
+    assert data["recipients"][0]["label"] == "Mario Rossi (@mariorossi)"
+
+
+def test_sync_telegram_recipients_requires_bot_token(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/telegram-recipients/sync")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == "telegram_not_configured"

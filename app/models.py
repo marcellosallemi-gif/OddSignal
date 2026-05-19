@@ -176,3 +176,11 @@ class ProviderPlanSetting(Base):
     hourly_request_limit = Column(Integer, nullable=True, default=100)
     max_bookmakers = Column(Integer, nullable=False, default=2)
     created_at = Column(DateTime, nullable=False)
+
+
+class ProviderBookmakerSetting(Base):
+    __tablename__ = "provider_bookmaker_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bookmakers_csv = Column(String, nullable=False, default="Stake,Sbobet")
+    created_at = Column(DateTime, nullable=False)

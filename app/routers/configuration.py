@@ -590,7 +590,7 @@ def toggle_notification_recipient(
     return item
 
 
-from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate, ProviderPlanSettingResponse, ProviderPlanSettingUpdate
+from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate, ProviderPlanSettingResponse, ProviderPlanSettingUpdate, ProviderBookmakerSettingResponse, ProviderBookmakerSettingUpdate
 from app.services.alert_settings_service import (
     get_or_create_alert_settings,
     update_alert_settings,
@@ -605,6 +605,11 @@ from app.services.provider_plan_settings_service import (
     get_or_create_provider_plan_settings,
     update_provider_plan_settings,
     validate_scheduler_against_provider_plan,
+)
+from app.services.provider_bookmaker_settings_service import (
+    bookmakers_from_csv,
+    get_or_create_provider_bookmaker_settings,
+    update_provider_bookmaker_settings,
 )
 
 
@@ -735,3 +740,41 @@ def put_provider_plan_settings(
         raise HTTPException(status_code=400, detail=str(exc))
 
     return _provider_plan_response(db)
+
+
+
+def _provider_bookmaker_response(db):
+    item = get_or_create_provider_bookmaker_settings(db)
+    plan = get_or_create_provider_plan_settings(db)
+    bookmakers = bookmakers_from_csv(item.bookmakers_csv)
+
+    return {
+        "id": item.id,
+        "bookmakers_csv": item.bookmakers_csv,
+        "bookmakers": bookmakers,
+        "bookmaker_count": len(bookmakers),
+        "max_bookmakers": plan.max_bookmakers,
+        "exceeds_bookmaker_limit": len(bookmakers) > plan.max_bookmakers,
+        "created_at": item.created_at,
+    }
+
+
+@router.get("/provider-bookmaker-settings", response_model=ProviderBookmakerSettingResponse)
+def get_provider_bookmaker_settings(db: Session = Depends(get_db)):
+    return _provider_bookmaker_response(db)
+
+
+@router.put("/provider-bookmaker-settings", response_model=ProviderBookmakerSettingResponse)
+def put_provider_bookmaker_settings(
+    payload: ProviderBookmakerSettingUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        update_provider_bookmaker_settings(
+            db=db,
+            bookmakers_csv=payload.bookmakers_csv,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _provider_bookmaker_response(db)

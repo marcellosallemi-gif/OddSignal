@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS provider_plan_settings (
 )
 """
 
+CREATE_PROVIDER_BOOKMAKER_SETTINGS_SQL = """
+CREATE TABLE IF NOT EXISTS provider_bookmaker_settings (
+    id INTEGER PRIMARY KEY,
+    bookmakers_csv VARCHAR NOT NULL DEFAULT 'Stake,Sbobet',
+    created_at DATETIME NOT NULL
+)
+"""
+
 CREATE_NOTIFICATION_RECIPIENTS_SQL = """
 CREATE TABLE IF NOT EXISTS notification_recipients (
     id INTEGER PRIMARY KEY,

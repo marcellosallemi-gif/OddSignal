@@ -660,3 +660,66 @@ def test_scheduler_activation_allows_unlimited_provider_plan():
 
     assert response.status_code == 200
     assert response.json()["enabled"] is True
+
+
+def test_get_provider_bookmaker_settings_returns_configured_bookmakers():
+    with TestClient(app) as client:
+        response = client.get("/configuration/provider-bookmaker-settings")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["bookmaker_count"] >= 1
+    assert isinstance(data["bookmakers"], list)
+    assert data["max_bookmakers"] >= 1
+    assert "bookmakers_csv" in data
+
+
+def test_update_provider_bookmaker_settings_normalizes_duplicates():
+    with TestClient(app) as client:
+        plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Pro",
+                "hourly_request_limit": 5000,
+                "max_bookmakers": 15,
+            },
+        )
+        assert plan_response.status_code == 200
+
+        response = client.put(
+            "/configuration/provider-bookmaker-settings",
+            json={
+                "bookmakers_csv": "Stake, Sbobet, stake,  Sbobet",
+            },
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["bookmakers_csv"] == "Stake,Sbobet"
+    assert data["bookmakers"] == ["Stake", "Sbobet"]
+    assert data["bookmaker_count"] == 2
+
+
+def test_update_provider_bookmaker_settings_rejects_above_plan_limit():
+    with TestClient(app) as client:
+        plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Free Plan",
+                "hourly_request_limit": 100,
+                "max_bookmakers": 2,
+            },
+        )
+        assert plan_response.status_code == 200
+
+        response = client.put(
+            "/configuration/provider-bookmaker-settings",
+            json={
+                "bookmakers_csv": "Stake,Sbobet,Bet365",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "Troppi bookmaker" in response.json()["detail"]

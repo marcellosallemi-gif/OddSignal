@@ -154,3 +154,18 @@ class ProviderPlanSettingResponse(BaseModel):
     max_bookmakers: int
     created_at: datetime
     usage_estimate: Optional[ProviderPlanUsageEstimate] = None
+
+
+
+class ProviderBookmakerSettingUpdate(BaseModel):
+    bookmakers_csv: str
+
+
+class ProviderBookmakerSettingResponse(BaseModel):
+    id: int
+    bookmakers_csv: str
+    bookmakers: list[str]
+    bookmaker_count: int
+    max_bookmakers: int
+    exceeds_bookmaker_limit: bool
+    created_at: datetime

@@ -5,6 +5,24 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
+class FakeProviderCompetitionRefresh:
+    def get_sample(self, limit=10, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "events_count": 2,
+            "events": [
+                {
+                    "league_name": "Provider Test League",
+                    "league_slug": "provider-test-league",
+                },
+                {
+                    "league_name": "Provider Test League",
+                    "league_slug": "provider-test-league",
+                },
+            ],
+        }
+
+
 def test_configuration_available_competitions_returns_list():
     with TestClient(app) as client:
         response = client.get("/configuration/available-competitions")
@@ -36,6 +54,41 @@ def test_create_monitored_competition():
     assert data["competition_name"] == competition_name
     assert data["provider_league_slug"] == payload["provider_league_slug"]
     assert data["is_active"] is True
+
+
+def test_refresh_provider_competitions_upserts_available_competition(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setattr(
+        configuration,
+        "OddsApiIoProvider",
+        lambda: FakeProviderCompetitionRefresh(),
+    )
+
+    with TestClient(app) as client:
+        refresh_response = client.post(
+            "/configuration/provider-competitions/refresh?limit=10"
+        )
+        available_response = client.get("/configuration/available-competitions")
+
+    assert refresh_response.status_code == 200
+
+    data = refresh_response.json()
+    assert data["provider"] == "odds_api_io"
+    assert data["events_received"] == 2
+    assert data["competitions_found"] == 1
+    assert data["competitions_upserted"] == 1
+    assert data["competitions"][0]["name"] == "Provider Test League"
+    assert data["competitions"][0]["provider_league_slug"] == "provider-test-league"
+
+    assert available_response.status_code == 200
+    available_competitions = available_response.json()
+    refreshed_competition = [
+        item
+        for item in available_competitions
+        if item["name"] == "Provider Test League"
+    ][0]
+    assert refreshed_competition["provider_league_slug"] == "provider-test-league"
 
 
 def test_get_monitored_markets_returns_list():

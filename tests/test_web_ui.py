@@ -23,6 +23,8 @@ def test_web_home_returns_html_page():
     assert "Soglie alert" in response.text
     assert "Salva soglie" in response.text
     assert "Campionati monitorati" in response.text
+    assert "Aggiorna campionati dal provider" in response.text
+    assert "refreshProviderCompetitions" in response.text
     assert "Mercati monitorati" in response.text
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text

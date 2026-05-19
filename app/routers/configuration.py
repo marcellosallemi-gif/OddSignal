@@ -14,6 +14,7 @@ from app.schemas import (
     NotificationRecipientCreate,
     NotificationRecipientResponse,
 )
+from app.services.odds_api_io_provider import OddsApiIoProvider
 
 
 router = APIRouter(prefix="/configuration", tags=["configuration"])
@@ -43,10 +44,72 @@ def get_available_competitions(db: Session = Depends(get_db)):
             else False,
             "provider_league_slug": monitored[competition.name].provider_league_slug
             if competition.name in monitored
-            else None,
+            else competition.provider_league_slug,
         }
         for competition in competitions
     ]
+
+
+@router.post("/provider-competitions/refresh")
+def refresh_provider_competitions(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    safe_limit = max(1, min(limit, 50))
+
+    try:
+        sample = OddsApiIoProvider().get_sample(limit=safe_limit, league_slugs=None)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Provider competition refresh failed: {}".format(
+                exc.__class__.__name__
+            ),
+        )
+
+    competitions_by_name = {}
+    for event in sample.get("events", []):
+        league_name = event.get("league_name")
+        if not league_name:
+            continue
+
+        competitions_by_name[league_name] = {
+            "name": league_name,
+            "provider_league_slug": event.get("league_slug"),
+            "country": "Unknown",
+        }
+
+    competitions = []
+    competitions_upserted = 0
+
+    for item in sorted(competitions_by_name.values(), key=lambda value: value["name"]):
+        existing = db.query(Competition).filter(Competition.name == item["name"]).first()
+
+        if existing:
+            if item["provider_league_slug"]:
+                existing.provider_league_slug = item["provider_league_slug"]
+            if not existing.country:
+                existing.country = "Unknown"
+        else:
+            existing = Competition(
+                name=item["name"],
+                country=item["country"],
+                provider_league_slug=item["provider_league_slug"],
+            )
+            db.add(existing)
+
+        competitions_upserted += 1
+        competitions.append(item)
+
+    db.commit()
+
+    return {
+        "provider": sample.get("provider"),
+        "events_received": sample.get("events_count", 0),
+        "competitions_found": len(competitions),
+        "competitions_upserted": competitions_upserted,
+        "competitions": competitions,
+    }
 
 
 @router.get(

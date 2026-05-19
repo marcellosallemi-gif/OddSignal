@@ -338,6 +338,7 @@ def web_home():
         <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
       </div>
       <div class="section-actions">
+        <button class="primary" onclick="refreshProviderCompetitions()">Aggiorna campionati dal provider</button>
         <button onclick="loadCompetitions()">Aggiorna campionati</button>
       </div>
     </div>
@@ -611,6 +612,26 @@ async function monitorCompetition(name, country, slug, isActive) {
     await loadStatus();
   } catch (error) {
     setFeedback("competitions-feedback", "Operazione campionato non completata: " + error.message, "error");
+  }
+}
+
+async function refreshProviderCompetitions() {
+  setFeedback("competitions-feedback", "Aggiornamento campionati dal provider in corso...", "");
+
+  try {
+    const data = await api("/configuration/provider-competitions/refresh?limit=10", {
+      method: "POST"
+    });
+
+    await loadCompetitions();
+    await loadStatus();
+    setFeedback(
+      "competitions-feedback",
+      `Provider aggiornato: ${data.competitions_found} campionati trovati da ${data.events_received} eventi.`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback("competitions-feedback", "Aggiornamento provider non completato: " + error.message, "error");
   }
 }
 

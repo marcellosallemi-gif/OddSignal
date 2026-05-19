@@ -118,4 +118,3 @@ class SchedulerSettingResponse(BaseModel):
     poll_interval_seconds: int
     event_limit: int
     created_at: datetime
-

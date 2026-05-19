@@ -165,4 +165,3 @@ class SchedulerSetting(Base):
     poll_interval_seconds = Column(Integer, nullable=False, default=300)
     event_limit = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False)
-

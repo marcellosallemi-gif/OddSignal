@@ -503,4 +503,3 @@ def put_scheduler_settings(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-

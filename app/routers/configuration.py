@@ -371,7 +371,7 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
         )
 
     payload = response.json()
-    synced = []
+    chats_by_id = {}
 
     for update in payload.get("result", []):
         message = update.get("message") or {}
@@ -384,7 +384,11 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
         if chat_id is None:
             continue
 
-        recipient_value = str(chat_id)
+        chats_by_id[str(chat_id)] = chat
+
+    synced = []
+
+    for recipient_value, chat in chats_by_id.items():
         label = _telegram_label_from_chat(chat)
 
         existing = (

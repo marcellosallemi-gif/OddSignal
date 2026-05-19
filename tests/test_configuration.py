@@ -286,20 +286,23 @@ class FakeTelegramResponse:
     status_code = 200
 
     def json(self):
+        private_chat_update = {
+            "message": {
+                "chat": {
+                    "id": 987654321,
+                    "type": "private",
+                    "first_name": "Mario",
+                    "last_name": "Rossi",
+                    "username": "mariorossi",
+                }
+            }
+        }
+
         return {
             "ok": True,
             "result": [
-                {
-                    "message": {
-                        "chat": {
-                            "id": 987654321,
-                            "type": "private",
-                            "first_name": "Mario",
-                            "last_name": "Rossi",
-                            "username": "mariorossi",
-                        }
-                    }
-                }
+                private_chat_update,
+                private_chat_update,
             ],
         }
 

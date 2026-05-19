@@ -425,7 +425,7 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Notifiche Telegram</h2>
-        <p class="muted">Collega il tuo account Telegram al bot e ricevi gli alert direttamente in chat.</p>
+        <p class="muted">Rileva gli account che hanno scritto al bot. Solo gli account attivati manualmente ricevono alert.</p>
       </div>
     </div>
     <div class="info-box">
@@ -801,9 +801,9 @@ async function loadCompetitions() {
   let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
 
   for (const item of orderedCompetitions) {
-    const active = item.is_active ? "Attivo" : "Non attivo";
+    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
     const badgeClass = item.is_active ? "badge ok" : "badge";
-    const actionLabel = item.is_active ? "Disattiva" : "Attiva";
+    const actionLabel = item.is_active ? "Disattiva" : "Attiva notifiche";
     const nextState = item.is_active ? "false" : "true";
     const nameArg = JSON.stringify(item.name || "");
     const countryArg = JSON.stringify(item.country || "");
@@ -880,7 +880,7 @@ async function loadMonitoredMarkets() {
 
   let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Nome provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
-    const active = item.is_active ? "Attivo" : "Non attivo";
+    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
     const badgeClass = item.is_active ? "badge ok" : "badge";
     html += `<tr>
       <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
@@ -947,6 +947,8 @@ async function loadRecipients() {
   const data = await api("/configuration/notification-recipients");
   const telegramRecipients = data.filter((item) => item.channel === "telegram");
   const activeRecipients = telegramRecipients.filter((item) => item.is_active);
+  const pendingRecipients = telegramRecipients.filter((item) => !item.is_active);
+  const orderedRecipients = pendingRecipients.concat(activeRecipients);
 
   dashboardState.activeRecipients = activeRecipients.length;
   renderDashboardSummary();
@@ -958,10 +960,10 @@ async function loadRecipients() {
   }
 
   let html = "<div class='table-wrap'><table><thead><tr><th>Account Telegram</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
-  for (const item of telegramRecipients) {
-    const active = item.is_active ? "Attivo" : "Non attivo";
+  for (const item of orderedRecipients) {
+    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
     const badgeClass = item.is_active ? "badge ok" : "badge";
-    const actionLabel = item.is_active ? "Disattiva" : "Attiva";
+    const actionLabel = item.is_active ? "Disattiva" : "Attiva notifiche";
     const nextState = item.is_active ? "false" : "true";
 
     html += `<tr>
@@ -974,7 +976,7 @@ async function loadRecipients() {
   }
   html += "</tbody></table></div>";
   document.getElementById("recipients-table").innerHTML = html;
-  setFeedback("recipients-feedback", `Destinatari Telegram: ${telegramRecipients.length}. Attivi: ${activeRecipients.length}.`, "success");
+  setFeedback("recipients-feedback", `Account Telegram: ${telegramRecipients.length}. Attivi: ${activeRecipients.length}. In attesa: ${pendingRecipients.length}.`, "success");
 }
 
 async function toggleRecipient(recipientId, isActive) {

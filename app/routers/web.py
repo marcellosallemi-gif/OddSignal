@@ -808,21 +808,16 @@ async function loadCompetitions() {
   let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
 
   for (const item of orderedCompetitions) {
-    const statusLabels = {
-      pending: "In attesa di attivazione",
-      active: "Attivo",
-      disabled: "Disattivato"
-    };
-    const active = statusLabels[item.status] || "In attesa di attivazione";
-    const badgeClass = item.status === "active" ? "badge ok" : "badge";
-    const actionLabel = item.status === "active" ? "Disattiva" : "Attiva notifiche";
-    const nextState = item.status === "active" ? "false" : "true";
+    const active = item.is_active ? "Attivo" : "Non attivo";
+    const badgeClass = item.is_active ? "badge ok" : "badge";
+    const actionLabel = item.is_active ? "Disattiva" : "Attiva";
+    const nextState = item.is_active ? "false" : "true";
     const nameArg = JSON.stringify(item.name || "");
     const countryArg = JSON.stringify(item.country || "");
     const slugArg = JSON.stringify(item.provider_league_slug || "");
     const providerDetail = item.provider_league_slug
       ? `<details><summary>Dettaglio provider</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
-      : `<span class="secondary-text">Provider non disponibile</span>`;
+      : `<span class="secondary-text">Provider non mappato</span>`;
 
     html += `<tr>
       <td>

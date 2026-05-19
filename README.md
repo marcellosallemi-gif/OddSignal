@@ -1,161 +1,130 @@
 # Calcolo Quote
 
-Backend locale MVP per monitorare quote calcistiche a scopo informativo.
+Software MVP locale per monitorare quote calcistiche a scopo informativo.
 
-Questa base include una app FastAPI, configurazione SQLite locale, health check ed endpoint eventi.
+Il sistema usa Odds-API.io, salva storico quote, calcola variazioni, genera alert e consente configurazione da UI web minimale.
 
-## Installazione
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+Non piazza scommesse, non automatizza betting, non usa scraping aggressivo e non interagisce con account bookmaker.
 
 ## Avvio
 
-```bash
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
 
-## Avvio server in background
+Aprire:
 
-```bash
-nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 & echo $! > uvicorn.pid
-```
+http://127.0.0.1:8001/
 
-## Stop server
+## Funzioni UI
 
-```bash
-kill $(cat uvicorn.pid)
-```
+- stato sistema
+- stato scheduler
+- selezione campionati
+- configurazione soglie alert
+- destinatari Telegram e telefono
+- attivazione/disattivazione destinatari
+- controllo quote manuale
+- storico alert
+- log notifiche
+
+## Configurazione
+
+Copiare .env.example in .env e impostare almeno:
+
+ODDS_API_KEY=your_api_key
+ODDS_API_SPORT=football
+ODDS_API_BOOKMAKERS=Stake,Sbobet
+
+Telegram:
+
+TELEGRAM_BOT_TOKEN=
+
+I destinatari Telegram vengono gestiti dalla UI. TELEGRAM_CHAT_ID resta solo fallback opzionale.
+
+## Alert
+
+Formula:
+
+((quota_nuova - quota_precedente) / quota_precedente) * 100
+
+Le soglie sono configurabili da UI/API:
+
+- min_percent
+- max_percent
+- critical_percent
+- deduplication_minutes
+
+Default:
+
+- min_percent = 8
+- max_percent = 15
+- critical_percent = 15
+- deduplication_minutes = 30
+
+## Campionati
+
+L utente seleziona i campionati da monitorare dalla UI.
+
+L ingestion usa solo i campionati attivi e, se disponibile, interroga Odds-API.io tramite provider_league_slug.
+
+## Mercati MVP
+
+Monitorati:
+
+- ML
+- Totals
+- Both Teams To Score
+- Spread
+
+Esclusi:
+
+- HT
+- Team Total
+
+## Endpoint principali
+
+GET /
+GET /health
+GET /system/status
+GET /configuration/available-competitions
+GET /configuration/monitored-competitions
+POST /configuration/monitored-competitions
+GET /configuration/notification-recipients
+POST /configuration/notification-recipients
+GET /configuration/alert-settings
+PUT /configuration/alert-settings
+POST /api/odds-provider/ingest-sample?limit=1
+GET /odds
+GET /alerts
+GET /notification-logs
+GET /docs
+
+## Migrazioni
+
+Le migrazioni SQLite vengono eseguite automaticamente all avvio.
+
+Script manuali disponibili:
+
+python3 scripts/migrate_add_odds_snapshot_metadata.py
+python3 scripts/migrate_create_notification_logs.py
+python3 scripts/migrate_create_user_configuration.py
+python3 scripts/migrate_add_competition_provider_slug.py
+python3 scripts/migrate_create_alert_settings.py
 
 ## Test
 
-```bash
 pytest
-```
 
-## URL
+Stato atteso attuale:
 
-- http://127.0.0.1:8000/health
-- http://127.0.0.1:8000/events
-- http://127.0.0.1:8000/odds
-- http://127.0.0.1:8000/alerts
-- http://127.0.0.1:8000/docs
+52 passed
 
-## Database
+## Note operative
 
-Il backend usa SQLite locale. Le tabelle MVP vengono create automaticamente all'avvio dell'app.
-
-## Variation formula
-
-La variazione percentuale delle quote decimali viene calcolata con:
-
-```text
-((current_odds - previous_odds) / previous_odds) * 100
-```
-
-Il valore con segno indica aumento o diminuzione; il valore assoluto serve per confrontare soglie future.
-
-## Alert logic
-
-Il motore alert puro restituisce `standard_alert` per variazioni assolute tra 8% e 15%, `critical_alert` sopra il 15% e nessun alert sotto l'8%.
-
-## Real provider configuration - Odds-API.io
-
-Il provider reale scelto è Odds-API.io.
-
-- Sport configurato: `football`
-- Modalità iniziale: pre-match, `status=pending`
-- Bookmaker configurati: `Stake,Sbobet`
-- Mercati target: `1X2`, `Goal/No Goal`, `Over/Under 2.5`
-
-La chiave API reale deve essere inserita solo nel file `.env` locale. Il file `.env` non va committato.
-
-`.env.example` contiene solo placeholder. `OddsApiIoProvider` è predisposto per costruire URL verso Odds-API.io, ma non sostituisce ancora `MockOddsProvider` e non esegue chiamate HTTP automatiche.
-
-`ODDS_API_LEAGUES` resta vuoto finché non vengono validati gli slug delle competizioni.
-
-Prossimo step: validare bookmaker e league slug con una singola chiamata controllata.
-
-## Endpoint disponibili
-
-### GET /health
-
-Risposta:
-
-```json
-{
-  "status": "ok",
-  "service": "football-odds-monitor"
-}
-```
-
-### GET /events
-
-Restituisce gli eventi calcistici mock/seed locali del MVP.
-
-Esempio risposta:
-
-```json
-[
-  {
-    "id": 1,
-    "competition": "Serie A",
-    "home_team": "Inter",
-    "away_team": "Milan",
-    "match": "Inter vs Milan",
-    "start_time": "2026-08-15T18:30:00",
-    "status": "scheduled"
-  }
-]
-```
-
-### GET /odds
-
-Restituisce quote mock deterministiche per il solo MVP locale.
-
-Esempio risposta:
-
-```json
-[
-  {
-    "id": 1,
-    "event": "Inter vs Milan",
-    "competition": "Serie A",
-    "provider": "MockProvider A",
-    "bookmaker": "MockBook A",
-    "market": "Over/Under 2.5",
-    "selection": "Over 2.5",
-    "odds_decimal": 2.0,
-    "captured_at": "2026-05-17T10:00:00"
-  }
-]
-```
-
-### GET /alerts
-
-Restituisce gli alert salvati nel database locale. Gli alert saranno generati automaticamente nel prossimo step con `POST /poll`.
-
-Esempio risposta:
-
-```json
-[
-  {
-    "id": 1,
-    "event": "Inter vs Milan",
-    "competition": "Serie A",
-    "provider": "MockProvider A",
-    "bookmaker": "MockBook A",
-    "market": "Over/Under 2.5",
-    "selection": "Over 2.5",
-    "previous_odds": 1.8,
-    "current_odds": 2.0,
-    "variation_percent": 11.11,
-    "direction": "increase",
-    "alert_type": "standard_alert",
-    "created_at": "2026-05-17T10:00:00"
-  }
-]
-```
+- usare solo fonti dati legittime
+- non committare .env
+- lo scheduler e spento di default
+- testare prima con il pulsante UI Esegui controllo quote ora
+- il bookmaker va scritto Sbobet, non SBOBET

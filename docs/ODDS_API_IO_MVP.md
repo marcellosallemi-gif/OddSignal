@@ -2,20 +2,34 @@
 
 ## Stato attuale
 
-Provider demo: Odds-API.io
+Provider: Odds-API.io
 Sport: football
-Bookmaker: Stake, Sbobet
+Bookmaker configurati: Stake, Sbobet
 Scheduler: disattivato di default
-Polling consigliato: 300 secondi
+Polling consigliato MVP: 300 secondi
 Eventi per ciclo scheduler: 1
 
 Il sistema usa Odds-API.io solo come fonte dati. Non piazza scommesse, non usa scraping e non interagisce con account bookmaker.
 
-## Variabili .env
+## UI operativa
 
-APP_NAME=Calcolo Quote
-APP_ENV=local
-APP_DEBUG=true
+La UI minimale è disponibile su:
+
+http://127.0.0.1:8001/
+
+Dalla UI puoi:
+
+- vedere stato sistema;
+- vedere stato scheduler;
+- selezionare campionati;
+- configurare soglie alert;
+- inserire destinatari Telegram o telefono;
+- attivare/disattivare destinatari;
+- eseguire controllo quote manuale;
+- vedere alert;
+- vedere log notifiche.
+
+## Variabili .env principali
 
 DATABASE_URL=sqlite:///./football_odds_monitor.db
 
@@ -26,12 +40,6 @@ ODDS_API_SPORT=football
 ODDS_API_STATUS=pending
 ODDS_API_BOOKMAKERS=Stake,Sbobet
 ODDS_API_EVENT_LIMIT=10
-ODDS_API_LEAGUES=
-ODDS_API_MARKETS=1X2,Goal/No Goal,Over/Under 2.5
-
-ALERT_MIN_PERCENT=8
-ALERT_MAX_PERCENT=15
-ALERT_DEDUPLICATION_MINUTES=30
 
 ODDS_SCHEDULER_ENABLED=0
 ODDS_POLL_INTERVAL_SECONDS=300
@@ -40,48 +48,29 @@ ODDS_SCHEDULER_EVENT_LIMIT=1
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 
-## Migrazioni locali
+TELEGRAM_CHAT_ID è solo fallback opzionale. I destinatari Telegram reali vengono gestiti da UI/API.
 
-Se il database esiste gia, eseguire:
+## Campionati
 
-python3 scripts/migrate_add_odds_snapshot_metadata.py
-python3 scripts/migrate_create_notification_logs.py
+I campionati selezionati dall utente sono salvati in monitored_competitions.
 
-Le migrazioni sono idempotenti.
+L ingestion usa solo i campionati attivi.
 
-## Endpoint utili
+Se disponibile, provider_league_slug viene usato per interrogare direttamente Odds-API.io sul campionato selezionato.
 
-Health:
+## Mercati MVP
 
-curl "http://127.0.0.1:8001/health"
+Monitorati:
 
-Sample live:
+- ML
+- Totals
+- Both Teams To Score
+- Spread
 
-curl "http://127.0.0.1:8001/api/odds-provider/sample?limit=1"
+Esclusi:
 
-Ingestion manuale:
-
-curl -X POST "http://127.0.0.1:8001/api/odds-provider/ingest-sample?limit=1"
-
-Quote salvate:
-
-curl "http://127.0.0.1:8001/odds?provider=odds_api_io&limit=20"
-
-Quote Stake:
-
-curl "http://127.0.0.1:8001/odds?provider=odds_api_io&bookmaker=Stake&limit=20"
-
-Alert:
-
-curl "http://127.0.0.1:8001/alerts?provider=odds_api_io&limit=20"
-
-Alert critici:
-
-curl "http://127.0.0.1:8001/alerts?provider=odds_api_io&alert_type=critical_alert&limit=20"
-
-Log notifiche:
-
-curl "http://127.0.0.1:8001/notification-logs?limit=20"
+- HT
+- Team Total
 
 ## Logica alert
 
@@ -89,15 +78,18 @@ Formula:
 
 ((quota_nuova - quota_precedente) / quota_precedente) * 100
 
-Regole:
+Le soglie sono persistenti nel database e modificabili da UI/API.
 
-- sotto 8%: nessun alert
-- da 8% a 15%: standard_alert
-- oltre 15%: critical_alert
+Default:
+
+min_percent = 8
+max_percent = 15
+critical_percent = 15
+deduplication_minutes = 30
 
 ## Deduplicazione
 
-La deduplicazione evita alert ripetuti entro ALERT_DEDUPLICATION_MINUTES sulla stessa combinazione:
+Evita alert ripetuti nella finestra deduplication_minutes sulla stessa combinazione:
 
 - evento
 - provider
@@ -106,18 +98,27 @@ La deduplicazione evita alert ripetuti entro ALERT_DEDUPLICATION_MINUTES sulla s
 - selezione
 - tipo alert
 
-La direzione non viene usata per deduplicare, cosi si evitano alert ping-pong.
+La direzione non viene usata per deduplicare, così si evitano alert ping-pong.
 
 ## Telegram
 
-Se TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID non sono configurati, il sistema non invia notifiche e salva un log skipped.
+TELEGRAM_BOT_TOKEN resta in .env.
 
-Se Telegram e configurato correttamente, salva status=sent.
-In caso di errore HTTP o rete, salva status=failed.
+I destinatari Telegram sono salvati in notification_recipients.
+
+Se Telegram non è configurato o non ci sono destinatari attivi, il sistema crea log skipped e non va in errore.
+
+Stati log:
+
+- sent
+- skipped
+- failed
+
+I numeri telefono sono salvati per integrazioni future SMS/WhatsApp ufficiali. L MVP non invia ancora SMS o WhatsApp.
 
 ## Scheduler
 
-Lo scheduler e spento di default:
+Lo scheduler è spento di default:
 
 ODDS_SCHEDULER_ENABLED=0
 
@@ -125,10 +126,49 @@ Per abilitarlo:
 
 ODDS_SCHEDULER_ENABLED=1
 
-Per il piano gratuito non scendere sotto:
+Per piano gratuito o test controllati:
 
 ODDS_POLL_INTERVAL_SECONDS=300
 ODDS_SCHEDULER_EVENT_LIMIT=1
+
+Prima di abilitarlo, testare sempre il controllo manuale dalla UI.
+
+## Endpoint utili
+
+GET /
+GET /health
+GET /system/status
+
+GET /configuration/available-competitions
+GET /configuration/monitored-competitions
+POST /configuration/monitored-competitions
+PATCH /configuration/monitored-competitions/{competition_id}/toggle
+
+GET /configuration/notification-recipients
+POST /configuration/notification-recipients
+PATCH /configuration/notification-recipients/{recipient_id}/toggle
+
+GET /configuration/alert-settings
+PUT /configuration/alert-settings
+
+POST /api/odds-provider/ingest-sample?limit=1
+
+GET /odds
+GET /alerts
+GET /notification-logs
+GET /docs
+
+## Migrazioni
+
+Le migrazioni SQLite vengono eseguite automaticamente all avvio.
+
+Script manuali idempotenti:
+
+python3 scripts/migrate_add_odds_snapshot_metadata.py
+python3 scripts/migrate_create_notification_logs.py
+python3 scripts/migrate_create_user_configuration.py
+python3 scripts/migrate_add_competition_provider_slug.py
+python3 scripts/migrate_create_alert_settings.py
 
 ## Test
 
@@ -136,18 +176,14 @@ Suite completa:
 
 pytest
 
-Test ingestion:
+Stato atteso attuale:
 
-pytest tests/test_odds_ingestion_service.py
-
-Test Telegram:
-
-pytest tests/test_telegram_notifier.py
+52 passed
 
 ## Note operative
 
-- Lo slug calcio e football.
+- Lo slug calcio è football.
 - Il bookmaker asiatico va scritto Sbobet, non SBOBET.
 - Il primo ciclo salva snapshot ma non crea alert.
-- Gli alert possono nascere dal secondo ciclo.
-- Prima di abilitare lo scheduler, testare sempre ingest-sample manualmente.
+- Gli alert possono nascere dal secondo ciclo utile.
+- Non committare .env.

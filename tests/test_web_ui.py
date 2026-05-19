@@ -30,7 +30,8 @@ def test_web_home_returns_html_page():
     assert "Salva soglie" in response.text
     assert "Campionati" in response.text
     assert "Campionati rilevati dagli eventi disponibili ora" in response.text
-    assert "Aggiorna campionati dal provider" in response.text
+    assert "Aggiorna leghe/slug dal provider" in response.text
+    assert "Aggiorna campionati da eventi" in response.text
     assert "refreshProviderCompetitions" in response.text
     assert "Mercati MVP supportati" in response.text
     assert "Mercati futuri / da integrare" in response.text

@@ -420,7 +420,8 @@ def web_home():
         <p class="muted">Scegli i campionati su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
       </div>
       <div class="section-actions">
-        <button class="primary" onclick="refreshProviderCompetitions()">Aggiorna campionati dal provider</button>
+        <button class="primary" onclick="refreshProviderLeagues()">Aggiorna leghe/slug dal provider</button>
+        <button onclick="refreshProviderCompetitions()">Aggiorna campionati da eventi</button>
         <button onclick="loadCompetitions()">Aggiorna campionati</button>
       </div>
     </div>
@@ -1057,6 +1058,28 @@ async function refreshProviderCompetitions() {
     );
   } catch (error) {
     setFeedback("competitions-feedback", "Aggiornamento campionati non completato. " + error.message, "error");
+  }
+}
+
+
+async function refreshProviderLeagues() {
+  setFeedback("competitions-feedback", "Aggiornamento leghe e slug dal provider in corso...", "");
+
+  try {
+    const data = await api("/configuration/provider-leagues/refresh", {
+      method: "POST"
+    });
+
+    await loadCompetitions();
+    await loadProviderPlanSettings();
+    await loadStatus();
+    setFeedback(
+      "competitions-feedback",
+      `Leghe provider aggiornate: ${data.leagues_upserted}. Campionati monitorati aggiornati: ${data.monitored_updated}.`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback("competitions-feedback", "Aggiornamento leghe provider non completato. " + error.message, "error");
   }
 }
 

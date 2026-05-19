@@ -262,6 +262,7 @@ def web_home():
     <a href="#competitions">Campionati</a>
     <a href="#markets">Mercati</a>
     <a href="#automation">Automazione</a>
+    <a href="#provider-plan">Piano API</a>
     <a href="#recipients">Destinatari</a>
     <a href="#recent-alerts">Alert</a>
     <a href="#notification-logs-section">Log notifiche</a>
@@ -324,6 +325,44 @@ def web_home():
     <details>
       <summary>Dettagli tecnici sistema</summary>
       <pre id="system-status">Caricamento...</pre>
+    </details>
+  </section>
+
+  <section id="provider-plan">
+    <div class="section-header">
+      <div>
+        <h2>Piano API provider</h2>
+        <p class="muted">Configura i limiti del piano Odds-API.io e verifica se scheduler, campionati ed eventi sono sostenibili.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadProviderPlanSettings()">Ricarica piano API</button>
+      </div>
+    </div>
+    <div id="provider-plan-estimate" class="info-box">Caricamento piano API...</div>
+    <div class="form-grid">
+      <label>Preset piano
+        <select id="provider-plan-preset" onchange="applyProviderPlanPreset()">
+          <option value="custom">Custom</option>
+          <option value="free">Free - 100 richieste/ora</option>
+          <option value="pro5000">5000 richieste/ora</option>
+          <option value="unlimited">Illimitato</option>
+        </select>
+      </label>
+      <label>Nome piano
+        <input id="provider-plan-name" type="text" placeholder="Free">
+      </label>
+      <label>Limite richieste/ora
+        <input id="provider-hourly-request-limit" type="number" min="0" step="1" placeholder="100">
+      </label>
+      <label>Bookmaker massimi
+        <input id="provider-max-bookmakers" type="number" min="1" max="100" step="1" placeholder="2">
+      </label>
+      <button class="primary" onclick="saveProviderPlanSettings()">Salva piano API</button>
+    </div>
+    <div id="provider-plan-feedback" class="feedback muted">Caricamento piano API...</div>
+    <details>
+      <summary>JSON tecnico piano API</summary>
+      <pre id="provider-plan-result">Caricamento...</pre>
     </details>
   </section>
 
@@ -764,6 +803,104 @@ async function saveSchedulerSettings() {
 }
 
 
+
+function applyProviderPlanPreset() {
+  const preset = document.getElementById("provider-plan-preset").value;
+
+  if (preset === "free") {
+    document.getElementById("provider-plan-name").value = "Free";
+    document.getElementById("provider-hourly-request-limit").value = "100";
+    document.getElementById("provider-max-bookmakers").value = "2";
+  } else if (preset === "pro5000") {
+    document.getElementById("provider-plan-name").value = "5000/h";
+    document.getElementById("provider-hourly-request-limit").value = "5000";
+    document.getElementById("provider-max-bookmakers").value = "2";
+  } else if (preset === "unlimited") {
+    document.getElementById("provider-plan-name").value = "Illimitato";
+    document.getElementById("provider-hourly-request-limit").value = "0";
+    document.getElementById("provider-max-bookmakers").value = "100";
+  }
+}
+
+
+function renderProviderPlanEstimate(data) {
+  const estimate = data.usage_estimate;
+  const limitLabel = data.hourly_request_limit === null ? "Illimitato" : `${data.hourly_request_limit}/h`;
+  const statusClass = estimate.exceeds_hourly_limit ? "badge warn" : "badge ok";
+  const statusLabel = estimate.exceeds_hourly_limit ? "Supera limite" : "OK";
+
+  document.getElementById("provider-plan-estimate").innerHTML = `
+    <div class="summary-grid">
+      ${summaryCard("Piano", data.plan_name)}
+      ${summaryCard("Limite richieste", limitLabel)}
+      ${summaryCard("Bookmaker max", data.max_bookmakers)}
+      ${summaryCard("Stima richieste/h", estimate.estimated_requests_per_hour)}
+    </div>
+    <p><span class="${statusClass}">${statusLabel}</span></p>
+    <p class="muted">
+      Campionati attivi mappati: ${escapeHtml(estimate.active_mapped_competitions_count)}.
+      Eventi per ciclo: ${escapeHtml(estimate.event_limit)}.
+      Cicli/ora stimati: ${escapeHtml(estimate.cycles_per_hour)}.
+      Richieste/ciclo stimate: ${escapeHtml(estimate.estimated_requests_per_cycle)}.
+    </p>
+    <p class="muted">${escapeHtml(estimate.recommendation)}</p>
+  `;
+}
+
+
+function syncProviderPlanPreset(data) {
+  if (data.plan_name === "Free" && data.hourly_request_limit === 100 && data.max_bookmakers === 2) {
+    document.getElementById("provider-plan-preset").value = "free";
+  } else if (data.hourly_request_limit === 5000) {
+    document.getElementById("provider-plan-preset").value = "pro5000";
+  } else if (data.hourly_request_limit === null) {
+    document.getElementById("provider-plan-preset").value = "unlimited";
+  } else {
+    document.getElementById("provider-plan-preset").value = "custom";
+  }
+}
+
+
+async function loadProviderPlanSettings() {
+  const data = await api("/configuration/provider-plan-settings");
+
+  syncProviderPlanPreset(data);
+  document.getElementById("provider-plan-name").value = data.plan_name;
+  document.getElementById("provider-hourly-request-limit").value = data.hourly_request_limit === null ? "0" : data.hourly_request_limit;
+  document.getElementById("provider-max-bookmakers").value = data.max_bookmakers;
+  document.getElementById("provider-plan-result").textContent = JSON.stringify(data, null, 2);
+  renderProviderPlanEstimate(data);
+  setFeedback("provider-plan-feedback", "Piano API caricato.", "success");
+}
+
+
+async function saveProviderPlanSettings() {
+  const rawLimit = Number(document.getElementById("provider-hourly-request-limit").value);
+  const payload = {
+    plan_name: document.getElementById("provider-plan-name").value,
+    hourly_request_limit: rawLimit <= 0 ? null : rawLimit,
+    max_bookmakers: Number(document.getElementById("provider-max-bookmakers").value)
+  };
+
+  setFeedback("provider-plan-feedback", "Salvataggio piano API...", "");
+
+  try {
+    const data = await api("/configuration/provider-plan-settings", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById("provider-plan-result").textContent = JSON.stringify(data, null, 2);
+    renderProviderPlanEstimate(data);
+    syncProviderPlanPreset(data);
+    setFeedback("provider-plan-feedback", "Piano API salvato.", "success");
+  } catch (error) {
+    setFeedback("provider-plan-feedback", "Piano API non salvato: " + error.message, "error");
+  }
+}
+
+
 async function saveAlertSettings() {
   setFeedback("alert-settings-feedback", "Salvataggio impostazioni alert...", "");
 
@@ -1093,6 +1230,7 @@ async function loadNotificationLogs() {
 loadStatus();
 loadAlertSettings();
 loadSchedulerSettings();
+loadProviderPlanSettings();
 loadCompetitions();
 loadMonitoredMarkets();
 loadRecipients();

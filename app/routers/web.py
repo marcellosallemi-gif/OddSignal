@@ -401,25 +401,19 @@ def web_home():
   <section id="recipients">
     <div class="section-header">
       <div>
-        <h2>Destinatari notifiche</h2>
-        <p class="muted">Telegram usa il chat_id. Il telefono viene salvato per integrazioni future ufficiali.</p>
+        <h2>Notifiche Telegram</h2>
+        <p class="muted">Inserisci uno o più Chat ID Telegram per ricevere gli alert quote. Le notifiche vengono inviate solo ai destinatari attivi.</p>
       </div>
     </div>
     <div class="form-grid">
-      <label>Canale
-        <select id="recipient-channel">
-          <option value="telegram">telegram</option>
-          <option value="phone">phone</option>
-        </select>
-      </label>
-      <label>Destinatario
-        <input id="recipient-value" placeholder="chat_id Telegram o numero telefono">
+      <label>Chat ID Telegram
+        <input id="recipient-value" placeholder="es. 877063309">
       </label>
       <label>Etichetta
-        <input id="recipient-label" placeholder="es. Admin">
+        <input id="recipient-label" placeholder="es. Amministratore">
       </label>
-      <button class="primary" onclick="saveRecipient()">Salva destinatario</button>
-      <button onclick="loadRecipients()">Aggiorna destinatari</button>
+      <button class="primary" onclick="saveRecipient()">Salva destinatario Telegram</button>
+      <button onclick="loadRecipients()">Aggiorna Telegram</button>
     </div>
     <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
     <div id="recipients-table"></div>
@@ -809,23 +803,22 @@ async function toggleMonitoredMarket(marketId, isActive) {
 }
 
 async function saveRecipient() {
-  const channel = document.getElementById("recipient-channel").value;
   const value = document.getElementById("recipient-value").value.trim();
   const label = document.getElementById("recipient-label").value.trim();
 
   if (!value) {
-    setFeedback("recipients-feedback", "Inserisci un destinatario.", "error");
+    setFeedback("recipients-feedback", "Inserisci il Chat ID Telegram.", "error");
     return;
   }
 
-  setFeedback("recipients-feedback", "Salvataggio destinatario...", "");
+  setFeedback("recipients-feedback", "Salvataggio destinatario Telegram...", "");
 
   try {
     await api("/configuration/notification-recipients", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
-        channel: channel,
+        channel: "telegram",
         recipient_value: value,
         label: label || null,
         is_active: true
@@ -835,40 +828,50 @@ async function saveRecipient() {
     document.getElementById("recipient-value").value = "";
     document.getElementById("recipient-label").value = "";
     await loadRecipients();
-    setFeedback("recipients-feedback", "Destinatario salvato.", "success");
+    setFeedback("recipients-feedback", "Destinatario Telegram salvato.", "success");
     await loadStatus();
   } catch (error) {
-    setFeedback("recipients-feedback", "Destinatario non salvato: " + error.message, "error");
+    setFeedback("recipients-feedback", "Destinatario Telegram non salvato: " + error.message, "error");
   }
 }
 
 async function loadRecipients() {
   const data = await api("/configuration/notification-recipients");
-  dashboardState.activeRecipients = data.filter((item) => item.is_active).length;
+  const telegramRecipients = data.filter((item) => item.channel === "telegram");
+  const activeRecipients = telegramRecipients.filter((item) => item.is_active);
+
+  dashboardState.activeRecipients = activeRecipients.length;
   renderDashboardSummary();
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Canale</th><th>Destinatario</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
-  for (const item of data) {
+  if (telegramRecipients.length === 0) {
+    document.getElementById("recipients-table").innerHTML = "<p class='muted'>Nessun destinatario Telegram configurato.</p>";
+    setFeedback("recipients-feedback", "Aggiungi almeno un Chat ID Telegram per ricevere alert.", "");
+    return;
+  }
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Chat ID Telegram</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  for (const item of telegramRecipients) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
+    const actionLabel = item.is_active ? "Disattiva" : "Attiva";
+    const nextState = item.is_active ? "false" : "true";
+
     html += `<tr>
-      <td>${escapeHtml(item.channel)}</td>
       <td>${escapeHtml(item.recipient_value)}</td>
-      <td>${escapeHtml(item.label)}</td>
+      <td>${escapeHtml(item.label || "Telegram")}</td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
-        <button class="compact" onclick="toggleRecipient(${item.id}, true)">Attiva</button>
-        <button class="compact" onclick="toggleRecipient(${item.id}, false)">Disattiva</button>
+        <button class="compact ${item.is_active ? "" : "primary"}" onclick="toggleRecipient(${item.id}, ${nextState})">${actionLabel}</button>
       </td>
     </tr>`;
   }
   html += "</tbody></table></div>";
   document.getElementById("recipients-table").innerHTML = html;
-  setFeedback("recipients-feedback", `Destinatari caricati: ${data.length}.`, "success");
+  setFeedback("recipients-feedback", `Destinatari Telegram: ${telegramRecipients.length}. Attivi: ${activeRecipients.length}.`, "success");
 }
 
 async function toggleRecipient(recipientId, isActive) {
-  setFeedback("recipients-feedback", `${isActive ? "Attivazione" : "Disattivazione"} destinatario in corso...`, "");
+  setFeedback("recipients-feedback", `${isActive ? "Attivazione" : "Disattivazione"} destinatario Telegram in corso...`, "");
 
   try {
     await api(`/configuration/notification-recipients/${recipientId}/toggle?is_active=${isActive}`, {
@@ -876,10 +879,10 @@ async function toggleRecipient(recipientId, isActive) {
     });
 
     await loadRecipients();
-    setFeedback("recipients-feedback", `Destinatario ${isActive ? "attivato" : "disattivato"}.`, "success");
+    setFeedback("recipients-feedback", `Destinatario Telegram ${isActive ? "attivato" : "disattivato"}.`, "success");
     await loadStatus();
   } catch (error) {
-    setFeedback("recipients-feedback", "Operazione destinatario non completata: " + error.message, "error");
+    setFeedback("recipients-feedback", "Operazione destinatario Telegram non completata: " + error.message, "error");
   }
 }
 

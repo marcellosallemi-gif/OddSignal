@@ -33,7 +33,7 @@ def test_web_home_returns_html_page():
     assert "Mercati futuri / da integrare" in response.text
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
-    assert "Destinatari notifiche" in response.text
+    assert "Notifiche Telegram" in response.text
     assert "Alert recenti" in response.text
     assert "Log notifiche recenti" in response.text
     assert "toggleRecipient" in response.text

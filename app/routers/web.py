@@ -254,7 +254,7 @@ def web_home():
   <div class="page">
   <div class="hero">
     <h1>Calcolo Quote - MVP</h1>
-    <p>Dashboard locale per configurare monitoraggio quote, alert e notifiche.</p>
+    <p>Dashboard locale per monitorare quote calcio e inviare alert Telegram sui cali quota.</p>
   </div>
 
   <nav class="nav" aria-label="Navigazione dashboard">
@@ -348,7 +348,7 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Soglie alert e cooldown</h2>
-        <p class="muted">Configura quando generare alert e per quanto tempo evitare duplicati.</p>
+        <p class="muted">Configura le soglie. Telegram notifica solo i cali quota: Standard tra min/max, Critico oltre la soglia critica.</p>
       </div>
     </div>
     <div class="form-grid">
@@ -445,7 +445,7 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Alert recenti</h2>
-        <p class="muted">Ultimi movimenti quote salvati come alert.</p>
+        <p class="muted">Storico completo degli alert. Gli aumenti restano nello storico, ma non vengono notificati via Telegram.</p>
       </div>
       <div class="section-actions">
         <button onclick="loadAlerts()">Aggiorna alert</button>

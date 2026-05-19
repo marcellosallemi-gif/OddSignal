@@ -133,6 +133,8 @@ Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
 
 ## Notifiche aggregate
 
+Telegram notifica solo i cali quota. Gli aumenti restano nello storico alert ma non vengono inviati via Telegram.
+
 Gli alert creati nello stesso ciclo vengono aggregati in un singolo messaggio Telegram.
 
 Esempio operativo:

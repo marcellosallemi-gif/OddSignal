@@ -54,6 +54,8 @@ Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avv
 
 ## Alert
 
+Telegram notifica solo i cali quota. Gli aumenti restano nello storico alert ma non vengono inviati via Telegram.
+
 Formula:
 
 ((quota_nuova - quota_precedente) / quota_precedente) * 100

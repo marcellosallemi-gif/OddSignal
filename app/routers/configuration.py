@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Competition, MonitoredCompetition, NotificationRecipient
+from app.models import Competition, MonitoredCompetition, MonitoredMarket, NotificationRecipient
 from app.schemas import (
     MonitoredCompetitionCreate,
     MonitoredCompetitionResponse,
+    MonitoredMarketCreate,
+    MonitoredMarketResponse,
     NotificationRecipientCreate,
     NotificationRecipientResponse,
 )
@@ -111,6 +113,68 @@ def toggle_monitored_competition(
 
     if not item:
         raise HTTPException(status_code=404, detail="Monitored competition not found")
+
+    item.is_active = is_active
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
+@router.get(
+    "/monitored-markets",
+    response_model=List[MonitoredMarketResponse],
+)
+def get_monitored_markets(db: Session = Depends(get_db)):
+    return db.query(MonitoredMarket).order_by(MonitoredMarket.market_name).all()
+
+
+@router.post(
+    "/monitored-markets",
+    response_model=MonitoredMarketResponse,
+)
+def upsert_monitored_market(
+    payload: MonitoredMarketCreate,
+    db: Session = Depends(get_db),
+):
+    existing = (
+        db.query(MonitoredMarket)
+        .filter(MonitoredMarket.market_name == payload.market_name)
+        .first()
+    )
+
+    if existing:
+        existing.is_active = payload.is_active
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    item = MonitoredMarket(
+        market_name=payload.market_name,
+        is_active=payload.is_active,
+        created_at=_utc_now_naive(),
+    )
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
+@router.patch(
+    "/monitored-markets/{market_id}/toggle",
+    response_model=MonitoredMarketResponse,
+)
+def toggle_monitored_market(
+    market_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+):
+    item = db.query(MonitoredMarket).filter(MonitoredMarket.id == market_id).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Monitored market not found")
 
     item.is_active = is_active
     db.commit()

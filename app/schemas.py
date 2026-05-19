@@ -63,6 +63,18 @@ class MonitoredCompetitionResponse(BaseModel):
     created_at: datetime
 
 
+class MonitoredMarketCreate(BaseModel):
+    market_name: str
+    is_active: bool = True
+
+
+class MonitoredMarketResponse(BaseModel):
+    id: int
+    market_name: str
+    is_active: bool
+    created_at: datetime
+
+
 class NotificationRecipientCreate(BaseModel):
     channel: str
     recipient_value: str

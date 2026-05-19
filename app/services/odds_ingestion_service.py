@@ -3,7 +3,15 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
-from app.models import Alert, Competition, Event, MonitoredCompetition, OddsSnapshot, Team
+from app.models import (
+    Alert,
+    Competition,
+    Event,
+    MonitoredCompetition,
+    MonitoredMarket,
+    OddsSnapshot,
+    Team,
+)
 from app.services.alert_engine import evaluate_alert
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.odds_api_io_provider import OddsApiIoProvider
@@ -117,7 +125,29 @@ def _market_key(odd_data: Dict) -> str:
     return "{} {}".format(market_name, line)
 
 
-def _is_monitored_market(odd_data: Dict) -> bool:
+DEFAULT_MONITORED_MARKETS = {
+    "ML",
+    "Totals",
+    "Both Teams To Score",
+    "Spread",
+}
+
+
+def _get_active_monitored_market_names(db) -> set:
+    market_names = {
+        item.market_name
+        for item in db.query(MonitoredMarket)
+        .filter(MonitoredMarket.is_active.is_(True))
+        .all()
+    }
+
+    if not market_names and db.query(MonitoredMarket).count() == 0:
+        return DEFAULT_MONITORED_MARKETS
+
+    return market_names
+
+
+def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:
     market_name = odd_data.get("market_name") or ""
 
     if "HT" in market_name:
@@ -126,14 +156,7 @@ def _is_monitored_market(odd_data: Dict) -> bool:
     if market_name.startswith("Team Total"):
         return False
 
-    allowed_markets = {
-        "ML",
-        "Totals",
-        "Both Teams To Score",
-        "Spread",
-    }
-
-    return market_name in allowed_markets
+    return market_name in active_market_names
 
 
 def _get_active_monitored_competitions(db):
@@ -207,6 +230,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     active_competitions = _get_active_monitored_competitions(db)
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
+    active_market_names = _get_active_monitored_market_names(db)
 
     provider = OddsApiIoProvider()
     sample = provider.get_sample(
@@ -238,7 +262,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     ignored_odds = 0
 
     for odd_data in sample["odds"]:
-        if not _is_monitored_market(odd_data):
+        if not _is_monitored_market(odd_data, active_market_names):
             ignored_odds += 1
             continue
 
@@ -322,6 +346,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "active_provider_league_slugs_count": len(active_provider_league_slugs),
         "odds_received": sample["odds_count"],
         "odds_ignored": ignored_odds,
+        "active_markets_count": len(active_market_names),
         "snapshots_inserted": inserted_snapshots,
         "snapshots_unchanged": unchanged_snapshots,
         "alerts_created": created_alerts,

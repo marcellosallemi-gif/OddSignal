@@ -33,6 +33,24 @@ CREATE TABLE IF NOT EXISTS monitored_competitions (
 """
 
 
+DEFAULT_MONITORED_MARKETS = (
+    "ML",
+    "Totals",
+    "Both Teams To Score",
+    "Spread",
+)
+
+
+CREATE_MONITORED_MARKETS_SQL = """
+CREATE TABLE IF NOT EXISTS monitored_markets (
+    id INTEGER PRIMARY KEY,
+    market_name VARCHAR NOT NULL UNIQUE,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+)
+"""
+
+
 
 
 CREATE_ALERT_SETTINGS_SQL = """
@@ -118,6 +136,24 @@ def run_runtime_migrations() -> dict:
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_LOGS_SQL)
         conn.exec_driver_sql(CREATE_MONITORED_COMPETITIONS_SQL)
+        conn.exec_driver_sql(CREATE_MONITORED_MARKETS_SQL)
+        existing_monitored_markets = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM monitored_markets"
+        ).scalar()
+        if existing_monitored_markets == 0:
+            for market_name in DEFAULT_MONITORED_MARKETS:
+                conn.exec_driver_sql(
+                    """
+                    INSERT INTO monitored_markets (
+                        market_name,
+                        is_active,
+                        created_at
+                    )
+                    VALUES (?, 1, CURRENT_TIMESTAMP)
+                    """,
+                    (market_name,),
+                )
+
         monitored_competition_columns = {
             row[1]
             for row in conn.exec_driver_sql("PRAGMA table_info(monitored_competitions)").fetchall()
@@ -154,6 +190,7 @@ def run_runtime_migrations() -> dict:
         "added_odds_snapshot_columns": added_columns,
         "notification_logs": "ready",
         "monitored_competitions": "ready",
+        "monitored_markets": "ready",
         "notification_recipients": "ready",
         "alert_settings": "ready",
     }

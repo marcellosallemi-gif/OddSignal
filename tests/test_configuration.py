@@ -38,6 +38,55 @@ def test_create_monitored_competition():
     assert data["is_active"] is True
 
 
+def test_get_monitored_markets_returns_list():
+    with TestClient(app) as client:
+        response = client.get("/configuration/monitored-markets")
+
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_create_monitored_market():
+    market_name = "Test Market " + uuid4().hex
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "market_name": market_name,
+                "is_active": True,
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["market_name"] == market_name
+    assert data["is_active"] is True
+
+
+def test_toggle_monitored_market():
+    market_name = "Toggle Market " + uuid4().hex
+
+    with TestClient(app) as client:
+        create_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "market_name": market_name,
+                "is_active": True,
+            },
+        )
+        market_id = create_response.json()["id"]
+
+        toggle_response = client.patch(
+            f"/configuration/monitored-markets/{market_id}/toggle?is_active=false"
+        )
+
+    assert create_response.status_code == 200
+    assert toggle_response.status_code == 200
+    assert toggle_response.json()["is_active"] is False
+
+
 def test_create_notification_recipient():
     payload = {
         "channel": "telegram",

@@ -208,6 +208,14 @@ def web_home():
   </section>
 
   <section>
+    <h2>Mercati monitorati</h2>
+    <p class="muted">Seleziona i mercati quote da includere nel monitoraggio. I mercati HT e Team Total restano esclusi per sicurezza.</p>
+    <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
+    <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
+    <div id="monitored-markets"></div>
+  </section>
+
+  <section>
     <h2>Destinatari notifiche</h2>
     <p class="muted">Telegram usa il chat_id. Il telefono viene salvato per integrazioni future SMS/WhatsApp ufficiali.</p>
     <select id="recipient-channel">
@@ -423,6 +431,42 @@ async function monitorCompetition(name, country, slug, isActive) {
   }
 }
 
+async function loadMonitoredMarkets() {
+  const data = await api("/configuration/monitored-markets");
+  let html = "<table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  for (const item of data) {
+    const active = item.is_active ? "Attivo" : "Non attivo";
+    const badgeClass = item.is_active ? "badge ok" : "badge";
+    html += `<tr>
+      <td>${escapeHtml(item.market_name)}</td>
+      <td><span class="${badgeClass}">${active}</span></td>
+      <td>
+        <button onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
+        <button onclick="toggleMonitoredMarket(${item.id}, false)">Disattiva</button>
+      </td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  document.getElementById("monitored-markets").innerHTML = html;
+  setFeedback("markets-feedback", `Mercati caricati: ${data.length}.`, "success");
+}
+
+async function toggleMonitoredMarket(marketId, isActive) {
+  setFeedback("markets-feedback", `${isActive ? "Attivazione" : "Disattivazione"} mercato in corso...`, "");
+
+  try {
+    await api(`/configuration/monitored-markets/${marketId}/toggle?is_active=${isActive}`, {
+      method: "PATCH"
+    });
+
+    await loadMonitoredMarkets();
+    setFeedback("markets-feedback", `Mercato ${isActive ? "attivato" : "disattivato"}.`, "success");
+    await loadStatus();
+  } catch (error) {
+    setFeedback("markets-feedback", "Operazione mercato non completata: " + error.message, "error");
+  }
+}
+
 async function saveRecipient() {
   const channel = document.getElementById("recipient-channel").value;
   const value = document.getElementById("recipient-value").value.trim();
@@ -531,6 +575,7 @@ async function loadNotificationLogs() {
 loadStatus();
 loadAlertSettings();
 loadCompetitions();
+loadMonitoredMarkets();
 loadRecipients();
 loadAlerts();
 loadNotificationLogs();

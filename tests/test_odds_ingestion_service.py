@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import Base
 from datetime import datetime
 
-from app.models import Alert, MonitoredCompetition, OddsSnapshot
+from app.models import Alert, MonitoredCompetition, MonitoredMarket, OddsSnapshot
 from app.services import odds_ingestion_service
 
 
@@ -16,6 +16,17 @@ def add_monitored_competition(db, competition_name="Test League"):
         country="Test",
         provider="odds_api_io",
         is_active=True,
+        created_at=datetime.utcnow(),
+    )
+    db.add(item)
+    db.commit()
+    return item
+
+
+def add_monitored_market(db, market_name="ML", is_active=True):
+    item = MonitoredMarket(
+        market_name=market_name,
+        is_active=is_active,
         created_at=datetime.utcnow(),
     )
     db.add(item)
@@ -236,6 +247,51 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
 
         snapshot = db.query(OddsSnapshot).first()
         assert snapshot.market == "ML"
+    finally:
+        db.close()
+
+
+def test_ingestion_ignores_inactive_monitored_market(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "ML", is_active=False)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda: FakeProvider(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 1
+        assert result["snapshots_inserted"] == 0
+        assert db.query(OddsSnapshot).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_accepts_active_monitored_market(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "ML", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda: FakeProvider(),
+        )
+
+        FakeProvider.odds_decimal = 1.80
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 0
+        assert result["snapshots_inserted"] == 1
+        assert db.query(OddsSnapshot).count() == 1
     finally:
         db.close()
 

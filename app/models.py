@@ -127,6 +127,15 @@ class MonitoredCompetition(Base):
     created_at = Column(DateTime, nullable=False)
 
 
+class MonitoredMarket(Base):
+    __tablename__ = "monitored_markets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    market_name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False)
+
+
 class NotificationRecipient(Base):
     __tablename__ = "notification_recipients"
 

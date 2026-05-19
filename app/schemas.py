@@ -80,6 +80,7 @@ class NotificationRecipientCreate(BaseModel):
     recipient_value: str
     label: Optional[str] = None
     is_active: bool = True
+    status: Optional[str] = None
 
 
 class NotificationRecipientResponse(BaseModel):
@@ -88,6 +89,7 @@ class NotificationRecipientResponse(BaseModel):
     recipient_value: str
     label: Optional[str] = None
     is_active: bool
+    status: str
     created_at: datetime
 
 

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS notification_recipients (
     recipient_value VARCHAR NOT NULL,
     label VARCHAR,
     is_active BOOLEAN NOT NULL DEFAULT 1,
+    status VARCHAR NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL
 )
 """
@@ -121,28 +122,38 @@ def run_runtime_migrations() -> dict:
     added_columns = []
 
     with engine.connect() as conn:
-        existing_columns = {
-            row[1]
-            for row in conn.exec_driver_sql("PRAGMA table_info(odds_snapshots)").fetchall()
-        }
+        odds_snapshots_exists = conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='odds_snapshots'"
+        ).fetchone()
 
-        for column_name, column_type in ODDS_SNAPSHOT_METADATA_COLUMNS.items():
-            if column_name not in existing_columns:
-                conn.exec_driver_sql(
-                    f"ALTER TABLE odds_snapshots ADD COLUMN {column_name} {column_type}"
-                )
-                added_columns.append(column_name)
+        if odds_snapshots_exists:
+            existing_columns = {
+                row[1]
+                for row in conn.exec_driver_sql("PRAGMA table_info(odds_snapshots)").fetchall()
+            }
 
-        competition_columns = {
-            row[1]
-            for row in conn.exec_driver_sql("PRAGMA table_info(competitions)").fetchall()
-        }
+            for column_name, column_type in ODDS_SNAPSHOT_METADATA_COLUMNS.items():
+                if column_name not in existing_columns:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE odds_snapshots ADD COLUMN {column_name} {column_type}"
+                    )
+                    added_columns.append(column_name)
 
-        for column_name, column_type in COMPETITION_METADATA_COLUMNS.items():
-            if column_name not in competition_columns:
-                conn.exec_driver_sql(
-                    f"ALTER TABLE competitions ADD COLUMN {column_name} {column_type}"
-                )
+        competitions_exists = conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='competitions'"
+        ).fetchone()
+
+        if competitions_exists:
+            competition_columns = {
+                row[1]
+                for row in conn.exec_driver_sql("PRAGMA table_info(competitions)").fetchall()
+            }
+
+            for column_name, column_type in COMPETITION_METADATA_COLUMNS.items():
+                if column_name not in competition_columns:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE competitions ADD COLUMN {column_name} {column_type}"
+                    )
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_LOGS_SQL)
         conn.exec_driver_sql(CREATE_MONITORED_COMPETITIONS_SQL)
@@ -174,6 +185,19 @@ def run_runtime_migrations() -> dict:
             )
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_RECIPIENTS_SQL)
+
+        notification_recipient_columns = {
+            row[1]
+            for row in conn.exec_driver_sql("PRAGMA table_info(notification_recipients)").fetchall()
+        }
+        if "status" not in notification_recipient_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE notification_recipients ADD COLUMN status VARCHAR NOT NULL DEFAULT 'active'"
+            )
+            conn.exec_driver_sql(
+                "UPDATE notification_recipients SET status = 'disabled' WHERE is_active = 0"
+            )
+
         conn.exec_driver_sql(CREATE_ALERT_SETTINGS_SQL)
         conn.exec_driver_sql(CREATE_SCHEDULER_SETTINGS_SQL)
 

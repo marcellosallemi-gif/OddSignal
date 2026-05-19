@@ -801,10 +801,15 @@ async function loadCompetitions() {
   let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
 
   for (const item of orderedCompetitions) {
-    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
-    const badgeClass = item.is_active ? "badge ok" : "badge";
-    const actionLabel = item.is_active ? "Disattiva" : "Attiva notifiche";
-    const nextState = item.is_active ? "false" : "true";
+    const statusLabels = {
+      pending: "In attesa di attivazione",
+      active: "Attivo",
+      disabled: "Disattivato"
+    };
+    const active = statusLabels[item.status] || "In attesa di attivazione";
+    const badgeClass = item.status === "active" ? "badge ok" : "badge";
+    const actionLabel = item.status === "active" ? "Disattiva" : "Attiva notifiche";
+    const nextState = item.status === "active" ? "false" : "true";
     const nameArg = JSON.stringify(item.name || "");
     const countryArg = JSON.stringify(item.country || "");
     const slugArg = JSON.stringify(item.provider_league_slug || "");
@@ -946,9 +951,10 @@ async function syncTelegramRecipients() {
 async function loadRecipients() {
   const data = await api("/configuration/notification-recipients");
   const telegramRecipients = data.filter((item) => item.channel === "telegram");
-  const activeRecipients = telegramRecipients.filter((item) => item.is_active);
-  const pendingRecipients = telegramRecipients.filter((item) => !item.is_active);
-  const orderedRecipients = pendingRecipients.concat(activeRecipients);
+  const activeRecipients = telegramRecipients.filter((item) => item.status === "active");
+  const pendingRecipients = telegramRecipients.filter((item) => item.status === "pending");
+  const disabledRecipients = telegramRecipients.filter((item) => item.status === "disabled");
+  const orderedRecipients = pendingRecipients.concat(activeRecipients, disabledRecipients);
 
   dashboardState.activeRecipients = activeRecipients.length;
   renderDashboardSummary();
@@ -961,10 +967,15 @@ async function loadRecipients() {
 
   let html = "<div class='table-wrap'><table><thead><tr><th>Account Telegram</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of orderedRecipients) {
-    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
-    const badgeClass = item.is_active ? "badge ok" : "badge";
-    const actionLabel = item.is_active ? "Disattiva" : "Attiva notifiche";
-    const nextState = item.is_active ? "false" : "true";
+    const statusLabels = {
+      pending: "In attesa di attivazione",
+      active: "Attivo",
+      disabled: "Disattivato"
+    };
+    const active = statusLabels[item.status] || "In attesa di attivazione";
+    const badgeClass = item.status === "active" ? "badge ok" : "badge";
+    const actionLabel = item.status === "active" ? "Disattiva" : "Attiva notifiche";
+    const nextState = item.status === "active" ? "false" : "true";
 
     html += `<tr>
       <td><strong>${escapeHtml(item.label || "Telegram")}</strong><br><span class="secondary-text">ID tecnico salvato automaticamente</span></td>
@@ -976,7 +987,7 @@ async function loadRecipients() {
   }
   html += "</tbody></table></div>";
   document.getElementById("recipients-table").innerHTML = html;
-  setFeedback("recipients-feedback", `Account Telegram: ${telegramRecipients.length}. Attivi: ${activeRecipients.length}. In attesa: ${pendingRecipients.length}.`, "success");
+  setFeedback("recipients-feedback", `Account Telegram: ${telegramRecipients.length}. Attivi: ${activeRecipients.length}. In attesa: ${pendingRecipients.length}. Disattivati: ${disabledRecipients.length}.`, "success");
 }
 
 async function toggleRecipient(recipientId, isActive) {

@@ -144,6 +144,7 @@ class NotificationRecipient(Base):
     recipient_value = Column(String, nullable=False)
     label = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
+    status = Column(String, nullable=False, default="pending")
     created_at = Column(DateTime, nullable=False)
 
 

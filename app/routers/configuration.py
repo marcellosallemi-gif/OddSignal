@@ -191,6 +191,7 @@ def toggle_monitored_competition(
         raise HTTPException(status_code=404, detail="Monitored competition not found")
 
     item.is_active = is_active
+    item.status = "active" if is_active else "disabled"
     db.commit()
     db.refresh(item)
 
@@ -253,6 +254,7 @@ def toggle_monitored_market(
         raise HTTPException(status_code=404, detail="Monitored market not found")
 
     item.is_active = is_active
+    item.status = "active" if is_active else "disabled"
     db.commit()
     db.refresh(item)
 
@@ -294,9 +296,18 @@ def create_notification_recipient(
         .first()
     )
 
+    status = payload.status or ("active" if payload.is_active else "pending")
+
+    if status not in {"pending", "active", "disabled"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported recipient status.",
+        )
+
     if existing:
         existing.label = payload.label
         existing.is_active = payload.is_active
+        existing.status = status
         db.commit()
         db.refresh(existing)
         return existing
@@ -306,6 +317,7 @@ def create_notification_recipient(
         recipient_value=payload.recipient_value,
         label=payload.label,
         is_active=payload.is_active,
+        status=status,
         created_at=_utc_now_naive(),
     )
 
@@ -409,6 +421,7 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
                 recipient_value=recipient_value,
                 label=label,
                 is_active=False,
+                status="pending",
                 created_at=_utc_now_naive(),
             )
             db.add(recipient)
@@ -445,6 +458,7 @@ def toggle_notification_recipient(
         raise HTTPException(status_code=404, detail="Notification recipient not found")
 
     item.is_active = is_active
+    item.status = "active" if is_active else "disabled"
     db.commit()
     db.refresh(item)
 

@@ -156,3 +156,13 @@ class AlertSetting(Base):
     critical_percent = Column(Float, nullable=False, default=15.0)
     deduplication_minutes = Column(Integer, nullable=False, default=30)
     created_at = Column(DateTime, nullable=False)
+
+class SchedulerSetting(Base):
+    __tablename__ = "scheduler_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    enabled = Column(Boolean, nullable=False, default=False)
+    poll_interval_seconds = Column(Integer, nullable=False, default=300)
+    event_limit = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, nullable=False)
+

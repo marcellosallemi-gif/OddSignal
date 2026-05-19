@@ -64,6 +64,16 @@ CREATE TABLE IF NOT EXISTS alert_settings (
 )
 """
 
+CREATE_SCHEDULER_SETTINGS_SQL = """
+CREATE TABLE IF NOT EXISTS scheduler_settings (
+    id INTEGER PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT 0,
+    poll_interval_seconds INTEGER NOT NULL DEFAULT 300,
+    event_limit INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL
+)
+"""
+
 CREATE_NOTIFICATION_RECIPIENTS_SQL = """
 CREATE TABLE IF NOT EXISTS notification_recipients (
     id INTEGER PRIMARY KEY,
@@ -165,6 +175,44 @@ def run_runtime_migrations() -> dict:
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_RECIPIENTS_SQL)
         conn.exec_driver_sql(CREATE_ALERT_SETTINGS_SQL)
+        conn.exec_driver_sql(CREATE_SCHEDULER_SETTINGS_SQL)
+
+        existing_scheduler_settings = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM scheduler_settings"
+        ).scalar()
+        if existing_scheduler_settings == 0:
+            scheduler_enabled = 1 if os.getenv("ODDS_SCHEDULER_ENABLED", "0") == "1" else 0
+
+            try:
+                scheduler_interval = int(os.getenv("ODDS_POLL_INTERVAL_SECONDS", "300"))
+            except ValueError:
+                scheduler_interval = 300
+
+            if scheduler_interval < 3:
+                scheduler_interval = 3
+
+            try:
+                scheduler_event_limit = int(os.getenv("ODDS_SCHEDULER_EVENT_LIMIT", "1"))
+            except ValueError:
+                scheduler_event_limit = 1
+
+            if scheduler_event_limit < 1:
+                scheduler_event_limit = 1
+            if scheduler_event_limit > 10:
+                scheduler_event_limit = 10
+
+            conn.exec_driver_sql(
+                """
+                INSERT INTO scheduler_settings (
+                    enabled,
+                    poll_interval_seconds,
+                    event_limit,
+                    created_at
+                )
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (scheduler_enabled, scheduler_interval, scheduler_event_limit),
+            )
 
         existing_alert_settings = conn.exec_driver_sql(
             "SELECT COUNT(*) FROM alert_settings"
@@ -193,6 +241,7 @@ def run_runtime_migrations() -> dict:
         "monitored_markets": "ready",
         "notification_recipients": "ready",
         "alert_settings": "ready",
+        "scheduler_settings": "ready",
     }
 
 

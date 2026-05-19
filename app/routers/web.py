@@ -297,6 +297,29 @@ def web_home():
       </div>
     </div>
     <div id="automation-status" class="info-box">Caricamento automazione...</div>
+    <div class="form-grid">
+      <label>Controllo automatico
+        <select id="scheduler-enabled">
+          <option value="false">Spento</option>
+          <option value="true">Attivo</option>
+        </select>
+      </label>
+      <label>Frequenza controllo
+        <select id="scheduler-poll-interval-seconds">
+          <option value="3">3 secondi - test locale</option>
+          <option value="30">30 secondi</option>
+          <option value="60">1 minuto</option>
+          <option value="300">5 minuti - consigliato</option>
+          <option value="900">15 minuti</option>
+        </select>
+      </label>
+      <label>Eventi per ciclo
+        <input id="scheduler-event-limit" type="number" min="1" max="10" step="1" placeholder="1">
+      </label>
+      <button class="primary" onclick="saveSchedulerSettings()">Salva automazione</button>
+      <button onclick="loadSchedulerSettings()">Ricarica automazione</button>
+    </div>
+    <div id="scheduler-settings-feedback" class="feedback muted">Caricamento automazione...</div>
     <div id="scheduler-status"></div>
     <details>
       <summary>Dettagli tecnici sistema</summary>
@@ -698,6 +721,42 @@ async function loadAlertSettings() {
   }
 }
 
+async function loadSchedulerSettings() {
+  const data = await api("/configuration/scheduler-settings");
+
+  document.getElementById("scheduler-enabled").value = String(data.enabled);
+  document.getElementById("scheduler-poll-interval-seconds").value = String(data.poll_interval_seconds);
+  document.getElementById("scheduler-event-limit").value = data.event_limit;
+  setFeedback("scheduler-settings-feedback", "Impostazioni automazione caricate.", "success");
+
+  await loadStatus();
+}
+
+
+async function saveSchedulerSettings() {
+  const payload = {
+    enabled: document.getElementById("scheduler-enabled").value === "true",
+    poll_interval_seconds: Number(document.getElementById("scheduler-poll-interval-seconds").value),
+    event_limit: Number(document.getElementById("scheduler-event-limit").value)
+  };
+
+  setFeedback("scheduler-settings-feedback", "Salvataggio automazione...", "");
+
+  try {
+    await api("/configuration/scheduler-settings", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    setFeedback("scheduler-settings-feedback", "Automazione salvata. Le nuove impostazioni vengono applicate dal prossimo ciclo scheduler.", "success");
+    await loadSchedulerSettings();
+  } catch (error) {
+    setFeedback("scheduler-settings-feedback", "Automazione non salvata: " + error.message, "error");
+  }
+}
+
+
 async function saveAlertSettings() {
   setFeedback("alert-settings-feedback", "Salvataggio impostazioni alert...", "");
 
@@ -988,6 +1047,7 @@ async function loadNotificationLogs() {
 
 loadStatus();
 loadAlertSettings();
+loadSchedulerSettings();
 loadCompetitions();
 loadMonitoredMarkets();
 loadRecipients();

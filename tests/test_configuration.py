@@ -334,3 +334,54 @@ def test_sync_telegram_recipients_requires_bot_token(monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["detail"]["error"] == "telegram_not_configured"
+
+
+def test_get_scheduler_settings():
+    with TestClient(app) as client:
+        response = client.get("/configuration/scheduler-settings")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "enabled" in data
+    assert "poll_interval_seconds" in data
+    assert "event_limit" in data
+
+
+def test_update_scheduler_settings_allows_local_short_interval(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("APP_DEBUG", "true")
+
+    payload = {
+        "enabled": False,
+        "poll_interval_seconds": 3,
+        "event_limit": 2,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/scheduler-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enabled"] is False
+    assert data["poll_interval_seconds"] == 3
+    assert data["event_limit"] == 2
+
+
+def test_update_scheduler_settings_rejects_invalid_event_limit():
+    payload = {
+        "enabled": True,
+        "poll_interval_seconds": 300,
+        "event_limit": 99,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/scheduler-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 400
+    assert "eventi per ciclo" in response.json()["detail"].lower()

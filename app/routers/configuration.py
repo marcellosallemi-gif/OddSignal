@@ -452,10 +452,14 @@ def toggle_notification_recipient(
     return item
 
 
-from app.schemas import AlertSettingResponse, AlertSettingUpdate
+from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate
 from app.services.alert_settings_service import (
     get_or_create_alert_settings,
     update_alert_settings,
+)
+from app.services.scheduler_settings_service import (
+    get_or_create_scheduler_settings,
+    update_scheduler_settings,
 )
 
 
@@ -479,3 +483,24 @@ def put_alert_settings(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+@router.get("/scheduler-settings", response_model=SchedulerSettingResponse)
+def get_scheduler_settings(db: Session = Depends(get_db)):
+    return get_or_create_scheduler_settings(db)
+
+
+@router.put("/scheduler-settings", response_model=SchedulerSettingResponse)
+def put_scheduler_settings(
+    payload: SchedulerSettingUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_scheduler_settings(
+            db=db,
+            enabled=payload.enabled,
+            poll_interval_seconds=payload.poll_interval_seconds,
+            event_limit=payload.event_limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+

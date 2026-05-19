@@ -105,3 +105,17 @@ class AlertSettingResponse(BaseModel):
     critical_percent: float
     deduplication_minutes: int
     created_at: datetime
+
+class SchedulerSettingUpdate(BaseModel):
+    enabled: bool
+    poll_interval_seconds: int
+    event_limit: int
+
+
+class SchedulerSettingResponse(BaseModel):
+    id: int
+    enabled: bool
+    poll_interval_seconds: int
+    event_limit: int
+    created_at: datetime
+

@@ -19,6 +19,9 @@ def test_web_home_returns_html_page():
     assert "Automazione" in response.text
     assert "Frequenza controllo" in response.text
     assert "Cooldown notifiche" in response.text
+    assert "Salva automazione" in response.text
+    assert "Frequenza controllo" in response.text
+    assert "3 secondi - test locale" in response.text
     assert "Definisce ogni quanto controllare le quote" in response.text
     assert "Dettagli tecnici sistema" in response.text
     assert "Controllo quote manuale" in response.text

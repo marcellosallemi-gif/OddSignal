@@ -604,6 +604,7 @@ from app.services.provider_plan_settings_service import (
     get_active_mapped_competitions_count,
     get_or_create_provider_plan_settings,
     update_provider_plan_settings,
+    validate_scheduler_against_provider_plan,
 )
 
 
@@ -639,6 +640,12 @@ def put_scheduler_settings(
     db: Session = Depends(get_db),
 ):
     try:
+        validate_scheduler_against_provider_plan(
+            db=db,
+            enabled=payload.enabled,
+            poll_interval_seconds=payload.poll_interval_seconds,
+            event_limit=payload.event_limit,
+        )
         return update_scheduler_settings(
             db=db,
             enabled=payload.enabled,

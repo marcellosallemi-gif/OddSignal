@@ -127,3 +127,42 @@ def get_active_mapped_competitions_count(db):
         )
         .count()
     )
+
+
+
+def validate_scheduler_against_provider_plan(
+    db,
+    enabled: bool,
+    poll_interval_seconds: int,
+    event_limit: int,
+):
+    if not enabled:
+        return None
+
+    plan = get_or_create_provider_plan_settings(db)
+
+    if plan.hourly_request_limit is None:
+        return None
+
+    active_mapped_competitions_count = get_active_mapped_competitions_count(db)
+    estimate = estimate_provider_hourly_requests(
+        poll_interval_seconds=poll_interval_seconds,
+        event_limit=event_limit,
+        active_mapped_competitions_count=active_mapped_competitions_count,
+    )
+
+    estimated_requests_per_hour = estimate["estimated_requests_per_hour"]
+
+    if estimated_requests_per_hour <= plan.hourly_request_limit:
+        return None
+
+    raise ValueError(
+        "Configurazione scheduler troppo aggressiva per il piano API {plan_name}: "
+        "stima {estimated} richieste/ora su limite {limit} richieste/ora. "
+        "Aumenta l’intervallo scheduler, riduci eventi per ciclo o riduci campionati attivi."
+        .format(
+            plan_name=plan.plan_name,
+            estimated=estimated_requests_per_hour,
+            limit=plan.hourly_request_limit,
+        )
+    )

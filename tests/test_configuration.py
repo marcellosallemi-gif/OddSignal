@@ -610,3 +610,53 @@ def test_refresh_provider_leagues_upserts_competitions(monkeypatch):
     assert premier["provider_league_slug"] == "england-premier-league"
     assert serie_a["country"] == "Italy"
     assert serie_a["provider_league_slug"] == "italy-serie-a"
+
+
+def test_scheduler_activation_rejects_configuration_above_provider_plan_limit():
+    with TestClient(app) as client:
+        plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Free Test",
+                "hourly_request_limit": 1,
+                "max_bookmakers": 2,
+            },
+        )
+        assert plan_response.status_code == 200
+
+        response = client.put(
+            "/configuration/scheduler-settings",
+            json={
+                "enabled": True,
+                "poll_interval_seconds": 300,
+                "event_limit": 1,
+            },
+        )
+
+    assert response.status_code == 400
+    assert "troppo aggressiva" in response.json()["detail"]
+
+
+def test_scheduler_activation_allows_unlimited_provider_plan():
+    with TestClient(app) as client:
+        plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Illimitato Test",
+                "hourly_request_limit": None,
+                "max_bookmakers": 100,
+            },
+        )
+        assert plan_response.status_code == 200
+
+        response = client.put(
+            "/configuration/scheduler-settings",
+            json={
+                "enabled": True,
+                "poll_interval_seconds": 30,
+                "event_limit": 10,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True

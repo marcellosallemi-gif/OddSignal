@@ -16,27 +16,81 @@ def web_home():
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 24px;
-      background: #f6f7f9;
+      margin: 0;
+      background: #eef2f7;
       color: #1f2937;
     }
     .page {
-      max-width: 1180px;
+      max-width: 1240px;
       margin: 0 auto;
+      padding: 24px;
     }
-    h1, h2 {
+    .hero {
+      background: #111827;
+      color: white;
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      color: #d1d5db;
+      margin: 8px 0 0;
+    }
+    h1, h2, h3 {
       margin-bottom: 8px;
+    }
+    h1 {
+      margin-top: 0;
     }
     section {
       background: white;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 18px;
       margin-bottom: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0 18px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(238, 242, 247, .96);
+      padding: 10px 0;
+    }
+    .nav a {
+      color: #1f2937;
+      text-decoration: none;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    .nav a:hover {
+      border-color: #111827;
+    }
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .section-header h2 {
+      margin: 0 0 4px;
+    }
+    .section-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin-top: 12px;
     }
@@ -57,37 +111,69 @@ def web_home():
       font-size: 20px;
       font-weight: 700;
     }
+    .grid-two {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 700;
+    }
     button {
       cursor: pointer;
       padding: 8px 12px;
       border-radius: 6px;
-      border: 1px solid #888;
+      border: 1px solid #9ca3af;
       background: #fff;
+      color: #111827;
     }
     button.primary {
       background: #1f2937;
       color: white;
       border-color: #1f2937;
     }
+    button.compact {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
     input, select {
       padding: 8px;
-      margin: 4px;
       border-radius: 6px;
       border: 1px solid #bbb;
+      min-width: 0;
+    }
+    .table-wrap {
+      overflow-x: auto;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 12px;
+      background: white;
     }
     th, td {
       border-bottom: 1px solid #eee;
-      padding: 8px;
+      padding: 10px 8px;
       text-align: left;
       font-size: 14px;
     }
     th {
-      background: #f0f2f5;
+      background: #f9fafb;
+      color: #374151;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
     }
     .muted {
       color: #6b7280;
@@ -95,10 +181,11 @@ def web_home():
     }
     .badge {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 999px;
       background: #e5e7eb;
       font-size: 12px;
+      font-weight: 700;
     }
     .ok {
       background: #dcfce7;
@@ -145,26 +232,51 @@ def web_home():
 </head>
 <body>
   <div class="page">
-  <h1>Calcolo Quote - MVP</h1>
-  <p class="muted">Dashboard locale per monitoraggio quote, alert e notifiche.</p>
+  <div class="hero">
+    <h1>Calcolo Quote - MVP</h1>
+    <p>Dashboard locale per configurare monitoraggio quote, alert e notifiche.</p>
+  </div>
 
-  <section>
-    <h2>Riepilogo dashboard</h2>
+  <nav class="nav" aria-label="Navigazione dashboard">
+    <a href="#overview">Panoramica</a>
+    <a href="#competitions">Campionati</a>
+    <a href="#markets">Mercati</a>
+    <a href="#recipients">Destinatari</a>
+    <a href="#alert-settings">Soglie alert</a>
+    <a href="#manual-check">Controllo quote</a>
+    <a href="#recent-alerts">Alert</a>
+    <a href="#notification-logs-section">Log notifiche</a>
+  </nav>
+
+  <section id="overview">
+    <div class="section-header">
+      <div>
+        <h2>Panoramica</h2>
+        <p class="muted">Stato operativo, configurazione attiva e volumi principali.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadStatus()">Aggiorna stato</button>
+      </div>
+    </div>
     <div id="dashboard-summary" class="summary-grid">
       <div class="summary-card"><div class="summary-label">Provider</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Sport</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Scheduler</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Eventi</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Quote</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Alert</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Campionati attivi</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Mercati attivi</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Destinatari attivi</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Alert recenti</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
     </div>
   </section>
 
   <section>
-    <h2>Stato sistema</h2>
-    <button onclick="loadStatus()">Aggiorna stato</button>
+    <div class="section-header">
+      <div>
+        <h2>Stato sistema</h2>
+        <p class="muted">Dettaglio scheduler e configurazione runtime.</p>
+      </div>
+    </div>
     <div id="scheduler-status"></div>
     <details>
       <summary>JSON tecnico sistema</summary>
@@ -172,10 +284,16 @@ def web_home():
     </details>
   </section>
 
-  <section>
-    <h2>Controllo quote manuale</h2>
-    <p class="muted">Esegue subito un controllo quote sui campionati attivi. Utile per testare senza terminale.</p>
-    <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
+  <section id="manual-check">
+    <div class="section-header">
+      <div>
+        <h2>Controllo quote manuale</h2>
+        <p class="muted">Esegue subito un controllo quote sui campionati attivi.</p>
+      </div>
+      <div class="section-actions">
+        <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
+      </div>
+    </div>
     <div id="manual-odds-check-feedback" class="feedback muted">Nessun controllo eseguito.</div>
     <details>
       <summary>Risposta tecnica ultimo controllo</summary>
@@ -183,15 +301,29 @@ def web_home():
     </details>
   </section>
 
-  <section>
-    <h2>Impostazioni alert</h2>
-    <p class="muted">Configura le soglie senza modificare il file .env.</p>
-    <input id="alert-min-percent" type="number" step="0.01" placeholder="Min %">
-    <input id="alert-max-percent" type="number" step="0.01" placeholder="Max %">
-    <input id="alert-critical-percent" type="number" step="0.01" placeholder="Critico %">
-    <input id="alert-deduplication-minutes" type="number" step="1" placeholder="Dedup minuti">
-    <button class="primary" onclick="saveAlertSettings()">Salva impostazioni alert</button>
-    <button onclick="loadAlertSettings()">Ricarica impostazioni</button>
+  <section id="alert-settings">
+    <div class="section-header">
+      <div>
+        <h2>Soglie alert</h2>
+        <p class="muted">Configura le soglie senza modificare il file .env.</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      <label>Min %
+        <input id="alert-min-percent" type="number" step="0.01" placeholder="8">
+      </label>
+      <label>Max %
+        <input id="alert-max-percent" type="number" step="0.01" placeholder="15">
+      </label>
+      <label>Critico %
+        <input id="alert-critical-percent" type="number" step="0.01" placeholder="15">
+      </label>
+      <label>Dedup minuti
+        <input id="alert-deduplication-minutes" type="number" step="1" placeholder="30">
+      </label>
+      <button class="primary" onclick="saveAlertSettings()">Salva soglie</button>
+      <button onclick="loadAlertSettings()">Ricarica</button>
+    </div>
     <div id="alert-settings-feedback" class="feedback muted">Caricamento impostazioni...</div>
     <details>
       <summary>JSON tecnico impostazioni</summary>
@@ -199,46 +331,84 @@ def web_home():
     </details>
   </section>
 
-  <section>
-    <h2>Campionati disponibili</h2>
-    <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
-    <button onclick="loadCompetitions()">Aggiorna campionati</button>
+  <section id="competitions">
+    <div class="section-header">
+      <div>
+        <h2>Campionati monitorati</h2>
+        <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadCompetitions()">Aggiorna campionati</button>
+      </div>
+    </div>
     <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
-    <div id="competitions"></div>
+    <div id="competitions-table"></div>
   </section>
 
-  <section>
-    <h2>Mercati monitorati</h2>
-    <p class="muted">Seleziona i mercati quote da includere nel monitoraggio. I mercati HT e Team Total restano esclusi per sicurezza.</p>
-    <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
+  <section id="markets">
+    <div class="section-header">
+      <div>
+        <h2>Mercati monitorati</h2>
+        <p class="muted">Seleziona i mercati quote da includere. HT e Team Total restano esclusi per sicurezza.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
+      </div>
+    </div>
     <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
     <div id="monitored-markets"></div>
   </section>
 
-  <section>
-    <h2>Destinatari notifiche</h2>
-    <p class="muted">Telegram usa il chat_id. Il telefono viene salvato per integrazioni future SMS/WhatsApp ufficiali.</p>
-    <select id="recipient-channel">
-      <option value="telegram">telegram</option>
-      <option value="phone">phone</option>
-    </select>
-    <input id="recipient-value" placeholder="chat_id Telegram o numero telefono">
-    <input id="recipient-label" placeholder="etichetta">
-    <button class="primary" onclick="saveRecipient()">Salva destinatario</button>
-    <button onclick="loadRecipients()">Aggiorna destinatari</button>
+  <section id="recipients">
+    <div class="section-header">
+      <div>
+        <h2>Destinatari notifiche</h2>
+        <p class="muted">Telegram usa il chat_id. Il telefono viene salvato per integrazioni future ufficiali.</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      <label>Canale
+        <select id="recipient-channel">
+          <option value="telegram">telegram</option>
+          <option value="phone">phone</option>
+        </select>
+      </label>
+      <label>Destinatario
+        <input id="recipient-value" placeholder="chat_id Telegram o numero telefono">
+      </label>
+      <label>Etichetta
+        <input id="recipient-label" placeholder="es. Admin">
+      </label>
+      <button class="primary" onclick="saveRecipient()">Salva destinatario</button>
+      <button onclick="loadRecipients()">Aggiorna destinatari</button>
+    </div>
     <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
-    <div id="recipients"></div>
+    <div id="recipients-table"></div>
   </section>
 
-  <section>
-    <h2>Alert</h2>
-    <button onclick="loadAlerts()">Aggiorna alert</button>
+  <section id="recent-alerts">
+    <div class="section-header">
+      <div>
+        <h2>Alert recenti</h2>
+        <p class="muted">Ultimi movimenti quote salvati come alert.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadAlerts()">Aggiorna alert</button>
+      </div>
+    </div>
     <div id="alerts"></div>
   </section>
 
-  <section>
-    <h2>Log notifiche</h2>
-    <button onclick="loadNotificationLogs()">Aggiorna log</button>
+  <section id="notification-logs-section">
+    <div class="section-header">
+      <div>
+        <h2>Log notifiche recenti</h2>
+        <p class="muted">Esiti recenti degli invii verso destinatari configurati.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadNotificationLogs()">Aggiorna log</button>
+      </div>
+    </div>
     <div id="notification-logs"></div>
   </section>
 
@@ -260,6 +430,13 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+const dashboardState = {
+  system: {},
+  activeCompetitions: "...",
+  activeMarkets: "...",
+  activeRecipients: "..."
+};
+
 function setFeedback(elementId, message, type) {
   const element = document.getElementById(elementId);
   if (!element) {
@@ -280,21 +457,24 @@ function summaryCard(label, value) {
 }
 
 function renderDashboardSummary(data) {
-  const scheduler = data.scheduler || {};
-  const telegram = data.telegram || {};
-  const counts = data.database_counts || {};
+  if (data) {
+    dashboardState.system = data;
+  }
+
+  const system = dashboardState.system || {};
+  const scheduler = system.scheduler || {};
+  const counts = system.database_counts || {};
   const schedulerValue = scheduler.enabled === true ? "Attivo" : "Spento";
-  const telegramValue = telegram.configured === true ? "Configurato" : "Non configurato";
 
   document.getElementById("dashboard-summary").innerHTML = [
-    summaryCard("Provider", data.provider || "n/d"),
-    summaryCard("Sport", data.sport || "n/d"),
+    summaryCard("Provider", system.provider || "n/d"),
+    summaryCard("Sport", system.sport || "n/d"),
     summaryCard("Scheduler status", schedulerValue),
-    summaryCard("Telegram configured", telegramValue),
-    summaryCard("Events count", counts.events ?? 0),
-    summaryCard("Odds snapshots count", counts.odds_snapshots ?? 0),
-    summaryCard("Alerts count", counts.alerts ?? 0),
-    summaryCard("Notification logs count", counts.notification_logs ?? 0)
+    summaryCard("Campionati attivi", dashboardState.activeCompetitions),
+    summaryCard("Mercati attivi", dashboardState.activeMarkets),
+    summaryCard("Destinatari attivi", dashboardState.activeRecipients),
+    summaryCard("Alert recenti", counts.alerts ?? 0),
+    summaryCard("Log notifiche", counts.notification_logs ?? 0)
   ].join("");
 }
 
@@ -388,7 +568,10 @@ async function saveAlertSettings() {
 
 async function loadCompetitions() {
   const data = await api("/configuration/available-competitions");
-  let html = "<table><thead><tr><th>Campionato</th><th>Paese</th><th>Slug provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  dashboardState.activeCompetitions = data.filter((item) => item.is_active).length;
+  renderDashboardSummary();
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Slug provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
@@ -398,13 +581,13 @@ async function loadCompetitions() {
       <td>${escapeHtml(item.provider_league_slug)}</td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
-        <button onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', true)">Attiva</button>
-        <button onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', false)">Disattiva</button>
+        <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', true)">Attiva</button>
+        <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', false)">Disattiva</button>
       </td>
     </tr>`;
   }
-  html += "</tbody></table>";
-  document.getElementById("competitions").innerHTML = html;
+  html += "</tbody></table></div>";
+  document.getElementById("competitions-table").innerHTML = html;
   setFeedback("competitions-feedback", `Campionati caricati: ${data.length}.`, "success");
 }
 
@@ -433,7 +616,10 @@ async function monitorCompetition(name, country, slug, isActive) {
 
 async function loadMonitoredMarkets() {
   const data = await api("/configuration/monitored-markets");
-  let html = "<table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  dashboardState.activeMarkets = data.filter((item) => item.is_active).length;
+  renderDashboardSummary();
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
@@ -441,12 +627,12 @@ async function loadMonitoredMarkets() {
       <td>${escapeHtml(item.market_name)}</td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
-        <button onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
-        <button onclick="toggleMonitoredMarket(${item.id}, false)">Disattiva</button>
+        <button class="compact" onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
+        <button class="compact" onclick="toggleMonitoredMarket(${item.id}, false)">Disattiva</button>
       </td>
     </tr>`;
   }
-  html += "</tbody></table>";
+  html += "</tbody></table></div>";
   document.getElementById("monitored-markets").innerHTML = html;
   setFeedback("markets-feedback", `Mercati caricati: ${data.length}.`, "success");
 }
@@ -503,7 +689,10 @@ async function saveRecipient() {
 
 async function loadRecipients() {
   const data = await api("/configuration/notification-recipients");
-  let html = "<table><thead><tr><th>Canale</th><th>Destinatario</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  dashboardState.activeRecipients = data.filter((item) => item.is_active).length;
+  renderDashboardSummary();
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Canale</th><th>Destinatario</th><th>Etichetta</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
@@ -513,13 +702,13 @@ async function loadRecipients() {
       <td>${escapeHtml(item.label)}</td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
-        <button onclick="toggleRecipient(${item.id}, true)">Attiva</button>
-        <button onclick="toggleRecipient(${item.id}, false)">Disattiva</button>
+        <button class="compact" onclick="toggleRecipient(${item.id}, true)">Attiva</button>
+        <button class="compact" onclick="toggleRecipient(${item.id}, false)">Disattiva</button>
       </td>
     </tr>`;
   }
-  html += "</tbody></table>";
-  document.getElementById("recipients").innerHTML = html;
+  html += "</tbody></table></div>";
+  document.getElementById("recipients-table").innerHTML = html;
   setFeedback("recipients-feedback", `Destinatari caricati: ${data.length}.`, "success");
 }
 
@@ -541,7 +730,12 @@ async function toggleRecipient(recipientId, isActive) {
 
 async function loadAlerts() {
   const data = await api("/alerts?limit=20");
-  let html = "<table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Var.</th><th>Tipo</th></tr></thead><tbody>";
+  if (data.length === 0) {
+    document.getElementById("alerts").innerHTML = "<p class='muted'>Nessun alert recente.</p>";
+    return;
+  }
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Var.</th><th>Tipo</th></tr></thead><tbody>";
   for (const item of data) {
     html += `<tr>
       <td>${escapeHtml(item.event)}</td>
@@ -552,13 +746,18 @@ async function loadAlerts() {
       <td>${escapeHtml(item.alert_type)}</td>
     </tr>`;
   }
-  html += "</tbody></table>";
+  html += "</tbody></table></div>";
   document.getElementById("alerts").innerHTML = html;
 }
 
 async function loadNotificationLogs() {
   const data = await api("/notification-logs?limit=20");
-  let html = "<table><thead><tr><th>Canale</th><th>Stato</th><th>Destinatario</th><th>Errore</th><th>Data</th></tr></thead><tbody>";
+  if (data.length === 0) {
+    document.getElementById("notification-logs").innerHTML = "<p class='muted'>Nessun log notifica recente.</p>";
+    return;
+  }
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Canale</th><th>Stato</th><th>Destinatario</th><th>Errore</th><th>Data</th></tr></thead><tbody>";
   for (const item of data) {
     html += `<tr>
       <td>${escapeHtml(item.channel)}</td>
@@ -568,7 +767,7 @@ async function loadNotificationLogs() {
       <td>${escapeHtml(item.sent_at)}</td>
     </tr>`;
   }
-  html += "</tbody></table>";
+  html += "</tbody></table></div>";
   document.getElementById("notification-logs").innerHTML = html;
 }
 

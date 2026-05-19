@@ -5,25 +5,25 @@
 Provider: Odds-API.io
 Sport: football
 Bookmaker configurati: Stake, Sbobet
-Scheduler: disattivato di default
+Scheduler: configurabile da dashboard/API
 Polling consigliato MVP: 300 secondi
-Eventi per ciclo scheduler: 1
+Eventi per ciclo scheduler: configurabili, default 1
 
 Il sistema usa Odds-API.io solo come fonte dati. Non piazza scommesse, non usa scraping e non interagisce con account bookmaker.
 
 ## UI operativa
 
-La UI minimale è disponibile su:
+La dashboard operativa è disponibile su:
 
 http://127.0.0.1:8001/
 
 Dalla UI puoi:
 
 - vedere stato sistema;
-- vedere stato scheduler;
+- configurare il controllo automatico;
 - selezionare campionati;
 - configurare soglie alert;
-- inserire destinatari Telegram o telefono;
+- rilevare account Telegram tramite bot;
 - attivare/disattivare destinatari;
 - eseguire controllo quote manuale;
 - vedere alert;
@@ -48,7 +48,7 @@ ODDS_SCHEDULER_EVENT_LIMIT=1
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 
-TELEGRAM_CHAT_ID è solo fallback opzionale. I destinatari Telegram reali vengono gestiti da UI/API.
+TELEGRAM_CHAT_ID è solo fallback opzionale. Gli account Telegram reali vengono rilevati dalla dashboard dopo che l’utente ha avviato il bot.
 
 ## Campionati
 
@@ -62,10 +62,10 @@ Se disponibile, provider_league_slug viene usato per interrogare direttamente Od
 
 Monitorati:
 
-- ML
-- Totals
-- Both Teams To Score
-- Spread
+- 1X2 (provider: ML)
+- Over/Under (provider: Totals)
+- Goal/No Goal (provider: Both Teams To Score)
+- Handicap (provider: Spread)
 
 Esclusi:
 
@@ -106,6 +106,21 @@ TELEGRAM_BOT_TOKEN resta in .env.
 
 I destinatari Telegram sono salvati in notification_recipients.
 
+Flusso utente:
+
+1. l’utente apre il bot Telegram;
+2. invia /start o un messaggio;
+3. dalla dashboard clicca “Rileva account Telegram”;
+4. il sistema chiama getUpdates;
+5. salva/aggiorna il destinatario in notification_recipients.
+
+Endpoint:
+
+POST /configuration/telegram-recipients/sync
+
+Il sistema deduplica gli update Telegram per chat_id, quindi lo stesso account non viene ritornato più volte anche se ha scritto più messaggi al bot.
+
+
 Se Telegram non è configurato o non ci sono destinatari attivi, il sistema crea log skipped e non va in errore.
 
 Stati log:
@@ -114,22 +129,42 @@ Stati log:
 - skipped
 - failed
 
-I numeri telefono sono salvati per integrazioni future SMS/WhatsApp ufficiali. L MVP non invia ancora SMS o WhatsApp.
+Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
+
+## Notifiche aggregate
+
+Gli alert creati nello stesso ciclo vengono aggregati in un singolo messaggio Telegram.
+
+Esempio operativo:
+
+5 alert nel ciclo = 1 messaggio Telegram con 5 dettagli.
+
+Questo evita spam e rende il sistema più adatto a uso commerciale.
+
+Nota tecnica: oggi il log aggregato viene collegato al primo alert del gruppo. In futuro può essere introdotto un concetto dedicato di notification batch.
 
 ## Scheduler
 
-Lo scheduler è spento di default:
+Lo scheduler è configurabile da dashboard e API.
 
-ODDS_SCHEDULER_ENABLED=0
+Endpoint:
 
-Per abilitarlo:
+GET /configuration/scheduler-settings
+PUT /configuration/scheduler-settings
 
-ODDS_SCHEDULER_ENABLED=1
+Esempio:
 
-Per piano gratuito o test controllati:
+curl -X PUT "http://127.0.0.1:8001/configuration/scheduler-settings" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled":false,"poll_interval_seconds":30,"event_limit":1}'
 
-ODDS_POLL_INTERVAL_SECONDS=300
-ODDS_SCHEDULER_EVENT_LIMIT=1
+Valori consigliati:
+
+- 3 secondi: solo test locale
+- 30 secondi: test reale controllato
+- 60 secondi: frequente
+- 300 secondi: prudente/consigliato
+- 900 secondi: conservativo
 
 Prima di abilitarlo, testare sempre il controllo manuale dalla UI.
 
@@ -145,11 +180,14 @@ POST /configuration/monitored-competitions
 PATCH /configuration/monitored-competitions/{competition_id}/toggle
 
 GET /configuration/notification-recipients
-POST /configuration/notification-recipients
+POST /configuration/telegram-recipients/sync
 PATCH /configuration/notification-recipients/{recipient_id}/toggle
 
 GET /configuration/alert-settings
 PUT /configuration/alert-settings
+
+GET /configuration/scheduler-settings
+PUT /configuration/scheduler-settings
 
 POST /api/odds-provider/ingest-sample?limit=1
 
@@ -178,7 +216,7 @@ pytest
 
 Stato atteso attuale:
 
-52 passed
+67 passed
 
 ## Note operative
 

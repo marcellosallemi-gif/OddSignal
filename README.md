@@ -2,11 +2,11 @@
 
 Software MVP locale per monitorare quote calcistiche a scopo informativo.
 
-Il sistema usa Odds-API.io, salva storico quote, calcola variazioni, genera alert e consente configurazione da UI web minimale.
+Il sistema acquisisce quote calcio da Odds-API.io, salva storico quote, calcola variazioni percentuali, genera alert e invia notifiche Telegram. La configurazione principale avviene da dashboard web.
 
 Non piazza scommesse, non automatizza betting, non usa scraping aggressivo e non interagisce con account bookmaker.
 
-## Avvio
+## Avvio locale
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -20,10 +20,10 @@ http://127.0.0.1:8001/
 ## Funzioni UI
 
 - stato sistema
-- stato scheduler
+- configurazione controllo automatico
 - selezione campionati
 - configurazione soglie alert
-- destinatari Telegram e telefono
+- rilevamento account Telegram tramite bot
 - attivazione/disattivazione destinatari
 - controllo quote manuale
 - storico alert
@@ -41,7 +41,16 @@ Telegram:
 
 TELEGRAM_BOT_TOKEN=
 
-I destinatari Telegram vengono gestiti dalla UI. TELEGRAM_CHAT_ID resta solo fallback opzionale.
+Flusso Telegram:
+
+1. aprire il bot Telegram configurato;
+2. inviare /start o un messaggio;
+3. dalla dashboard cliccare “Rileva account Telegram”;
+4. il sistema salva internamente l’ID tecnico della chat.
+
+Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
+
+Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avviato il bot. TELEGRAM_CHAT_ID resta solo fallback opzionale.
 
 ## Alert
 
@@ -65,7 +74,7 @@ Default:
 
 ## Campionati
 
-L utente seleziona i campionati da monitorare dalla UI.
+L’utente seleziona i campionati da monitorare dalla dashboard.
 
 L ingestion usa solo i campionati attivi e, se disponibile, interroga Odds-API.io tramite provider_league_slug.
 
@@ -73,15 +82,35 @@ L ingestion usa solo i campionati attivi e, se disponibile, interroga Odds-API.i
 
 Monitorati:
 
-- ML
-- Totals
-- Both Teams To Score
-- Spread
+- 1X2 (provider: ML)
+- Over/Under (provider: Totals)
+- Goal/No Goal (provider: Both Teams To Score)
+- Handicap (provider: Spread)
 
 Esclusi:
 
 - HT
 - Team Total
+
+
+## Scheduler automatico
+
+Lo scheduler è configurabile da dashboard e API.
+
+Endpoint:
+
+GET /configuration/scheduler-settings
+PUT /configuration/scheduler-settings
+
+Valori consigliati:
+
+- 3 secondi: solo test locale
+- 30 secondi: test reale controllato
+- 60 secondi: frequente
+- 300 secondi: consigliato/prudente
+- 900 secondi: conservativo
+
+Per uso commerciale non usare 3 secondi come default: può consumare molte chiamate API e generare rumore.
 
 ## Endpoint principali
 
@@ -92,9 +121,11 @@ GET /configuration/available-competitions
 GET /configuration/monitored-competitions
 POST /configuration/monitored-competitions
 GET /configuration/notification-recipients
-POST /configuration/notification-recipients
+POST /configuration/telegram-recipients/sync
 GET /configuration/alert-settings
 PUT /configuration/alert-settings
+GET /configuration/scheduler-settings
+PUT /configuration/scheduler-settings
 POST /api/odds-provider/ingest-sample?limit=1
 GET /odds
 GET /alerts
@@ -119,12 +150,12 @@ pytest
 
 Stato atteso attuale:
 
-52 passed
+67 passed
 
 ## Note operative
 
 - usare solo fonti dati legittime
 - non committare .env
-- lo scheduler e spento di default
+- lo scheduler è configurabile da dashboard/API
 - testare prima con il pulsante UI Esegui controllo quote ora
 - il bookmaker va scritto Sbobet, non SBOBET

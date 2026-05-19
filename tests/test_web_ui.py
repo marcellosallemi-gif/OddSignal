@@ -16,10 +16,11 @@ def test_web_home_returns_html_page():
     assert "Campionati attivi" in response.text
     assert "Mercati attivi" in response.text
     assert "Destinatari attivi" in response.text
-    assert "Scheduler automatico" in response.text
     assert "Automazione" in response.text
-    assert "Il controllo automatico richiede riavvio" in response.text
-    assert "JSON tecnico sistema" in response.text
+    assert "Frequenza controllo" in response.text
+    assert "Cooldown notifiche" in response.text
+    assert "Definisce ogni quanto controllare le quote" in response.text
+    assert "Dettagli tecnici sistema" in response.text
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
     assert "Soglie alert" in response.text

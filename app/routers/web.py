@@ -293,13 +293,13 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Automazione</h2>
-        <p class="muted">Frequenza controlli automatici e cooldown alert duplicati.</p>
+        <p class="muted">Definisce ogni quanto controllare le quote e come evitare notifiche ripetute.</p>
       </div>
     </div>
     <div id="automation-status" class="info-box">Caricamento automazione...</div>
     <div id="scheduler-status"></div>
     <details>
-      <summary>JSON tecnico sistema</summary>
+      <summary>Dettagli tecnici sistema</summary>
       <pre id="system-status">Caricamento...</pre>
     </details>
   </section>
@@ -570,22 +570,34 @@ function renderAutomationStatus(data) {
   const scheduler = data.scheduler || {};
   const alerts = data.alerts || {};
   const schedulerEnabled = scheduler.enabled === true;
+  const intervalLabel = humanizeSeconds(scheduler.poll_interval_seconds);
+  const eventLimit = scheduler.event_limit ?? "n/d";
+  const cooldownMinutes = alerts.deduplication_minutes ?? "n/d";
 
   document.getElementById("automation-status").innerHTML = `
-    <p>
-      <strong>Scheduler automatico:</strong>
-      <span class="${schedulerEnabled ? "badge ok" : "badge warn"}">
-        ${schedulerEnabled ? "Attivo" : "Spento"}
-      </span>
-    </p>
-    <p class="muted">
-      Frequenza controllo: ${escapeHtml(humanizeSeconds(scheduler.poll_interval_seconds))} |
-      Eventi per ciclo: ${escapeHtml(scheduler.event_limit)} |
-      Cooldown alert duplicati: ${escapeHtml(alerts.deduplication_minutes)} minuti
-    </p>
-    <p class="muted">
-      Il controllo automatico richiede riavvio se configurato da .env.
-    </p>
+    <div class="summary-grid">
+      ${summaryCard("Controllo automatico", schedulerEnabled ? "Attivo" : "Spento")}
+      ${summaryCard("Frequenza controllo", intervalLabel)}
+      ${summaryCard("Eventi per ciclo", eventLimit)}
+      ${summaryCard("Cooldown notifiche", `${cooldownMinutes} min`)}
+    </div>
+  `;
+
+  document.getElementById("scheduler-status").innerHTML = `
+    <div class="info-box">
+      <strong>Come funziona</strong>
+      <p class="muted">
+        Il sistema confronta le nuove quote con lo storico salvato. Genera alert solo quando la variazione rientra nelle soglie configurate.
+      </p>
+      <p class="muted">
+        Il cooldown evita notifiche ripetute per lo stesso evento, mercato, selezione e bookmaker entro ${escapeHtml(cooldownMinutes)} minuti.
+      </p>
+      <p class="muted">
+        ${schedulerEnabled
+          ? `Il controllo automatico è attivo e verifica fino a ${escapeHtml(eventLimit)} evento/i ogni ${escapeHtml(intervalLabel)}.`
+          : "Il controllo automatico è spento. Puoi usare il controllo manuale oppure abilitarlo nella configurazione server e riavviare l'app."}
+      </p>
+    </div>
   `;
 }
 
@@ -595,27 +607,6 @@ async function loadStatus() {
   renderDashboardSummary(data);
   renderAutomationStatus(data);
 
-  const scheduler = data.scheduler || {};
-  const schedulerEnabled = scheduler.enabled === true;
-  const schedulerHtml = `
-    <p>
-      <strong>Scheduler automatico:</strong>
-      <span class="${schedulerEnabled ? "badge ok" : "badge warn"}">
-        ${schedulerEnabled ? "Attivo" : "Spento"}
-      </span>
-    </p>
-    <p class="muted">
-      Intervallo polling: ${escapeHtml(scheduler.poll_interval_seconds)} secondi |
-      Eventi per ciclo: ${escapeHtml(scheduler.event_limit)}
-    </p>
-    <p class="muted">
-      ${schedulerEnabled
-        ? "Il sistema può eseguire controlli automatici secondo la configurazione."
-        : "Lo scheduler è spento: usa il controllo quote manuale oppure abilitalo da .env e riavvia il server."}
-    </p>
-  `;
-
-  document.getElementById("scheduler-status").innerHTML = schedulerHtml;
   document.getElementById("system-status").textContent = JSON.stringify(data, null, 2);
 }
 

@@ -518,13 +518,29 @@ function humanizeSeconds(seconds) {
 }
 
 function readableMarketName(marketName) {
-  const labels = {
-    "ML": "1X2",
-    "Totals": "Over/Under",
-    "Both Teams To Score": "Goal/No Goal",
-    "Spread": "Handicap"
-  };
-  return labels[marketName] || marketName;
+  if (!marketName) {
+    return "Mercato non specificato";
+  }
+
+  if (marketName === "ML") {
+    return "1X2";
+  }
+
+  if (marketName.startsWith("Totals")) {
+    const suffix = marketName.replace("Totals", "").trim();
+    return "Over/Under" + (suffix ? ` ${suffix}` : "");
+  }
+
+  if (marketName.startsWith("Both Teams To Score")) {
+    return "Goal/No Goal";
+  }
+
+  if (marketName.startsWith("Spread")) {
+    const suffix = marketName.replace("Spread", "").trim();
+    return "Handicap" + (suffix ? ` ${suffix}` : "");
+  }
+
+  return marketName;
 }
 
 function renderDashboardSummary(data) {
@@ -865,7 +881,7 @@ async function loadAlerts() {
     html += `<tr>
       <td>${escapeHtml(item.event)}</td>
       <td>${escapeHtml(item.bookmaker)}</td>
-      <td>${escapeHtml(item.market)}</td>
+      <td>${escapeHtml(readableMarketName(item.market))}</td>
       <td>${escapeHtml(item.selection)}</td>
       <td>${escapeHtml(item.variation_percent)}%</td>
       <td>${escapeHtml(item.alert_type)}</td>

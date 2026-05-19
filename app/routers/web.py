@@ -354,8 +354,8 @@ def web_home():
   <section id="competitions">
     <div class="section-header">
       <div>
-        <h2>Campionati</h2>
-        <p class="muted">Campionati rilevati dagli eventi disponibili ora. La lista dipende dalla disponibilità del provider e dagli eventi correnti.</p>
+        <h2>Campionati da monitorare</h2>
+        <p class="muted">Scegli i campionati su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
       </div>
       <div class="section-actions">
         <button class="primary" onclick="refreshProviderCompetitions()">Aggiorna campionati dal provider</button>
@@ -363,9 +363,10 @@ def web_home():
       </div>
     </div>
     <div class="info-box">
-      <strong>Campionati attivi</strong>
-      <p class="muted">Solo i campionati attivati vengono usati per il monitoraggio. Lo slug provider resta un dettaglio tecnico secondario.</p>
+      <strong>Come usare questa sezione</strong>
+      <p class="muted">Attiva solo i campionati che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
     </div>
+    <div id="competitions-summary" class="summary-grid"></div>
     <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
     <div id="competitions-table"></div>
   </section>
@@ -679,27 +680,49 @@ async function saveAlertSettings() {
 
 async function loadCompetitions() {
   const data = await api("/configuration/available-competitions");
-  dashboardState.activeCompetitions = data.filter((item) => item.is_active).length;
+  const activeCompetitions = data.filter((item) => item.is_active);
+  const inactiveCompetitions = data.filter((item) => !item.is_active);
+  const orderedCompetitions = activeCompetitions.concat(inactiveCompetitions);
+
+  dashboardState.activeCompetitions = activeCompetitions.length;
   renderDashboardSummary();
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Dettaglio provider</th><th>Azione</th></tr></thead><tbody>";
-  for (const item of data) {
+  document.getElementById("competitions-summary").innerHTML = [
+    summaryCard("Campionati attivi", activeCompetitions.length),
+    summaryCard("Campionati disponibili", data.length),
+    summaryCard("Non attivi", inactiveCompetitions.length)
+  ].join("");
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+
+  for (const item of orderedCompetitions) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
+    const actionLabel = item.is_active ? "Disattiva" : "Attiva";
+    const nextState = item.is_active ? "false" : "true";
+    const nameArg = JSON.stringify(item.name || "");
+    const countryArg = JSON.stringify(item.country || "");
+    const slugArg = JSON.stringify(item.provider_league_slug || "");
+    const providerDetail = item.provider_league_slug
+      ? `<details><summary>Dettaglio provider</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
+      : `<span class="secondary-text">Provider non disponibile</span>`;
+
     html += `<tr>
-      <td>${escapeHtml(item.name)}</td>
-      <td>${escapeHtml(item.country)}</td>
-      <td><span class="${badgeClass}">${active}</span></td>
-      <td><span class="secondary-text">${escapeHtml(item.provider_league_slug || "non disponibile")}</span></td>
       <td>
-        <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', true)">Attiva</button>
-        <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', false)">Disattiva</button>
+        <strong>${escapeHtml(item.name)}</strong><br>
+        ${providerDetail}
+      </td>
+      <td>${escapeHtml(item.country || "n/d")}</td>
+      <td><span class="${badgeClass}">${active}</span></td>
+      <td>
+        <button class="compact ${item.is_active ? "" : "primary"}" onclick='monitorCompetition(${nameArg}, ${countryArg}, ${slugArg}, ${nextState})'>${actionLabel}</button>
       </td>
     </tr>`;
   }
+
   html += "</tbody></table></div>";
   document.getElementById("competitions-table").innerHTML = html;
-  setFeedback("competitions-feedback", `Campionati caricati: ${data.length}.`, "success");
+  setFeedback("competitions-feedback", `Campionati disponibili: ${data.length}. Attivi: ${activeCompetitions.length}.`, "success");
 }
 
 async function monitorCompetition(name, country, slug, isActive) {

@@ -20,6 +20,9 @@ curl "http://127.0.0.1:8001/system/status"
 
 1. Stato operativo.
 2. Campionati da monitorare.
+   - verificare quali campionati sono mappati;
+   - per i campionati non mappati usare “Salva mapping” solo con slug provider valido;
+   - attivare solo campionati realmente monitorabili.
 3. Mercati MVP.
 4. Notifiche Telegram.
 5. Alert recenti.

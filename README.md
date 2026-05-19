@@ -74,6 +74,21 @@ Default:
 - critical_percent = 15
 - deduplication_minutes = 30
 
+## Mapping manuale campionati
+
+I campionati senza `provider_league_slug` risultano non monitorabili perché il software non può interrogare il provider in modo mirato.
+
+Dalla dashboard, nella sezione “Campionati da monitorare”, è possibile inserire manualmente lo slug provider e cliccare “Salva mapping”.
+
+Dopo il salvataggio:
+
+- il campionato diventa monitorabile;
+- può essere attivato/disattivato dalla dashboard;
+- viene incluso nei controlli quote se attivo;
+- la stima del Piano API viene aggiornata.
+
+Non inserire slug inventati: usare solo slug validi recuperati da Odds-API.io o da documentazione/provider.
+
 ## Campionati
 
 L’utente seleziona i campionati da monitorare dalla dashboard.

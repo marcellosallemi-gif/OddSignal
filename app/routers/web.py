@@ -20,6 +20,10 @@ def web_home():
       background: #f6f7f9;
       color: #1f2937;
     }
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
     h1, h2 {
       margin-bottom: 8px;
     }
@@ -29,6 +33,29 @@ def web_home():
       border-radius: 10px;
       padding: 16px;
       margin-bottom: 18px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .summary-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f9fafb;
+    }
+    .summary-label {
+      color: #6b7280;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .summary-value {
+      margin-top: 6px;
+      font-size: 20px;
+      font-weight: 700;
     }
     button {
       cursor: pointer;
@@ -79,6 +106,33 @@ def web_home():
     .warn {
       background: #fef3c7;
     }
+    .feedback {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+    .feedback.success {
+      background: #ecfdf5;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+    .feedback.error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    details {
+      margin-top: 12px;
+    }
+    summary {
+      cursor: pointer;
+      color: #374151;
+      font-size: 14px;
+      font-weight: 700;
+    }
     pre {
       white-space: pre-wrap;
       background: #111827;
@@ -90,21 +144,43 @@ def web_home():
   </style>
 </head>
 <body>
+  <div class="page">
   <h1>Calcolo Quote - MVP</h1>
-  <p class="muted">Interfaccia minima per configurare campionati, destinatari e controllare alert.</p>
+  <p class="muted">Dashboard locale per monitoraggio quote, alert e notifiche.</p>
+
+  <section>
+    <h2>Riepilogo dashboard</h2>
+    <div id="dashboard-summary" class="summary-grid">
+      <div class="summary-card"><div class="summary-label">Provider</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Sport</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Scheduler</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Eventi</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Quote</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Alert</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
+    </div>
+  </section>
 
   <section>
     <h2>Stato sistema</h2>
     <button onclick="loadStatus()">Aggiorna stato</button>
     <div id="scheduler-status"></div>
-    <pre id="system-status">Caricamento...</pre>
+    <details>
+      <summary>JSON tecnico sistema</summary>
+      <pre id="system-status">Caricamento...</pre>
+    </details>
   </section>
 
   <section>
     <h2>Controllo quote manuale</h2>
     <p class="muted">Esegue subito un controllo quote sui campionati attivi. Utile per testare senza terminale.</p>
     <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
-    <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
+    <div id="manual-odds-check-feedback" class="feedback muted">Nessun controllo eseguito.</div>
+    <details>
+      <summary>Risposta tecnica ultimo controllo</summary>
+      <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
+    </details>
   </section>
 
   <section>
@@ -116,13 +192,18 @@ def web_home():
     <input id="alert-deduplication-minutes" type="number" step="1" placeholder="Dedup minuti">
     <button class="primary" onclick="saveAlertSettings()">Salva impostazioni alert</button>
     <button onclick="loadAlertSettings()">Ricarica impostazioni</button>
-    <pre id="alert-settings-result">Caricamento...</pre>
+    <div id="alert-settings-feedback" class="feedback muted">Caricamento impostazioni...</div>
+    <details>
+      <summary>JSON tecnico impostazioni</summary>
+      <pre id="alert-settings-result">Caricamento...</pre>
+    </details>
   </section>
 
   <section>
     <h2>Campionati disponibili</h2>
     <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
     <button onclick="loadCompetitions()">Aggiorna campionati</button>
+    <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
     <div id="competitions"></div>
   </section>
 
@@ -137,6 +218,7 @@ def web_home():
     <input id="recipient-label" placeholder="etichetta">
     <button class="primary" onclick="saveRecipient()">Salva destinatario</button>
     <button onclick="loadRecipients()">Aggiorna destinatari</button>
+    <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
     <div id="recipients"></div>
   </section>
 
@@ -170,8 +252,48 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function setFeedback(elementId, message, type) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return;
+  }
+
+  element.className = "feedback" + (type ? " " + type : " muted");
+  element.textContent = message;
+}
+
+function summaryCard(label, value) {
+  return `
+    <div class="summary-card">
+      <div class="summary-label">${escapeHtml(label)}</div>
+      <div class="summary-value">${escapeHtml(value)}</div>
+    </div>
+  `;
+}
+
+function renderDashboardSummary(data) {
+  const scheduler = data.scheduler || {};
+  const telegram = data.telegram || {};
+  const counts = data.database_counts || {};
+  const schedulerValue = scheduler.enabled === true ? "Attivo" : "Spento";
+  const telegramValue = telegram.configured === true ? "Configurato" : "Non configurato";
+
+  document.getElementById("dashboard-summary").innerHTML = [
+    summaryCard("Provider", data.provider || "n/d"),
+    summaryCard("Sport", data.sport || "n/d"),
+    summaryCard("Scheduler status", schedulerValue),
+    summaryCard("Telegram configured", telegramValue),
+    summaryCard("Events count", counts.events ?? 0),
+    summaryCard("Odds snapshots count", counts.odds_snapshots ?? 0),
+    summaryCard("Alerts count", counts.alerts ?? 0),
+    summaryCard("Notification logs count", counts.notification_logs ?? 0)
+  ].join("");
+}
+
 async function loadStatus() {
   const data = await api("/system/status");
+
+  renderDashboardSummary(data);
 
   const scheduler = data.scheduler || {};
   const schedulerEnabled = scheduler.enabled === true;
@@ -199,6 +321,7 @@ async function loadStatus() {
 
 async function runManualOddsCheck() {
   const resultBox = document.getElementById("manual-odds-check-result");
+  setFeedback("manual-odds-check-feedback", "Controllo quote in corso...", "");
   resultBox.textContent = "Controllo in corso...";
 
   try {
@@ -207,12 +330,14 @@ async function runManualOddsCheck() {
     });
 
     resultBox.textContent = JSON.stringify(data, null, 2);
+    setFeedback("manual-odds-check-feedback", "Controllo quote completato. Dashboard aggiornata.", "success");
 
     await loadStatus();
     await loadAlerts();
     await loadNotificationLogs();
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
+    setFeedback("manual-odds-check-feedback", "Controllo quote non completato: " + error.message, "error");
   }
 }
 
@@ -224,9 +349,12 @@ async function loadAlertSettings() {
   document.getElementById("alert-critical-percent").value = data.critical_percent;
   document.getElementById("alert-deduplication-minutes").value = data.deduplication_minutes;
   document.getElementById("alert-settings-result").textContent = JSON.stringify(data, null, 2);
+  setFeedback("alert-settings-feedback", "Impostazioni alert caricate.", "success");
 }
 
 async function saveAlertSettings() {
+  setFeedback("alert-settings-feedback", "Salvataggio impostazioni alert...", "");
+
   const payload = {
     min_percent: Number(document.getElementById("alert-min-percent").value),
     max_percent: Number(document.getElementById("alert-max-percent").value),
@@ -242,9 +370,11 @@ async function saveAlertSettings() {
     });
 
     document.getElementById("alert-settings-result").textContent = JSON.stringify(data, null, 2);
+    setFeedback("alert-settings-feedback", "Impostazioni alert salvate.", "success");
     await loadStatus();
   } catch (error) {
     document.getElementById("alert-settings-result").textContent = "Errore impostazioni alert: " + error.message;
+    setFeedback("alert-settings-feedback", "Impostazioni alert non salvate: " + error.message, "error");
   }
 }
 
@@ -267,22 +397,30 @@ async function loadCompetitions() {
   }
   html += "</tbody></table>";
   document.getElementById("competitions").innerHTML = html;
+  setFeedback("competitions-feedback", `Campionati caricati: ${data.length}.`, "success");
 }
 
 async function monitorCompetition(name, country, slug, isActive) {
-  await api("/configuration/monitored-competitions", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      competition_name: name,
-      country: country || null,
-      provider: "odds_api_io",
-      provider_league_slug: slug || null,
-      is_active: isActive
-    })
-  });
-  await loadCompetitions();
-  await loadStatus();
+  setFeedback("competitions-feedback", `${isActive ? "Attivazione" : "Disattivazione"} campionato in corso...`, "");
+
+  try {
+    await api("/configuration/monitored-competitions", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        competition_name: name,
+        country: country || null,
+        provider: "odds_api_io",
+        provider_league_slug: slug || null,
+        is_active: isActive
+      })
+    });
+    await loadCompetitions();
+    setFeedback("competitions-feedback", `Campionato ${isActive ? "attivato" : "disattivato"}: ${name}.`, "success");
+    await loadStatus();
+  } catch (error) {
+    setFeedback("competitions-feedback", "Operazione campionato non completata: " + error.message, "error");
+  }
 }
 
 async function saveRecipient() {
@@ -291,24 +429,32 @@ async function saveRecipient() {
   const label = document.getElementById("recipient-label").value.trim();
 
   if (!value) {
-    alert("Inserisci un destinatario.");
+    setFeedback("recipients-feedback", "Inserisci un destinatario.", "error");
     return;
   }
 
-  await api("/configuration/notification-recipients", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      channel: channel,
-      recipient_value: value,
-      label: label || null,
-      is_active: true
-    })
-  });
+  setFeedback("recipients-feedback", "Salvataggio destinatario...", "");
 
-  document.getElementById("recipient-value").value = "";
-  document.getElementById("recipient-label").value = "";
-  await loadRecipients();
+  try {
+    await api("/configuration/notification-recipients", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        channel: channel,
+        recipient_value: value,
+        label: label || null,
+        is_active: true
+      })
+    });
+
+    document.getElementById("recipient-value").value = "";
+    document.getElementById("recipient-label").value = "";
+    await loadRecipients();
+    setFeedback("recipients-feedback", "Destinatario salvato.", "success");
+    await loadStatus();
+  } catch (error) {
+    setFeedback("recipients-feedback", "Destinatario non salvato: " + error.message, "error");
+  }
 }
 
 async function loadRecipients() {
@@ -330,15 +476,23 @@ async function loadRecipients() {
   }
   html += "</tbody></table>";
   document.getElementById("recipients").innerHTML = html;
+  setFeedback("recipients-feedback", `Destinatari caricati: ${data.length}.`, "success");
 }
 
 async function toggleRecipient(recipientId, isActive) {
-  await api(`/configuration/notification-recipients/${recipientId}/toggle?is_active=${isActive}`, {
-    method: "PATCH"
-  });
+  setFeedback("recipients-feedback", `${isActive ? "Attivazione" : "Disattivazione"} destinatario in corso...`, "");
 
-  await loadRecipients();
-  await loadStatus();
+  try {
+    await api(`/configuration/notification-recipients/${recipientId}/toggle?is_active=${isActive}`, {
+      method: "PATCH"
+    });
+
+    await loadRecipients();
+    setFeedback("recipients-feedback", `Destinatario ${isActive ? "attivato" : "disattivato"}.`, "success");
+    await loadStatus();
+  } catch (error) {
+    setFeedback("recipients-feedback", "Operazione destinatario non completata: " + error.message, "error");
+  }
 }
 
 async function loadAlerts() {
@@ -381,6 +535,7 @@ loadRecipients();
 loadAlerts();
 loadNotificationLogs();
 </script>
+  </div>
 </body>
 </html>
 """

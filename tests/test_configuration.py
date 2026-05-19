@@ -553,3 +553,60 @@ def test_update_competition_provider_mapping_rejects_empty_slug():
 
     assert response.status_code == 400
     assert "slug" in response.json()["detail"].lower()
+
+
+class FakeProviderLeaguesRefresh:
+    sport = "football"
+
+    def get_leagues(self):
+        return [
+            {
+                "name": "England - Premier League",
+                "slug": "england-premier-league",
+                "eventsCount": 12,
+            },
+            {
+                "name": "Italy - Serie A",
+                "slug": "italy-serie-a",
+                "eventsCount": 8,
+            },
+        ]
+
+
+def test_refresh_provider_leagues_upserts_competitions(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setattr(
+        configuration,
+        "OddsApiIoProvider",
+        lambda: FakeProviderLeaguesRefresh(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/provider-leagues/refresh")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["leagues_received"] == 2
+    assert data["leagues_upserted"] == 2
+
+    with TestClient(app) as client:
+        available_response = client.get("/configuration/available-competitions")
+
+    available = available_response.json()
+    premier = [
+        item
+        for item in available
+        if item["name"] == "England - Premier League"
+    ][0]
+    serie_a = [
+        item
+        for item in available
+        if item["name"] == "Italy - Serie A"
+    ][0]
+
+    assert premier["country"] == "England"
+    assert premier["provider_league_slug"] == "england-premier-league"
+    assert serie_a["country"] == "Italy"
+    assert serie_a["provider_league_slug"] == "italy-serie-a"

@@ -106,6 +106,86 @@ def update_competition_provider_mapping(
     }
 
 
+def _country_from_league_name(name: str):
+    if not name:
+        return "Unknown"
+
+    if " - " in name:
+        return name.split(" - ", 1)[0].strip() or "Unknown"
+
+    return "Unknown"
+
+
+@router.post("/provider-leagues/refresh")
+def refresh_provider_leagues(db: Session = Depends(get_db)):
+    try:
+        provider = OddsApiIoProvider()
+        provider_leagues = provider.get_leagues()
+    except RuntimeError as exc:
+        status_code, detail = classify_provider_error(exc)
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+    leagues_upserted = 0
+    monitored_updated = 0
+    leagues = []
+
+    for league in provider_leagues:
+        league_name = league.get("name")
+        league_slug = league.get("slug")
+
+        if not league_name or not league_slug:
+            continue
+
+        country = _country_from_league_name(league_name)
+
+        competition = db.query(Competition).filter(Competition.name == league_name).first()
+
+        if competition:
+            competition.provider_league_slug = league_slug
+            if competition.country in {None, "", "Unknown"}:
+                competition.country = country
+        else:
+            competition = Competition(
+                name=league_name,
+                country=country,
+                provider_league_slug=league_slug,
+            )
+            db.add(competition)
+
+        monitored = (
+            db.query(MonitoredCompetition)
+            .filter(MonitoredCompetition.competition_name == league_name)
+            .first()
+        )
+
+        if monitored:
+            monitored.provider_league_slug = league_slug
+            if not monitored.country or monitored.country == "Unknown":
+                monitored.country = country
+            monitored_updated += 1
+
+        leagues_upserted += 1
+        leagues.append(
+            {
+                "name": league_name,
+                "country": country,
+                "provider_league_slug": league_slug,
+                "events_count": league.get("eventsCount"),
+            }
+        )
+
+    db.commit()
+
+    return {
+        "provider": "odds_api_io",
+        "sport": "football",
+        "leagues_received": len(provider_leagues),
+        "leagues_upserted": leagues_upserted,
+        "monitored_updated": monitored_updated,
+        "leagues": leagues,
+    }
+
+
 @router.post("/provider-competitions/refresh")
 def refresh_provider_competitions(
     limit: int = 10,

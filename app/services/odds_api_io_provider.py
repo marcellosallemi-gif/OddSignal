@@ -143,6 +143,14 @@ class OddsApiIoProvider:
         )
         return "{}/odds/multi?{}".format(self.base_url, query)
 
+    def get_leagues(self):
+        return self._get(
+            "/leagues",
+            params={
+                "sport": self.sport,
+            },
+        )
+
     def get_events(
         self,
         limit: Optional[int] = None,

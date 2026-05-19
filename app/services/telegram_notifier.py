@@ -59,6 +59,73 @@ def build_alert_message(alert: Alert) -> str:
     )
 
 
+def _alert_event_label(alert: Alert) -> str:
+    event = alert.event
+    home_team = event.home_team.name if event and event.home_team else "Unknown home"
+    away_team = event.away_team.name if event and event.away_team else "Unknown away"
+    return f"{home_team} vs {away_team}"
+
+
+def _alert_competition_label(alert: Alert) -> str:
+    event = alert.event
+    return event.competition.name if event and event.competition else "Unknown competition"
+
+
+def build_alerts_summary_message(alerts: List[Alert], max_items: int = 50) -> str:
+    if not alerts:
+        return "Nessun alert quote calcio rilevato."
+
+    critical_count = len([alert for alert in alerts if alert.alert_type == "critical_alert"])
+    standard_count = len([alert for alert in alerts if alert.alert_type == "standard_alert"])
+
+    lines = [
+        f"Alert quote calcio: {len(alerts)} movimenti validi rilevati",
+        "",
+        f"Critici: {critical_count}",
+        f"Standard: {standard_count}",
+        "",
+        "Dettaglio alert:",
+    ]
+
+    sorted_alerts = sorted(
+        alerts,
+        key=lambda alert: abs(alert.variation_percent or 0),
+        reverse=True,
+    )
+
+    for index, alert in enumerate(sorted_alerts[:max_items], start=1):
+        severity_label = " CRITICO" if alert.alert_type == "critical_alert" else ""
+        direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
+        competition = _alert_competition_label(alert)
+        event_label = _alert_event_label(alert)
+
+        lines.extend(
+            [
+                "",
+                f"{index}. {competition}",
+                f"Evento: {event_label}",
+                f"Tipo: {alert.alert_type}{severity_label}",
+                f"Bookmaker: {alert.bookmaker}",
+                f"Mercato: {alert.market}",
+                f"Selezione: {alert.selection}",
+                f"Variazione: {alert.variation_percent}% ({direction_label})",
+                f"Quota precedente: {alert.previous_odds}",
+                f"Quota attuale: {alert.current_odds}",
+            ]
+        )
+
+    remaining = len(alerts) - max_items
+    if remaining > 0:
+        lines.extend(
+            [
+                "",
+                f"Altri {remaining} alert non inclusi per limite messaggio.",
+            ]
+        )
+
+    return "\n".join(lines)
+
+
 def save_notification_log(
     db,
     alert: Alert,
@@ -199,5 +266,73 @@ def send_telegram_alert(db, alert: Alert):
         "logs_created": len(results),
         "sent": len([item for item in results if item["status"] == "sent"]),
         "failed": len([item for item in results if item["status"] == "failed"]),
+        "results": results,
+    }
+
+
+def send_telegram_alert_summary(db, alerts: List[Alert]):
+    if not alerts:
+        return {
+            "status": "skipped",
+            "channel": "telegram",
+            "logs_created": 0,
+            "reason": "No alerts to notify.",
+        }
+
+    message = build_alerts_summary_message(alerts)
+    log_alert = alerts[0]
+
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        save_notification_log(
+            db=db,
+            alert=log_alert,
+            status="skipped",
+            recipient=None,
+            message=message,
+            error_message="Telegram bot token is not configured.",
+        )
+        return {
+            "status": "skipped",
+            "channel": "telegram",
+            "logs_created": 1,
+            "reason": "Telegram bot token is not configured.",
+        }
+
+    recipients = get_active_telegram_recipients(db)
+    if not recipients:
+        save_notification_log(
+            db=db,
+            alert=log_alert,
+            status="skipped",
+            recipient=None,
+            message=message,
+            error_message="No active Telegram recipients configured.",
+        )
+        return {
+            "status": "skipped",
+            "channel": "telegram",
+            "logs_created": 1,
+            "reason": "No active Telegram recipients configured.",
+        }
+
+    results = [
+        _send_single_telegram_message(
+            db=db,
+            alert=log_alert,
+            bot_token=bot_token,
+            recipient=recipient,
+            message=message,
+        )
+        for recipient in recipients
+    ]
+
+    return {
+        "status": "completed",
+        "channel": "telegram",
+        "logs_created": len(results),
+        "sent": len([item for item in results if item["status"] == "sent"]),
+        "failed": len([item for item in results if item["status"] == "failed"]),
+        "alerts_included": len(alerts),
         "results": results,
     }

@@ -165,3 +165,62 @@ def test_send_telegram_alert_skips_when_no_active_recipients(monkeypatch, tmp_pa
         assert "No active Telegram recipients configured" in log.error_message
     finally:
         db.close()
+
+
+def test_build_alerts_summary_message_contains_all_alerts(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        first_alert = create_alert(db)
+
+        second_alert = Alert(
+            event_id=first_alert.event_id,
+            provider="odds_api_io",
+            bookmaker="Sbobet",
+            market="ML",
+            selection="away",
+            previous_odds=7.40,
+            current_odds=6.30,
+            variation_percent=-14.86,
+            direction="decrease",
+            alert_type="standard_alert",
+            created_at=datetime.utcnow(),
+        )
+
+        third_alert = Alert(
+            event_id=first_alert.event_id,
+            provider="odds_api_io",
+            bookmaker="Stake",
+            market="ML",
+            selection="away",
+            previous_odds=8.60,
+            current_odds=7.20,
+            variation_percent=-16.28,
+            direction="decrease",
+            alert_type="critical_alert",
+            created_at=datetime.utcnow(),
+        )
+
+        db.add_all([second_alert, third_alert])
+        db.commit()
+        db.refresh(first_alert)
+        db.refresh(second_alert)
+        db.refresh(third_alert)
+
+        from app.services.telegram_notifier import build_alerts_summary_message
+
+        message = build_alerts_summary_message(
+            [first_alert, second_alert, third_alert]
+        )
+
+        assert "3 movimenti validi rilevati" in message
+        assert "Critici: 1" in message
+        assert "Standard: 2" in message
+        assert "Stake" in message
+        assert "Sbobet" in message
+        assert "-16.28%" in message
+        assert "-14.86%" in message
+        assert "11.11%" in message
+        assert "Apri la dashboard" not in message
+    finally:
+        db.close()

@@ -15,7 +15,7 @@ from app.models import (
 from app.services.alert_engine import evaluate_alert
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.odds_api_io_provider import OddsApiIoProvider
-from app.services.telegram_notifier import send_telegram_alert
+from app.services.telegram_notifier import send_telegram_alert_summary
 from app.services.variation_engine import calculate_variation
 
 
@@ -260,6 +260,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     created_alerts = 0
     skipped_duplicate_alerts = 0
     notification_logs_created = 0
+    created_alert_records = []
 
     captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -335,10 +336,16 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
                 db.add(alert)
                 db.flush()
 
-                send_telegram_alert(db=db, alert=alert)
+                created_alert_records.append(alert)
 
                 created_alerts += 1
-                notification_logs_created += 1
+
+    if created_alert_records:
+        notification_result = send_telegram_alert_summary(
+            db=db,
+            alerts=created_alert_records,
+        )
+        notification_logs_created += notification_result.get("logs_created", 0)
 
     db.commit()
 

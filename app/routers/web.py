@@ -448,9 +448,16 @@ def web_home():
         <p class="muted">Storico completo degli alert. Gli aumenti restano nello storico, ma non vengono notificati via Telegram.</p>
       </div>
       <div class="section-actions">
+        <select id="alerts-filter" onchange="renderAlertsTable()">
+          <option value="all">Tutti</option>
+          <option value="notifiable">Solo cali notificabili</option>
+          <option value="increases">Aumenti non notificati</option>
+          <option value="critical">Critici</option>
+        </select>
         <button onclick="loadAlerts()">Aggiorna alert</button>
       </div>
     </div>
+    <div id="alerts-filter-feedback" class="feedback muted">Gli alert Telegram vengono inviati solo sui cali quota.</div>
     <div id="alerts"></div>
   </section>
 
@@ -1008,16 +1015,38 @@ async function toggleRecipient(recipientId, isActive) {
 
 async function loadAlerts() {
   const data = await api("/alerts?limit=20");
-  if (data.length === 0) {
-    document.getElementById("alerts").innerHTML = "<p class='muted'>Nessun alert recente.</p>";
+  dashboardState.recentAlerts = data;
+  renderAlertsTable();
+}
+
+
+function renderAlertsTable() {
+  const filterElement = document.getElementById("alerts-filter");
+  const filter = filterElement ? filterElement.value : "all";
+  const data = dashboardState.recentAlerts || [];
+
+  let filtered = data;
+  if (filter === "notifiable") {
+    filtered = data.filter((item) => item.direction === "decrease");
+  } else if (filter === "increases") {
+    filtered = data.filter((item) => item.direction === "increase");
+  } else if (filter === "critical") {
+    filtered = data.filter((item) => item.alert_type === "critical_alert");
+  }
+
+  if (filtered.length === 0) {
+    document.getElementById("alerts").innerHTML = "<p class='muted'>Nessun alert per il filtro selezionato.</p>";
+    setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "");
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Variazione</th><th>Tipo</th><th>Data</th></tr></thead><tbody>";
-  for (const item of data) {
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Variazione</th><th>Notifica</th><th>Tipo</th><th>Data</th></tr></thead><tbody>";
+  for (const item of filtered) {
     const variation = `${item.variation_percent}%`;
     const alertLabel = readableAlertType(item.alert_type);
     const alertBadgeClass = alertTypeBadgeClass(item.alert_type);
+    const notificationLabel = item.direction === "decrease" ? "Telegram" : "Solo storico";
+    const notificationBadgeClass = item.direction === "decrease" ? "badge ok" : "badge";
 
     html += `<tr>
       <td><strong>${escapeHtml(item.event)}</strong></td>
@@ -1025,12 +1054,14 @@ async function loadAlerts() {
       <td>${escapeHtml(readableMarketName(item.market))}</td>
       <td>${escapeHtml(item.selection)}</td>
       <td><strong>${escapeHtml(variation)}</strong></td>
+      <td><span class="${notificationBadgeClass}">${escapeHtml(notificationLabel)}</span></td>
       <td><span class="${alertBadgeClass}">${escapeHtml(alertLabel)}</span></td>
       <td><span class="secondary-text">${escapeHtml(formatDateTime(item.created_at))}</span></td>
     </tr>`;
   }
   html += "</tbody></table></div>";
   document.getElementById("alerts").innerHTML = html;
+  setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "success");
 }
 
 async function loadNotificationLogs() {

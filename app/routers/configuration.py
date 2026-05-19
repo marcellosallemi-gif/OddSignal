@@ -58,17 +58,27 @@ def refresh_provider_competitions(
     safe_limit = max(1, min(limit, 50))
 
     try:
-        sample = OddsApiIoProvider().get_sample(limit=safe_limit, league_slugs=None)
-    except Exception as exc:
+        provider = OddsApiIoProvider()
+        first_bookmaker = provider.bookmakers.split(",")[0].strip()
+        provider_events = provider.get_events(
+            limit=safe_limit,
+            bookmaker=first_bookmaker,
+        )
+        events = [provider.normalize_event(event) for event in provider_events]
+    except RuntimeError as exc:
         raise HTTPException(
             status_code=502,
-            detail="Provider competition refresh failed: {}".format(
-                exc.__class__.__name__
-            ),
-        )
+            detail={
+                "error": "provider_error",
+                "message": (
+                    "Impossibile aggiornare i campionati dal provider. "
+                    "Verifica configurazione Odds-API.io e disponibilita eventi."
+                ),
+            },
+        ) from exc
 
     competitions_by_name = {}
-    for event in sample.get("events", []):
+    for event in events:
         league_name = event.get("league_name")
         if not league_name:
             continue
@@ -104,8 +114,8 @@ def refresh_provider_competitions(
     db.commit()
 
     return {
-        "provider": sample.get("provider"),
-        "events_received": sample.get("events_count", 0),
+        "provider": "odds_api_io",
+        "events_received": len(events),
         "competitions_found": len(competitions),
         "competitions_upserted": competitions_upserted,
         "competitions": competitions,

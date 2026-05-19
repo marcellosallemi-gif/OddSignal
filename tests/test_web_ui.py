@@ -11,21 +11,25 @@ def test_web_home_returns_html_page():
     assert "text/html" in response.headers["content-type"]
     assert "Calcolo Quote - MVP" in response.text
     assert "Navigazione dashboard" in response.text
-    assert "Panoramica" in response.text
+    assert "Stato operativo" in response.text
     assert "dashboard-summary" in response.text
     assert "Campionati attivi" in response.text
     assert "Mercati attivi" in response.text
     assert "Destinatari attivi" in response.text
     assert "Scheduler automatico" in response.text
+    assert "Automazione" in response.text
+    assert "Il controllo automatico richiede riavvio" in response.text
     assert "JSON tecnico sistema" in response.text
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
     assert "Soglie alert" in response.text
     assert "Salva soglie" in response.text
-    assert "Campionati monitorati" in response.text
+    assert "Campionati" in response.text
+    assert "Campionati rilevati dagli eventi disponibili ora" in response.text
     assert "Aggiorna campionati dal provider" in response.text
     assert "refreshProviderCompetitions" in response.text
-    assert "Mercati monitorati" in response.text
+    assert "Mercati MVP supportati" in response.text
+    assert "Mercati futuri / da integrare" in response.text
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
     assert "Destinatari notifiche" in response.text

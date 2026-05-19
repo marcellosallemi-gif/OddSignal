@@ -85,7 +85,7 @@ class OddsApiIoProvider:
         except httpx.TimeoutException as exc:
             raise RuntimeError("Odds-API.io timeout while calling {}".format(path)) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError("Odds-API.io request error while calling {}: {}".format(path, exc)) from exc
+            raise RuntimeError("Odds-API.io request error while calling {}".format(path)) from exc
 
         if response.status_code == 401:
             raise RuntimeError("Odds-API.io API key is invalid or unauthorized.")

@@ -45,4 +45,13 @@ def ingest_provider_sample(
     try:
         return ingest_odds_sample(db=db, limit=limit)
     except RuntimeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "provider_error",
+                "message": (
+                    "Controllo quote non completato. Verifica provider, "
+                    "campionati attivi e disponibilita eventi."
+                ),
+            },
+        ) from exc

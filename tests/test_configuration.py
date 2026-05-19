@@ -6,21 +6,37 @@ from app.main import app
 
 
 class FakeProviderCompetitionRefresh:
-    def get_sample(self, limit=10, league_slugs=None):
+    bookmakers = "Stake,Sbobet"
+
+    def get_events(self, limit=10, bookmaker=None):
+        return [
+            {
+                "league": {
+                    "name": "Provider Test League",
+                    "slug": "provider-test-league",
+                },
+            },
+            {
+                "league": {
+                    "name": "Provider Test League",
+                    "slug": "provider-test-league",
+                },
+            },
+        ]
+
+    def normalize_event(self, event):
+        league = event["league"]
         return {
-            "provider": "odds_api_io",
-            "events_count": 2,
-            "events": [
-                {
-                    "league_name": "Provider Test League",
-                    "league_slug": "provider-test-league",
-                },
-                {
-                    "league_name": "Provider Test League",
-                    "league_slug": "provider-test-league",
-                },
-            ],
+            "league_name": league["name"],
+            "league_slug": league["slug"],
         }
+
+
+class FailingProviderCompetitionRefresh:
+    bookmakers = "Stake,Sbobet"
+
+    def get_events(self, limit=10, bookmaker=None):
+        raise RuntimeError("League not found")
 
 
 def test_configuration_available_competitions_returns_list():
@@ -89,6 +105,23 @@ def test_refresh_provider_competitions_upserts_available_competition(monkeypatch
         if item["name"] == "Provider Test League"
     ][0]
     assert refreshed_competition["provider_league_slug"] == "provider-test-league"
+
+
+def test_refresh_provider_competitions_returns_502_on_provider_error(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setattr(
+        configuration,
+        "OddsApiIoProvider",
+        lambda: FailingProviderCompetitionRefresh(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/provider-competitions/refresh?limit=10")
+
+    assert response.status_code == 502
+    assert response.json()["detail"]["error"] == "provider_error"
+    assert "Impossibile aggiornare" in response.json()["detail"]["message"]
 
 
 def test_get_monitored_markets_returns_list():

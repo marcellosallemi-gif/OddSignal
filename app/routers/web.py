@@ -211,6 +211,26 @@ def web_home():
       border-color: #fecaca;
       color: #991b1b;
     }
+    .info-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .secondary-text {
+      color: #6b7280;
+      font-size: 12px;
+    }
+    .market-name {
+      font-weight: 700;
+    }
+    .future-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
     details {
       margin-top: 12px;
     }
@@ -241,9 +261,8 @@ def web_home():
     <a href="#overview">Panoramica</a>
     <a href="#competitions">Campionati</a>
     <a href="#markets">Mercati</a>
+    <a href="#automation">Automazione</a>
     <a href="#recipients">Destinatari</a>
-    <a href="#alert-settings">Soglie alert</a>
-    <a href="#manual-check">Controllo quote</a>
     <a href="#recent-alerts">Alert</a>
     <a href="#notification-logs-section">Log notifiche</a>
   </nav>
@@ -251,8 +270,8 @@ def web_home():
   <section id="overview">
     <div class="section-header">
       <div>
-        <h2>Panoramica</h2>
-        <p class="muted">Stato operativo, configurazione attiva e volumi principali.</p>
+        <h2>Stato operativo</h2>
+        <p class="muted">Panoramica immediata di configurazione, automazione e attività recente.</p>
       </div>
       <div class="section-actions">
         <button onclick="loadStatus()">Aggiorna stato</button>
@@ -270,13 +289,14 @@ def web_home():
     </div>
   </section>
 
-  <section>
+  <section id="automation">
     <div class="section-header">
       <div>
-        <h2>Stato sistema</h2>
-        <p class="muted">Dettaglio scheduler e configurazione runtime.</p>
+        <h2>Automazione</h2>
+        <p class="muted">Frequenza controlli automatici e cooldown alert duplicati.</p>
       </div>
     </div>
+    <div id="automation-status" class="info-box">Caricamento automazione...</div>
     <div id="scheduler-status"></div>
     <details>
       <summary>JSON tecnico sistema</summary>
@@ -304,8 +324,8 @@ def web_home():
   <section id="alert-settings">
     <div class="section-header">
       <div>
-        <h2>Soglie alert</h2>
-        <p class="muted">Configura le soglie senza modificare il file .env.</p>
+        <h2>Soglie alert e cooldown</h2>
+        <p class="muted">Configura quando generare alert e per quanto tempo evitare duplicati.</p>
       </div>
     </div>
     <div class="form-grid">
@@ -334,13 +354,17 @@ def web_home():
   <section id="competitions">
     <div class="section-header">
       <div>
-        <h2>Campionati monitorati</h2>
-        <p class="muted">Attiva solo i campionati per cui vuoi ricevere alert.</p>
+        <h2>Campionati</h2>
+        <p class="muted">Campionati rilevati dagli eventi disponibili ora. La lista dipende dalla disponibilità del provider e dagli eventi correnti.</p>
       </div>
       <div class="section-actions">
         <button class="primary" onclick="refreshProviderCompetitions()">Aggiorna campionati dal provider</button>
         <button onclick="loadCompetitions()">Aggiorna campionati</button>
       </div>
+    </div>
+    <div class="info-box">
+      <strong>Campionati attivi</strong>
+      <p class="muted">Solo i campionati attivati vengono usati per il monitoraggio. Lo slug provider resta un dettaglio tecnico secondario.</p>
     </div>
     <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
     <div id="competitions-table"></div>
@@ -349,11 +373,24 @@ def web_home():
   <section id="markets">
     <div class="section-header">
       <div>
-        <h2>Mercati monitorati</h2>
-        <p class="muted">Seleziona i mercati quote da includere. HT e Team Total restano esclusi per sicurezza.</p>
+        <h2>Mercati</h2>
+        <p class="muted">Seleziona i mercati MVP supportati da monitorare.</p>
       </div>
       <div class="section-actions">
         <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>Mercati MVP supportati</strong>
+      <p class="muted">1X2, Over/Under, Goal/No Goal e Handicap sono collegati ai mercati provider normalizzati.</p>
+      <strong>Mercati futuri / da integrare</strong>
+      <div class="future-list">
+        <span class="badge">Doppia chance</span>
+        <span class="badge">Risultato esatto</span>
+        <span class="badge">Primo tempo/finale</span>
+        <span class="badge">Corner</span>
+        <span class="badge">Cartellini</span>
+        <span class="badge">Marcatori</span>
       </div>
     </div>
     <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
@@ -418,7 +455,18 @@ async function api(path, options) {
   const response = await fetch(path, options || {});
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(response.status + " " + text);
+    let message = text;
+    try {
+      const payload = JSON.parse(text);
+      if (typeof payload.detail === "string") {
+        message = payload.detail;
+      } else if (payload.detail && payload.detail.message) {
+        message = payload.detail.message;
+      }
+    } catch (error) {
+      message = text;
+    }
+    throw new Error(response.status + " " + message);
   }
   return response.json();
 }
@@ -435,7 +483,8 @@ const dashboardState = {
   system: {},
   activeCompetitions: "...",
   activeMarkets: "...",
-  activeRecipients: "..."
+  activeRecipients: "...",
+  lastManualCheck: "Nessuno"
 };
 
 function setFeedback(elementId, message, type) {
@@ -457,6 +506,27 @@ function summaryCard(label, value) {
   `;
 }
 
+function humanizeSeconds(seconds) {
+  const value = Number(seconds || 0);
+  if (value >= 3600) {
+    return `${Math.round(value / 3600)} ore`;
+  }
+  if (value >= 60) {
+    return `${Math.round(value / 60)} minuti`;
+  }
+  return `${value} secondi`;
+}
+
+function readableMarketName(marketName) {
+  const labels = {
+    "ML": "1X2",
+    "Totals": "Over/Under",
+    "Both Teams To Score": "Goal/No Goal",
+    "Spread": "Handicap"
+  };
+  return labels[marketName] || marketName;
+}
+
 function renderDashboardSummary(data) {
   if (data) {
     dashboardState.system = data;
@@ -474,15 +544,40 @@ function renderDashboardSummary(data) {
     summaryCard("Campionati attivi", dashboardState.activeCompetitions),
     summaryCard("Mercati attivi", dashboardState.activeMarkets),
     summaryCard("Destinatari attivi", dashboardState.activeRecipients),
+    summaryCard("Ultimo controllo", dashboardState.lastManualCheck),
     summaryCard("Alert recenti", counts.alerts ?? 0),
     summaryCard("Log notifiche", counts.notification_logs ?? 0)
   ].join("");
+}
+
+function renderAutomationStatus(data) {
+  const scheduler = data.scheduler || {};
+  const alerts = data.alerts || {};
+  const schedulerEnabled = scheduler.enabled === true;
+
+  document.getElementById("automation-status").innerHTML = `
+    <p>
+      <strong>Scheduler automatico:</strong>
+      <span class="${schedulerEnabled ? "badge ok" : "badge warn"}">
+        ${schedulerEnabled ? "Attivo" : "Spento"}
+      </span>
+    </p>
+    <p class="muted">
+      Frequenza controllo: ${escapeHtml(humanizeSeconds(scheduler.poll_interval_seconds))} |
+      Eventi per ciclo: ${escapeHtml(scheduler.event_limit)} |
+      Cooldown alert duplicati: ${escapeHtml(alerts.deduplication_minutes)} minuti
+    </p>
+    <p class="muted">
+      Il controllo automatico richiede riavvio se configurato da .env.
+    </p>
+  `;
 }
 
 async function loadStatus() {
   const data = await api("/system/status");
 
   renderDashboardSummary(data);
+  renderAutomationStatus(data);
 
   const scheduler = data.scheduler || {};
   const schedulerEnabled = scheduler.enabled === true;
@@ -519,6 +614,8 @@ async function runManualOddsCheck() {
     });
 
     resultBox.textContent = JSON.stringify(data, null, 2);
+    dashboardState.lastManualCheck = "OK";
+    renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote completato. Dashboard aggiornata.", "success");
 
     await loadStatus();
@@ -526,7 +623,9 @@ async function runManualOddsCheck() {
     await loadNotificationLogs();
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
-    setFeedback("manual-odds-check-feedback", "Controllo quote non completato: " + error.message, "error");
+    dashboardState.lastManualCheck = "Errore";
+    renderDashboardSummary();
+    setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + error.message, "error");
   }
 }
 
@@ -539,6 +638,10 @@ async function loadAlertSettings() {
   document.getElementById("alert-deduplication-minutes").value = data.deduplication_minutes;
   document.getElementById("alert-settings-result").textContent = JSON.stringify(data, null, 2);
   setFeedback("alert-settings-feedback", "Impostazioni alert caricate.", "success");
+  if (dashboardState.system.alerts) {
+    dashboardState.system.alerts.deduplication_minutes = data.deduplication_minutes;
+    renderAutomationStatus(dashboardState.system);
+  }
 }
 
 async function saveAlertSettings() {
@@ -572,15 +675,15 @@ async function loadCompetitions() {
   dashboardState.activeCompetitions = data.filter((item) => item.is_active).length;
   renderDashboardSummary();
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Slug provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Dettaglio provider</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
     html += `<tr>
       <td>${escapeHtml(item.name)}</td>
       <td>${escapeHtml(item.country)}</td>
-      <td>${escapeHtml(item.provider_league_slug)}</td>
       <td><span class="${badgeClass}">${active}</span></td>
+      <td><span class="secondary-text">${escapeHtml(item.provider_league_slug || "non disponibile")}</span></td>
       <td>
         <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', true)">Attiva</button>
         <button class="compact" onclick="monitorCompetition('${escapeHtml(item.name)}','${escapeHtml(item.country)}','${escapeHtml(item.provider_league_slug)}', false)">Disattiva</button>
@@ -627,11 +730,11 @@ async function refreshProviderCompetitions() {
     await loadStatus();
     setFeedback(
       "competitions-feedback",
-      `Provider aggiornato: ${data.competitions_found} campionati trovati da ${data.events_received} eventi.`,
+      `Campionati rilevati dagli eventi disponibili ora: ${data.competitions_found} da ${data.events_received} eventi.`,
       "success"
     );
   } catch (error) {
-    setFeedback("competitions-feedback", "Aggiornamento provider non completato: " + error.message, "error");
+    setFeedback("competitions-feedback", "Aggiornamento campionati non completato. " + error.message, "error");
   }
 }
 
@@ -640,12 +743,13 @@ async function loadMonitoredMarkets() {
   dashboardState.activeMarkets = data.filter((item) => item.is_active).length;
   renderDashboardSummary();
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Nome provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "Non attivo";
     const badgeClass = item.is_active ? "badge ok" : "badge";
     html += `<tr>
-      <td>${escapeHtml(item.market_name)}</td>
+      <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
+      <td><span class="secondary-text">${escapeHtml(item.market_name)}</span></td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
         <button class="compact" onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>

@@ -23,8 +23,12 @@ def _parse_datetime(value: str) -> datetime:
     if not value:
         return datetime.now(timezone.utc).replace(tzinfo=None)
 
-    clean_value = value.replace("Z", "+00:00")
-    parsed = datetime.fromisoformat(clean_value)
+    clean_value = str(value).replace("Z", "+00:00")
+
+    try:
+        parsed = datetime.fromisoformat(clean_value)
+    except ValueError:
+        return datetime.now(timezone.utc).replace(tzinfo=None)
 
     if parsed.tzinfo is not None:
         parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)

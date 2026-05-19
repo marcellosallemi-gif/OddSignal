@@ -315,3 +315,11 @@ def test_ingestion_ignores_unmonitored_competitions(monkeypatch, tmp_path):
         assert db.query(OddsSnapshot).count() == 0
     finally:
         db.close()
+
+
+def test_parse_datetime_handles_provider_fractional_timezone_format():
+    from app.services.odds_ingestion_service import _parse_datetime
+
+    parsed = _parse_datetime("2026-05-19T09:35:23.33+00:00")
+
+    assert parsed is not None

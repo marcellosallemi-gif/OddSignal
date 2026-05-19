@@ -294,7 +294,7 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Automazione</h2>
-        <p class="muted">Definisce ogni quanto controllare le quote e come evitare notifiche ripetute.</p>
+        <p class="muted">Definisce ogni quanto controllare le quote. Se la stima supera il Piano API, lo scheduler non può essere attivato.</p>
       </div>
     </div>
     <div id="automation-status" class="info-box">Caricamento automazione...</div>
@@ -332,7 +332,7 @@ def web_home():
     <div class="section-header">
       <div>
         <h2>Piano API provider</h2>
-        <p class="muted">Configura i limiti del piano Odds-API.io e verifica se scheduler, campionati ed eventi sono sostenibili.</p>
+        <p class="muted">Configura i limiti del piano Odds-API.io. Se la configurazione stimata supera il limite, l’attivazione dello scheduler viene bloccata.</p>
       </div>
       <div class="section-actions">
         <button onclick="loadProviderPlanSettings()">Ricarica piano API</button>

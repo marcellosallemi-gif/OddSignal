@@ -444,3 +444,57 @@ def test_sync_telegram_recipients_preserves_existing_active_recipient(monkeypatc
     assert data["synced_count"] == 1
     assert data["recipients"][0]["is_active"] is True
     assert data["recipients"][0]["label"] == "Mario Rossi (@mariorossi)"
+
+
+def test_get_provider_plan_settings_returns_usage_estimate():
+    with TestClient(app) as client:
+        response = client.get("/configuration/provider-plan-settings")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["plan_name"]
+    assert data["max_bookmakers"] >= 1
+    assert data["usage_estimate"]["poll_interval_seconds"] >= 1
+    assert data["usage_estimate"]["event_limit"] >= 1
+    assert "estimated_requests_per_hour" in data["usage_estimate"]
+    assert "recommendation" in data["usage_estimate"]
+
+
+def test_update_provider_plan_settings_allows_unlimited_plan():
+    payload = {
+        "plan_name": "Unlimited",
+        "hourly_request_limit": None,
+        "max_bookmakers": 10,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/provider-plan-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["plan_name"] == "Unlimited"
+    assert data["hourly_request_limit"] is None
+    assert data["max_bookmakers"] == 10
+    assert data["usage_estimate"]["exceeds_hourly_limit"] is False
+
+
+def test_update_provider_plan_settings_rejects_invalid_bookmaker_limit():
+    payload = {
+        "plan_name": "Invalid",
+        "hourly_request_limit": 100,
+        "max_bookmakers": 0,
+    }
+
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/provider-plan-settings",
+            json=payload,
+        )
+
+    assert response.status_code == 400
+    assert "bookmaker" in response.json()["detail"].lower()

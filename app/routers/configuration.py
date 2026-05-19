@@ -457,7 +457,7 @@ def toggle_notification_recipient(
     return item
 
 
-from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate
+from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate, ProviderPlanSettingResponse, ProviderPlanSettingUpdate
 from app.services.alert_settings_service import (
     get_or_create_alert_settings,
     update_alert_settings,
@@ -465,6 +465,12 @@ from app.services.alert_settings_service import (
 from app.services.scheduler_settings_service import (
     get_or_create_scheduler_settings,
     update_scheduler_settings,
+)
+from app.services.provider_plan_settings_service import (
+    estimate_provider_hourly_requests,
+    get_active_mapped_competitions_count,
+    get_or_create_provider_plan_settings,
+    update_provider_plan_settings,
 )
 
 
@@ -508,3 +514,84 @@ def put_scheduler_settings(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+
+def _provider_plan_recommendation(
+    hourly_request_limit,
+    estimated_requests_per_hour,
+):
+    if hourly_request_limit is None:
+        return "Piano illimitato configurato: nessun blocco interno richieste/ora."
+
+    if estimated_requests_per_hour <= hourly_request_limit:
+        return "Configurazione compatibile con il limite richieste/ora impostato."
+
+    return (
+        "Configurazione troppo aggressiva per il limite richieste/ora impostato. "
+        "Aumenta l’intervallo scheduler, riduci eventi per ciclo o riduci campionati attivi."
+    )
+
+
+def _provider_plan_response(db):
+    plan = get_or_create_provider_plan_settings(db)
+    scheduler = get_or_create_scheduler_settings(db)
+    active_mapped_competitions_count = get_active_mapped_competitions_count(db)
+
+    estimate = estimate_provider_hourly_requests(
+        poll_interval_seconds=scheduler.poll_interval_seconds,
+        event_limit=scheduler.event_limit,
+        active_mapped_competitions_count=active_mapped_competitions_count,
+    )
+
+    estimated_requests_per_hour = estimate["estimated_requests_per_hour"]
+    exceeds_hourly_limit = (
+        False
+        if plan.hourly_request_limit is None
+        else estimated_requests_per_hour > plan.hourly_request_limit
+    )
+
+    return {
+        "id": plan.id,
+        "plan_name": plan.plan_name,
+        "hourly_request_limit": plan.hourly_request_limit,
+        "max_bookmakers": plan.max_bookmakers,
+        "created_at": plan.created_at,
+        "usage_estimate": {
+            "active_mapped_competitions_count": active_mapped_competitions_count,
+            "poll_interval_seconds": scheduler.poll_interval_seconds,
+            "event_limit": scheduler.event_limit,
+            "cycles_per_hour": estimate["cycles_per_hour"],
+            "estimated_requests_per_cycle": estimate["estimated_requests_per_cycle"],
+            "estimated_requests_per_hour": estimated_requests_per_hour,
+            "hourly_request_limit": plan.hourly_request_limit,
+            "exceeds_hourly_limit": exceeds_hourly_limit,
+            "recommendation": _provider_plan_recommendation(
+                hourly_request_limit=plan.hourly_request_limit,
+                estimated_requests_per_hour=estimated_requests_per_hour,
+            ),
+        },
+    }
+
+
+@router.get("/provider-plan-settings", response_model=ProviderPlanSettingResponse)
+def get_provider_plan_settings(db: Session = Depends(get_db)):
+    return _provider_plan_response(db)
+
+
+@router.put("/provider-plan-settings", response_model=ProviderPlanSettingResponse)
+def put_provider_plan_settings(
+    payload: ProviderPlanSettingUpdate,
+    db: Session = Depends(get_db),
+):
+    try:
+        update_provider_plan_settings(
+            db=db,
+            plan_name=payload.plan_name,
+            hourly_request_limit=payload.hourly_request_limit,
+            max_bookmakers=payload.max_bookmakers,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return _provider_plan_response(db)

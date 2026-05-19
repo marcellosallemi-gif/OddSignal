@@ -166,3 +166,13 @@ class SchedulerSetting(Base):
     poll_interval_seconds = Column(Integer, nullable=False, default=300)
     event_limit = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False)
+
+
+class ProviderPlanSetting(Base):
+    __tablename__ = "provider_plan_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_name = Column(String, nullable=False, default="Free")
+    hourly_request_limit = Column(Integer, nullable=True, default=100)
+    max_bookmakers = Column(Integer, nullable=False, default=2)
+    created_at = Column(DateTime, nullable=False)

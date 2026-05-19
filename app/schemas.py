@@ -120,3 +120,31 @@ class SchedulerSettingResponse(BaseModel):
     poll_interval_seconds: int
     event_limit: int
     created_at: datetime
+
+
+
+class ProviderPlanSettingUpdate(BaseModel):
+    plan_name: str
+    hourly_request_limit: Optional[int] = None
+    max_bookmakers: int
+
+
+class ProviderPlanUsageEstimate(BaseModel):
+    active_mapped_competitions_count: int
+    poll_interval_seconds: int
+    event_limit: int
+    cycles_per_hour: float
+    estimated_requests_per_cycle: int
+    estimated_requests_per_hour: float
+    hourly_request_limit: Optional[int] = None
+    exceeds_hourly_limit: bool
+    recommendation: str
+
+
+class ProviderPlanSettingResponse(BaseModel):
+    id: int
+    plan_name: str
+    hourly_request_limit: Optional[int] = None
+    max_bookmakers: int
+    created_at: datetime
+    usage_estimate: Optional[ProviderPlanUsageEstimate] = None

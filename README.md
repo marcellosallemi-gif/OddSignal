@@ -133,6 +133,8 @@ Il software calcola una stima prudenziale delle richieste orarie usando:
 
 La stima serve per capire se la configurazione è compatibile con il piano API impostato.
 
+Se lo scheduler viene attivato con una configurazione stimata sopra il limite richieste/ora del Piano API, il backend blocca il salvataggio e restituisce errore. Con piano Illimitato il blocco interno richieste/ora non viene applicato.
+
 Esempio prudente per piano Free:
 
 - 1 campionato mappato attivo;

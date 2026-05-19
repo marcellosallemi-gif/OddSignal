@@ -35,7 +35,8 @@ curl "http://127.0.0.1:8001/system/status"
 7. Piano API provider.
    - verificare preset attivo: Free, 5000/h, Illimitato o Custom;
    - controllare la stima richieste/ora;
-   - verificare che la configurazione non superi il limite impostato.
+   - verificare che la configurazione non superi il limite impostato;
+   - se la stima supera il limite, lo scheduler non può essere attivato.
 8. Automazione scheduler.
 
 ## Regole demo

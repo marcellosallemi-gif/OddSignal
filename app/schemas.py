@@ -45,6 +45,12 @@ class AlertResponse(BaseModel):
     created_at: datetime
 
 
+class CompetitionProviderMappingUpdate(BaseModel):
+    competition_name: str
+    provider_league_slug: str
+    country: Optional[str] = None
+
+
 class MonitoredCompetitionCreate(BaseModel):
     competition_name: str
     country: Optional[str] = None

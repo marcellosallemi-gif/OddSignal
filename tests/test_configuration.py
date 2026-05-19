@@ -498,3 +498,58 @@ def test_update_provider_plan_settings_rejects_invalid_bookmaker_limit():
 
     assert response.status_code == 400
     assert "bookmaker" in response.json()["detail"].lower()
+
+
+def test_update_competition_provider_mapping_updates_existing_competition():
+    competition_name = "Manual Mapping League " + uuid4().hex
+    provider_slug = "manual-mapping-league-" + uuid4().hex
+
+    with TestClient(app) as client:
+        create_response = client.post(
+            "/configuration/monitored-competitions",
+            json={
+                "competition_name": competition_name,
+                "country": "Unknown",
+                "provider": "odds_api_io",
+                "provider_league_slug": None,
+                "is_active": False,
+            },
+        )
+        assert create_response.status_code == 200
+
+        response = client.put(
+            "/configuration/competitions/provider-mapping",
+            json={
+                "competition_name": competition_name,
+                "country": "Test Country",
+                "provider_league_slug": provider_slug,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == competition_name
+        assert data["provider_league_slug"] == provider_slug
+        assert data["is_monitored"] is True
+        assert data["is_active"] is False
+
+        available_response = client.get("/configuration/available-competitions")
+        assert available_response.status_code == 200
+        available = available_response.json()
+        mapped = [item for item in available if item["name"] == competition_name]
+        assert mapped
+        assert mapped[0]["provider_league_slug"] == provider_slug
+
+
+def test_update_competition_provider_mapping_rejects_empty_slug():
+    with TestClient(app) as client:
+        response = client.put(
+            "/configuration/competitions/provider-mapping",
+            json={
+                "competition_name": "Missing Slug League",
+                "provider_league_slug": "",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "slug" in response.json()["detail"].lower()

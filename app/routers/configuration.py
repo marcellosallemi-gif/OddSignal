@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Competition, MonitoredCompetition, MonitoredMarket, NotificationRecipient
 from app.schemas import (
+    CompetitionProviderMappingUpdate,
     MonitoredCompetitionCreate,
     MonitoredCompetitionResponse,
     MonitoredMarketCreate,
@@ -51,6 +52,58 @@ def get_available_competitions(db: Session = Depends(get_db)):
         }
         for competition in competitions
     ]
+
+
+@router.put("/competitions/provider-mapping")
+def update_competition_provider_mapping(
+    payload: CompetitionProviderMappingUpdate,
+    db: Session = Depends(get_db),
+):
+    competition_name = payload.competition_name.strip()
+    provider_league_slug = payload.provider_league_slug.strip()
+    country = payload.country.strip() if payload.country else None
+
+    if not competition_name:
+        raise HTTPException(status_code=400, detail="Il nome campionato è obbligatorio.")
+
+    if not provider_league_slug:
+        raise HTTPException(status_code=400, detail="Lo slug provider è obbligatorio.")
+
+    competition = db.query(Competition).filter(Competition.name == competition_name).first()
+
+    if competition:
+        competition.provider_league_slug = provider_league_slug
+        if country and competition.country in {None, "", "Unknown"}:
+            competition.country = country
+    else:
+        competition = Competition(
+            name=competition_name,
+            country=country or "Unknown",
+            provider_league_slug=provider_league_slug,
+        )
+        db.add(competition)
+
+    monitored = (
+        db.query(MonitoredCompetition)
+        .filter(MonitoredCompetition.competition_name == competition_name)
+        .first()
+    )
+
+    if monitored:
+        monitored.provider_league_slug = provider_league_slug
+        if country:
+            monitored.country = country
+
+    db.commit()
+    db.refresh(competition)
+
+    return {
+        "name": competition.name,
+        "country": competition.country,
+        "provider_league_slug": competition.provider_league_slug,
+        "is_monitored": monitored is not None,
+        "is_active": monitored.is_active if monitored else False,
+    }
 
 
 @router.post("/provider-competitions/refresh")

@@ -538,6 +538,59 @@ function readableMarketName(marketName) {
   return marketName;
 }
 
+
+function readableAlertType(alertType) {
+  if (alertType === "critical_alert") {
+    return "Critico";
+  }
+
+  if (alertType === "standard_alert") {
+    return "Standard";
+  }
+
+  return alertType || "n/d";
+}
+
+function alertTypeBadgeClass(alertType) {
+  return alertType === "critical_alert" ? "badge warn" : "badge ok";
+}
+
+function readableNotificationStatus(status) {
+  if (status === "sent") {
+    return "Inviato";
+  }
+
+  if (status === "skipped") {
+    return "Non inviato";
+  }
+
+  if (status === "failed") {
+    return "Errore";
+  }
+
+  return status || "n/d";
+}
+
+function notificationStatusBadgeClass(status) {
+  if (status === "sent") {
+    return "badge ok";
+  }
+
+  if (status === "failed") {
+    return "badge warn";
+  }
+
+  return "badge";
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "n/d";
+  }
+
+  return String(value).replace("T", " ").slice(0, 19);
+}
+
 function renderDashboardSummary(data) {
   if (data) {
     dashboardState.system = data;
@@ -893,15 +946,20 @@ async function loadAlerts() {
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Var.</th><th>Tipo</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Variazione</th><th>Tipo</th><th>Data</th></tr></thead><tbody>";
   for (const item of data) {
+    const variation = `${item.variation_percent}%`;
+    const alertLabel = readableAlertType(item.alert_type);
+    const alertBadgeClass = alertTypeBadgeClass(item.alert_type);
+
     html += `<tr>
-      <td>${escapeHtml(item.event)}</td>
+      <td><strong>${escapeHtml(item.event)}</strong></td>
       <td>${escapeHtml(item.bookmaker)}</td>
       <td>${escapeHtml(readableMarketName(item.market))}</td>
       <td>${escapeHtml(item.selection)}</td>
-      <td>${escapeHtml(item.variation_percent)}%</td>
-      <td>${escapeHtml(item.alert_type)}</td>
+      <td><strong>${escapeHtml(variation)}</strong></td>
+      <td><span class="${alertBadgeClass}">${escapeHtml(alertLabel)}</span></td>
+      <td><span class="secondary-text">${escapeHtml(formatDateTime(item.created_at))}</span></td>
     </tr>`;
   }
   html += "</tbody></table></div>";
@@ -915,14 +973,18 @@ async function loadNotificationLogs() {
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Canale</th><th>Stato</th><th>Destinatario</th><th>Errore</th><th>Data</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Canale</th><th>Stato</th><th>Destinatario</th><th>Dettaglio</th><th>Data</th></tr></thead><tbody>";
   for (const item of data) {
+    const statusLabel = readableNotificationStatus(item.status);
+    const statusBadgeClass = notificationStatusBadgeClass(item.status);
+    const errorDetail = item.error_message ? item.error_message : "Nessun errore";
+
     html += `<tr>
-      <td>${escapeHtml(item.channel)}</td>
-      <td>${escapeHtml(item.status)}</td>
-      <td>${escapeHtml(item.recipient)}</td>
-      <td>${escapeHtml(item.error_message)}</td>
-      <td>${escapeHtml(item.sent_at)}</td>
+      <td>Telegram</td>
+      <td><span class="${statusBadgeClass}">${escapeHtml(statusLabel)}</span></td>
+      <td>${escapeHtml(item.recipient || "n/d")}</td>
+      <td><span class="secondary-text">${escapeHtml(errorDetail)}</span></td>
+      <td><span class="secondary-text">${escapeHtml(formatDateTime(item.sent_at))}</span></td>
     </tr>`;
   }
   html += "</tbody></table></div>";

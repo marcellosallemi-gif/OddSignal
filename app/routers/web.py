@@ -808,26 +808,32 @@ async function loadCompetitions() {
   let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
 
   for (const item of orderedCompetitions) {
-    const active = item.is_active ? "Attivo" : "Non attivo";
-    const badgeClass = item.is_active ? "badge ok" : "badge";
+    const isMapped = Boolean(item.provider_league_slug);
+    const active = isMapped ? (item.is_active ? "Attivo" : "Non attivo") : "Non monitorabile";
+    const badgeClass = item.is_active && isMapped ? "badge ok" : "badge";
     const actionLabel = item.is_active ? "Disattiva" : "Attiva";
     const nextState = item.is_active ? "false" : "true";
     const nameArg = JSON.stringify(item.name || "");
-    const countryArg = JSON.stringify(item.country || "");
+    const normalizedCountry = item.country && item.country !== "Unknown"
+      ? item.country
+      : ((item.name || "").includes(" - ") ? (item.name || "").split(" - ")[0] : "");
+    const countryArg = JSON.stringify(normalizedCountry || "");
     const slugArg = JSON.stringify(item.provider_league_slug || "");
-    const providerDetail = item.provider_league_slug
-      ? `<details><summary>Dettaglio provider</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
-      : `<span class="secondary-text">Provider non mappato</span>`;
+    const providerDetail = isMapped
+      ? `<details><summary>Provider mappato</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
+      : `<span class="secondary-text">Provider non mappato: aggiorna i campionati dal provider o aggiungi mapping valido</span>`;
 
     html += `<tr>
       <td>
         <strong>${escapeHtml(item.name)}</strong><br>
         ${providerDetail}
       </td>
-      <td>${escapeHtml(item.country || "n/d")}</td>
+      <td>${escapeHtml(normalizedCountry || "n/d")}</td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
-        <button class="compact ${item.is_active ? "" : "primary"}" onclick='monitorCompetition(${nameArg}, ${countryArg}, ${slugArg}, ${nextState})'>${actionLabel}</button>
+        ${isMapped
+          ? `<button class="compact ${item.is_active ? "" : "primary"}" onclick='monitorCompetition(${nameArg}, ${countryArg}, ${slugArg}, ${nextState})'>${actionLabel}</button>`
+          : `<button class="compact" disabled>Non mappato</button>`}
       </td>
     </tr>`;
   }

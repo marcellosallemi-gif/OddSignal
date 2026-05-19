@@ -935,7 +935,7 @@ async function syncTelegramRecipients() {
 
     setFeedback(
       "recipients-feedback",
-      `Account Telegram rilevati: ${data.synced_count}.`,
+      `Account Telegram rilevati: ${data.synced_count}. Attivali manualmente per abilitarli alle notifiche.`,
       "success"
     );
   } catch (error) {

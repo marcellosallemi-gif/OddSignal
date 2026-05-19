@@ -402,14 +402,13 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
 
         if existing:
             existing.label = label
-            existing.is_active = True
             recipient = existing
         else:
             recipient = NotificationRecipient(
                 channel="telegram",
                 recipient_value=recipient_value,
                 label=label,
-                is_active=True,
+                is_active=False,
                 created_at=_utc_now_naive(),
             )
             db.add(recipient)

@@ -324,6 +324,7 @@ def test_sync_telegram_recipients_detects_private_chat(monkeypatch):
     data = response.json()
     assert data["synced_count"] == 1
     assert data["recipients"][0]["label"] == "Mario Rossi (@mariorossi)"
+    assert data["recipients"][0]["is_active"] is False
 
 
 def test_sync_telegram_recipients_requires_bot_token(monkeypatch):
@@ -385,3 +386,36 @@ def test_update_scheduler_settings_rejects_invalid_event_limit():
 
     assert response.status_code == 400
     assert "eventi per ciclo" in response.json()["detail"].lower()
+
+
+
+def test_sync_telegram_recipients_preserves_existing_active_recipient(monkeypatch):
+    from app.routers import configuration
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr(
+        configuration.httpx,
+        "get",
+        lambda *args, **kwargs: FakeTelegramResponse(),
+    )
+
+    with TestClient(app) as client:
+        create_response = client.post(
+            "/configuration/notification-recipients",
+            json={
+                "channel": "telegram",
+                "recipient_value": "987654321",
+                "label": "Already Active",
+                "is_active": True,
+            },
+        )
+
+        sync_response = client.post("/configuration/telegram-recipients/sync")
+
+    assert create_response.status_code == 200
+    assert sync_response.status_code == 200
+
+    data = sync_response.json()
+    assert data["synced_count"] == 1
+    assert data["recipients"][0]["is_active"] is True
+    assert data["recipients"][0]["label"] == "Mario Rossi (@mariorossi)"

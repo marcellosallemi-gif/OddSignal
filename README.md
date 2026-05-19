@@ -78,7 +78,11 @@ Default:
 
 I campionati senza `provider_league_slug` risultano non monitorabili perché il software non può interrogare il provider in modo mirato.
 
-Dalla dashboard, nella sezione “Campionati da monitorare”, è possibile inserire manualmente lo slug provider e cliccare “Salva mapping”.
+Il flusso principale è usare il pulsante “Aggiorna leghe/slug dal provider”, che recupera dal catalogo Odds-API.io gli slug ufficiali disponibili.
+
+Il pulsante “Aggiorna campionati da eventi” aggiorna invece le competizioni partendo dagli eventi attualmente disponibili dal provider.
+
+Dalla dashboard, nella sezione “Campionati da monitorare”, è comunque possibile inserire manualmente lo slug provider e cliccare “Salva mapping”. Questa funzione è un fallback amministrativo, non il flusso principale.
 
 Dopo il salvataggio:
 

@@ -20,8 +20,10 @@ curl "http://127.0.0.1:8001/system/status"
 
 1. Stato operativo.
 2. Campionati da monitorare.
+   - usare prima “Aggiorna leghe/slug dal provider” per recuperare gli slug ufficiali;
+   - usare “Aggiorna campionati da eventi” per aggiornare le competizioni presenti negli eventi disponibili;
    - verificare quali campionati sono mappati;
-   - per i campionati non mappati usare “Salva mapping” solo con slug provider valido;
+   - usare “Salva mapping” solo come fallback amministrativo con slug provider valido;
    - attivare solo campionati realmente monitorabili.
 3. Mercati MVP.
 4. Notifiche Telegram.

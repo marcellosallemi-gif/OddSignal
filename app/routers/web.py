@@ -799,6 +799,16 @@ async function saveSchedulerSettings() {
     setFeedback("scheduler-settings-feedback", "Automazione salvata. Le nuove impostazioni vengono applicate dal prossimo ciclo scheduler.", "success");
     await loadSchedulerSettings();
   } catch (error) {
+    if (String(error.message).includes("troppo aggressiva per il piano API")) {
+      setFeedback(
+        "scheduler-settings-feedback",
+        "Scheduler non attivato: la configurazione supera il limite del Piano API. Riduci eventi per ciclo, aumenta l’intervallo di controllo oppure aggiorna il Piano API. Dettaglio tecnico: " + error.message,
+        "error"
+      );
+      await loadProviderPlanSettings();
+      return;
+    }
+
     setFeedback("scheduler-settings-feedback", "Automazione non salvata: " + error.message, "error");
   }
 }

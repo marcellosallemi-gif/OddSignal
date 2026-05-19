@@ -323,3 +323,49 @@ def test_parse_datetime_handles_provider_fractional_timezone_format():
     parsed = _parse_datetime("2026-05-19T09:35:23.33+00:00")
 
     assert parsed is not None
+
+
+def test_ingestion_notifies_only_odds_decreases(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+    captured_notifications = []
+
+    def fake_send_telegram_alert_summary(db, alerts):
+        captured_notifications.append([alert.direction for alert in alerts])
+        return {"logs_created": len(alerts)}
+
+    try:
+        add_monitored_competition(db)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda: FakeProvider(),
+        )
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "send_telegram_alert_summary",
+            fake_send_telegram_alert_summary,
+        )
+
+        FakeProvider.odds_decimal = 1.80
+        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        FakeProvider.odds_decimal = 1.98
+        increase_result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        FakeProvider.odds_decimal = 1.60
+        decrease_result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert increase_result["alerts_created"] == 1
+        assert increase_result["notification_logs_created"] == 0
+
+        assert decrease_result["alerts_created"] == 1
+        assert decrease_result["notification_logs_created"] == 1
+
+        assert captured_notifications == [["decrease"]]
+
+        alerts = db.query(Alert).order_by(Alert.id).all()
+        assert alerts[0].direction == "increase"
+        assert alerts[1].direction == "decrease"
+        assert alerts[1].alert_type == "critical_alert"
+    finally:
+        db.close()

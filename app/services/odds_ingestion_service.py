@@ -340,10 +340,16 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
 
                 created_alerts += 1
 
-    if created_alert_records:
+    alert_records_to_notify = [
+        alert
+        for alert in created_alert_records
+        if alert.direction == "decrease"
+    ]
+
+    if alert_records_to_notify:
         notification_result = send_telegram_alert_summary(
             db=db,
-            alerts=created_alert_records,
+            alerts=alert_records_to_notify,
         )
         notification_logs_created += notification_result.get("logs_created", 0)
 

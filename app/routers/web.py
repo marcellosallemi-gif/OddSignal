@@ -956,9 +956,15 @@ async function loadCompetitions() {
       : ((item.name || "").includes(" - ") ? (item.name || "").split(" - ")[0] : "");
     const countryArg = JSON.stringify(normalizedCountry || "");
     const slugArg = JSON.stringify(item.provider_league_slug || "");
+    const mappingInputId = `competition-mapping-${item.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    const mappingInputIdArg = JSON.stringify(mappingInputId);
     const providerDetail = isMapped
       ? `<details><summary>Provider mappato</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
-      : `<span class="secondary-text">Provider non mappato: aggiorna i campionati dal provider o aggiungi mapping valido</span>`;
+      : `<div class="inline-actions">
+          <input id="${escapeHtml(mappingInputId)}" type="text" placeholder="provider-league-slug">
+          <button class="compact" onclick='saveCompetitionProviderMapping(${nameArg}, ${countryArg}, ${mappingInputIdArg})'>Salva mapping</button>
+        </div>
+        <span class="secondary-text">Inserisci lo slug provider corretto per rendere il campionato monitorabile.</span>`;
 
     html += `<tr>
       <td>
@@ -1000,6 +1006,37 @@ async function monitorCompetition(name, country, slug, isActive) {
     await loadStatus();
   } catch (error) {
     setFeedback("competitions-feedback", "Operazione campionato non completata: " + error.message, "error");
+  }
+}
+
+
+async function saveCompetitionProviderMapping(name, country, inputId) {
+  const input = document.getElementById(inputId);
+  const providerLeagueSlug = input ? input.value.trim() : "";
+
+  if (!providerLeagueSlug) {
+    setFeedback("competitions-feedback", "Inserisci uno slug provider prima di salvare il mapping.", "error");
+    return;
+  }
+
+  setFeedback("competitions-feedback", `Salvataggio mapping provider per ${name}...`, "");
+
+  try {
+    await api("/configuration/competitions/provider-mapping", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        competition_name: name,
+        country: country || null,
+        provider_league_slug: providerLeagueSlug
+      })
+    });
+
+    await loadCompetitions();
+    await loadProviderPlanSettings();
+    setFeedback("competitions-feedback", `Mapping provider salvato per ${name}. Ora il campionato è monitorabile.`, "success");
+  } catch (error) {
+    setFeedback("competitions-feedback", "Mapping provider non salvato: " + error.message, "error");
   }
 }
 

@@ -12,6 +12,10 @@ def test_web_home_returns_html_page():
     assert "Calcolo Quote - MVP" in response.text
     assert "Navigazione dashboard" in response.text
     assert "Stato operativo" in response.text
+    assert "Prontezza sistema" in response.text
+    assert "readiness-summary" in response.text
+    assert "loadReadiness" in response.text
+    assert "/system/readiness" in response.text
     assert "dashboard-summary" in response.text
     assert "Campionati attivi" in response.text
     assert "Mercati attivi" in response.text

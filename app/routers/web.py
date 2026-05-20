@@ -348,6 +348,24 @@ def web_home():
     </details>
   </section>
 
+  <section id="readiness">
+    <div class="section-header">
+      <div>
+        <h2>Prontezza sistema</h2>
+        <p class="muted">Riepilogo tecnico per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadReadiness()">Ricarica prontezza</button>
+      </div>
+    </div>
+    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
+    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
+    <details>
+      <summary>JSON tecnico prontezza</summary>
+      <pre id="readiness-result">Caricamento...</pre>
+    </details>
+  </section>
+
   <section id="provider-plan">
     <div class="section-header">
       <div>

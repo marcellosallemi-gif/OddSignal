@@ -63,6 +63,7 @@ def get_system_readiness(db: Session = Depends(get_db)):
     scheduler_settings = get_or_create_scheduler_settings(db)
     provider_plan = get_or_create_provider_plan_settings(db)
     bookmakers = get_configured_bookmakers(db)
+    provider_usage = get_provider_usage_status(db)
 
     active_mapped_competitions_count = get_active_mapped_competitions_count(db)
     usage_estimate = estimate_provider_hourly_requests(
@@ -97,7 +98,21 @@ def get_system_readiness(db: Session = Depends(get_db)):
     active_telegram_recipients = get_active_telegram_recipients(db)
     telegram_ok = telegram_configured and len(active_telegram_recipients) > 0
 
+    provider_usage_ok = (
+        not provider_usage["limit_reached"]
+        and not provider_usage["cooldown_active"]
+    )
+
     checks = {
+        "provider_usage": {
+            "ok": provider_usage_ok,
+            "requests_used_last_hour": provider_usage["requests_used_last_hour"],
+            "requests_remaining": provider_usage["requests_remaining"],
+            "limit_reached": provider_usage["limit_reached"],
+            "cooldown_active": provider_usage["cooldown_active"],
+            "cooldown_until": provider_usage["cooldown_until"],
+            "message": provider_usage["message"],
+        },
         "provider_plan": {
             "ok": plan_api_ok,
             "plan_name": provider_plan.plan_name,
@@ -163,6 +178,7 @@ def get_system_readiness(db: Session = Depends(get_db)):
     }
 
     blocking_checks = [
+        "provider_usage",
         "provider_plan",
         "bookmakers",
         "competitions",

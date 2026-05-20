@@ -43,6 +43,7 @@ def test_system_readiness_returns_operational_checks():
 
     checks = payload["checks"]
 
+    assert "provider_usage" in checks
     assert "provider_plan" in checks
     assert "bookmakers" in checks
     assert "competitions" in checks
@@ -50,6 +51,9 @@ def test_system_readiness_returns_operational_checks():
     assert "telegram" in checks
     assert "scheduler" in checks
 
+    assert "ok" in checks["provider_usage"]
+    assert "cooldown_active" in checks["provider_usage"]
+    assert "limit_reached" in checks["provider_usage"]
     assert "ok" in checks["provider_plan"]
     assert "ok" in checks["bookmakers"]
     assert "ok" in checks["competitions"]

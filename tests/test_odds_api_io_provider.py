@@ -163,3 +163,34 @@ def test_provider_blocks_request_when_rate_limit_cooldown_is_active(monkeypatch,
             raise AssertionError("Expected provider cooldown to block request.")
     finally:
         db.close()
+
+
+
+def test_classify_provider_error_handles_local_cooldown():
+    from app.services.odds_api_io_provider import classify_provider_error
+
+    status_code, detail = classify_provider_error(
+        RuntimeError(
+            "Provider API cooldown active until 2026-05-20 10:41:17. "
+            "Endpoint blocked before calling Odds-API.io: /events."
+        )
+    )
+
+    assert status_code == 429
+    assert detail["error"] == "provider_rate_limit_cooldown"
+    assert "cooldown locale" in detail["message"]
+
+
+def test_classify_provider_error_handles_local_hourly_limit():
+    from app.services.odds_api_io_provider import classify_provider_error
+
+    status_code, detail = classify_provider_error(
+        RuntimeError(
+            "Provider API local hourly limit reached: 100/100 requests used. "
+            "Endpoint blocked before calling Odds-API.io: /events."
+        )
+    )
+
+    assert status_code == 429
+    assert detail["error"] == "provider_local_rate_limit"
+    assert "Limite locale" in detail["message"]

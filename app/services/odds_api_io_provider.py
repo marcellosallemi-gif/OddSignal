@@ -337,6 +337,20 @@ class OddsApiIoProvider:
 
 def classify_provider_error(exc: RuntimeError):
     message = str(exc)
+
+    if "Provider API cooldown active" in message:
+        return 429, {
+            "error": "provider_rate_limit_cooldown",
+            "message": "Provider Odds-API.io in cooldown locale per rate limit. Attendi il reset prima di nuove chiamate.",
+            "provider_message": message,
+        }
+
+    if "Provider API local hourly limit reached" in message:
+        return 429, {
+            "error": "provider_local_rate_limit",
+            "message": "Limite locale richieste/ora raggiunto. Attendi il reset orario oppure aggiorna il Piano API.",
+            "provider_message": message,
+        }
     normalized = message.lower()
 
     if "rate limit" in normalized:

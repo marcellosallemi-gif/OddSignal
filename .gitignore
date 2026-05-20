@@ -11,3 +11,11 @@ data/
 *.log
 uvicorn.log
 uvicorn.pid
+
+.env
+.venv/
+.venv-1/
+__pycache__/
+*.pyc
+football_odds_monitor.db
+*.db

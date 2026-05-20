@@ -263,6 +263,7 @@ def web_home():
     <a href="#markets">Mercati</a>
     <a href="#automation">Automazione</a>
     <a href="#provider-plan">Piano API</a>
+    <a href="#provider-bookmakers">Bookmaker</a>
     <a href="#recipients">Destinatari</a>
     <a href="#recent-alerts">Alert</a>
     <a href="#notification-logs-section">Log notifiche</a>
@@ -343,9 +344,11 @@ def web_home():
       <label>Preset piano
         <select id="provider-plan-preset" onchange="applyProviderPlanPreset()">
           <option value="custom">Custom</option>
-          <option value="free">Free - 100 richieste/ora</option>
-          <option value="pro5000">5000 richieste/ora</option>
-          <option value="unlimited">Illimitato</option>
+          <option value="free-plan">Free Plan</option>
+          <option value="starter">Starter</option>
+          <option value="growth">Growth</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
         </select>
       </label>
       <label>Nome piano
@@ -363,6 +366,30 @@ def web_home():
     <details>
       <summary>JSON tecnico piano API</summary>
       <pre id="provider-plan-result">Caricamento...</pre>
+    </details>
+  </section>
+
+  <section id="provider-bookmakers">
+    <div class="section-header">
+      <div>
+        <h2>Bookmaker provider</h2>
+        <p class="muted">Configura i bookmaker selezionati su Odds-API.io senza modificare file .env o codice.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadProviderBookmakerSettings()">Ricarica bookmaker</button>
+      </div>
+    </div>
+    <div id="provider-bookmakers-summary" class="info-box">Caricamento bookmaker...</div>
+    <div class="form-grid">
+      <label>Bookmaker configurati
+        <input id="provider-bookmakers-csv" type="text" placeholder="Stake,Sbobet">
+      </label>
+      <button class="primary" onclick="saveProviderBookmakerSettings()">Salva bookmaker</button>
+    </div>
+    <div id="provider-bookmakers-feedback" class="feedback muted">Caricamento bookmaker...</div>
+    <details>
+      <summary>JSON tecnico bookmaker</summary>
+      <pre id="provider-bookmakers-result">Caricamento...</pre>
     </details>
   </section>
 
@@ -818,16 +845,24 @@ async function saveSchedulerSettings() {
 function applyProviderPlanPreset() {
   const preset = document.getElementById("provider-plan-preset").value;
 
-  if (preset === "free") {
-    document.getElementById("provider-plan-name").value = "Free";
+  if (preset === "free-plan") {
+    document.getElementById("provider-plan-name").value = "Free Plan";
     document.getElementById("provider-hourly-request-limit").value = "100";
     document.getElementById("provider-max-bookmakers").value = "2";
-  } else if (preset === "pro5000") {
-    document.getElementById("provider-plan-name").value = "5000/h";
+  } else if (preset === "starter") {
+    document.getElementById("provider-plan-name").value = "Starter";
     document.getElementById("provider-hourly-request-limit").value = "5000";
-    document.getElementById("provider-max-bookmakers").value = "2";
-  } else if (preset === "unlimited") {
-    document.getElementById("provider-plan-name").value = "Illimitato";
+    document.getElementById("provider-max-bookmakers").value = "5";
+  } else if (preset === "growth") {
+    document.getElementById("provider-plan-name").value = "Growth";
+    document.getElementById("provider-hourly-request-limit").value = "5000";
+    document.getElementById("provider-max-bookmakers").value = "10";
+  } else if (preset === "pro") {
+    document.getElementById("provider-plan-name").value = "Pro";
+    document.getElementById("provider-hourly-request-limit").value = "5000";
+    document.getElementById("provider-max-bookmakers").value = "15";
+  } else if (preset === "enterprise") {
+    document.getElementById("provider-plan-name").value = "Enterprise";
     document.getElementById("provider-hourly-request-limit").value = "0";
     document.getElementById("provider-max-bookmakers").value = "100";
   }
@@ -860,12 +895,16 @@ function renderProviderPlanEstimate(data) {
 
 
 function syncProviderPlanPreset(data) {
-  if (data.plan_name === "Free" && data.hourly_request_limit === 100 && data.max_bookmakers === 2) {
-    document.getElementById("provider-plan-preset").value = "free";
-  } else if (data.hourly_request_limit === 5000) {
-    document.getElementById("provider-plan-preset").value = "pro5000";
-  } else if (data.hourly_request_limit === null) {
-    document.getElementById("provider-plan-preset").value = "unlimited";
+  if (data.plan_name === "Free Plan" && data.hourly_request_limit === 100 && data.max_bookmakers === 2) {
+    document.getElementById("provider-plan-preset").value = "free-plan";
+  } else if (data.plan_name === "Starter" && data.hourly_request_limit === 5000 && data.max_bookmakers === 5) {
+    document.getElementById("provider-plan-preset").value = "starter";
+  } else if (data.plan_name === "Growth" && data.hourly_request_limit === 5000 && data.max_bookmakers === 10) {
+    document.getElementById("provider-plan-preset").value = "growth";
+  } else if (data.plan_name === "Pro" && data.hourly_request_limit === 5000 && data.max_bookmakers === 15) {
+    document.getElementById("provider-plan-preset").value = "pro";
+  } else if (data.plan_name === "Enterprise" && data.hourly_request_limit === null) {
+    document.getElementById("provider-plan-preset").value = "enterprise";
   } else {
     document.getElementById("provider-plan-preset").value = "custom";
   }
@@ -905,9 +944,68 @@ async function saveProviderPlanSettings() {
     document.getElementById("provider-plan-result").textContent = JSON.stringify(data, null, 2);
     renderProviderPlanEstimate(data);
     syncProviderPlanPreset(data);
+    await loadProviderBookmakerSettings();
     setFeedback("provider-plan-feedback", "Piano API salvato.", "success");
   } catch (error) {
     setFeedback("provider-plan-feedback", "Piano API non salvato: " + error.message, "error");
+  }
+}
+
+
+
+function renderProviderBookmakerSettings(data) {
+  const statusClass = data.exceeds_bookmaker_limit ? "badge warn" : "badge ok";
+  const statusLabel = data.exceeds_bookmaker_limit ? "Supera limite" : "OK";
+
+  document.getElementById("provider-bookmakers-summary").innerHTML = `
+    <div class="summary-grid">
+      ${summaryCard("Bookmaker configurati", data.bookmaker_count)}
+      ${summaryCard("Limite piano", data.max_bookmakers)}
+      ${summaryCard("Stato", statusLabel)}
+    </div>
+    <p><span class="${statusClass}">${statusLabel}</span></p>
+    <p class="muted">
+      Bookmaker attivi: ${escapeHtml(data.bookmakers.join(", ") || "n/d")}.
+    </p>
+  `;
+}
+
+
+async function loadProviderBookmakerSettings() {
+  const data = await api("/configuration/provider-bookmaker-settings");
+
+  document.getElementById("provider-bookmakers-csv").value = data.bookmakers_csv;
+  document.getElementById("provider-bookmakers-result").textContent = JSON.stringify(data, null, 2);
+  renderProviderBookmakerSettings(data);
+  setFeedback("provider-bookmakers-feedback", "Bookmaker provider caricati.", "success");
+}
+
+
+async function saveProviderBookmakerSettings() {
+  const payload = {
+    bookmakers_csv: document.getElementById("provider-bookmakers-csv").value
+  };
+
+  setFeedback("provider-bookmakers-feedback", "Salvataggio bookmaker provider...", "");
+
+  try {
+    const data = await api("/configuration/provider-bookmaker-settings", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    document.getElementById("provider-bookmakers-result").textContent = JSON.stringify(data, null, 2);
+    document.getElementById("provider-bookmakers-csv").value = data.bookmakers_csv;
+    renderProviderBookmakerSettings(data);
+    await loadStatus();
+    setFeedback("provider-bookmakers-feedback", "Bookmaker provider salvati.", "success");
+  } catch (error) {
+    setFeedback(
+      "provider-bookmakers-feedback",
+      "Bookmaker provider non salvati: " + error.message,
+      "error"
+    );
   }
 }
 
@@ -1301,6 +1399,7 @@ loadStatus();
 loadAlertSettings();
 loadSchedulerSettings();
 loadProviderPlanSettings();
+loadProviderBookmakerSettings();
 loadCompetitions();
 loadMonitoredMarkets();
 loadRecipients();

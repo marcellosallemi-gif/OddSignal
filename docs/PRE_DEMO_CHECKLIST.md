@@ -33,11 +33,15 @@ curl "http://127.0.0.1:8001/system/status"
    - usare Critici per isolare i cali oltre soglia critica.
 6. Log notifiche.
 7. Piano API provider.
-   - verificare preset attivo: Free, 5000/h, Illimitato o Custom;
+   - verificare preset attivo: Free Plan, Starter, Growth, Pro o Enterprise;
    - controllare la stima richieste/ora;
    - verificare che la configurazione non superi il limite impostato;
    - se la stima supera il limite, lo scheduler non può essere attivato.
-8. Automazione scheduler.
+8. Bookmaker provider.
+   - verificare i bookmaker configurati;
+   - verificare che il numero bookmaker non superi il limite del Piano API;
+   - per Free Plan usare massimo 2 bookmaker, ad esempio Stake,Sbobet.
+9. Automazione scheduler.
 
 ## Regole demo
 

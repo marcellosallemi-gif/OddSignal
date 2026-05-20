@@ -120,10 +120,12 @@ La dashboard include una sezione “Piano API provider” per configurare i limi
 
 Preset disponibili:
 
-- Free: 100 richieste/ora, 2 bookmaker
-- 5000/h: 5000 richieste/ora
-- Illimitato: nessun blocco interno richieste/ora lato software
-- Custom: valori manuali
+- Free Plan: 100 richieste/ora, 2 bookmaker
+- Starter: 5.000 richieste/ora, 5 bookmaker
+- Growth: 5.000 richieste/ora, 10 bookmaker
+- Pro: 5.000 richieste/ora, 15 bookmaker
+- Enterprise: richieste illimitate lato software, bookmaker configurabili
+
 
 Il software calcola una stima prudenziale delle richieste orarie usando:
 
@@ -143,6 +145,25 @@ Esempio prudente per piano Free:
 - stima circa 24 richieste/ora.
 
 Il limite del piano provider non va aggirato: va configurato correttamente in base al piano acquistato.
+
+## Bookmaker provider
+
+La dashboard include una sezione “Bookmaker provider” per configurare i bookmaker selezionati su Odds-API.io senza modificare file `.env` o codice.
+
+Esempio:
+
+- `Stake,Sbobet`
+
+Il software normalizza automaticamente l’elenco:
+
+- rimuove spazi inutili;
+- elimina duplicati;
+- conserva l’ordine inserito;
+- valida il numero di bookmaker rispetto al Piano API attivo.
+
+Se il Piano API consente massimo 2 bookmaker, il salvataggio di 3 o più bookmaker viene bloccato con errore. Per aumentare il numero di bookmaker è necessario selezionare un piano coerente, ad esempio Starter, Growth, Pro o Enterprise.
+
+Il file `.env` resta solo come fallback iniziale: dopo il salvataggio dalla dashboard, il provider usa i bookmaker persistiti nel database.
 
 ## Scheduler automatico
 

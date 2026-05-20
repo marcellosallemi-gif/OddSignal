@@ -248,6 +248,25 @@ AUTH_EXEMPT_PATHS = {"/health", "/health/", "/auth-debug"}
 AUTH_EXEMPT_PREFIXES = ("/static/", "/public/")
 
 
+def log_auth_configuration_once():
+    if os.getenv("APP_AUTH_DEBUG_LOGGED") == "1":
+        return
+
+    os.environ["APP_AUTH_DEBUG_LOGGED"] = "1"
+
+    username = os.getenv("APP_USERNAME", "")
+    password = os.getenv("APP_PASSWORD", "")
+
+    print(
+        "[auth-debug] "
+        f"APP_AUTH_ENABLED={os.getenv('APP_AUTH_ENABLED', '')!r} "
+        f"APP_USERNAME={username!r} "
+        f"APP_USERNAME_LEN={len(username)} "
+        f"APP_PASSWORD_PRESENT={bool(password)} "
+        f"APP_PASSWORD_LEN={len(password)}"
+    )
+
+
 def is_auth_enabled() -> bool:
     return os.getenv("APP_AUTH_ENABLED", "0").strip().lower() in AUTH_ENABLED_VALUES
 
@@ -291,6 +310,8 @@ def valid_basic_auth_header(authorization) -> bool:
 @app.middleware("http")
 async def require_dashboard_auth(request: Request, call_next):
     path = request.url.path
+
+    log_auth_configuration_once()
 
     if not is_auth_enabled():
         return await call_next(request)

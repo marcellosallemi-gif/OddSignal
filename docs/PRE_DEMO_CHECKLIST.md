@@ -37,7 +37,12 @@ curl "http://127.0.0.1:8001/system/status"
    - controllare la stima richieste/ora;
    - verificare che la configurazione non superi il limite impostato;
    - se la stima supera il limite, lo scheduler non può essere attivato.
-8. Bookmaker provider.
+8. Consumo API provider.
+   - verificare richieste usate nell’ultima ora;
+   - verificare richieste residue;
+   - se il limite è raggiunto, non fare refresh provider o controllo quote;
+   - se Odds-API.io segnala rate limit, attendere il reset orario prima di test reali.
+9. Bookmaker provider.
    - verificare i bookmaker configurati;
    - verificare che il numero bookmaker non superi il limite del Piano API;
    - per Free Plan usare massimo 2 bookmaker, ad esempio Stake,Sbobet;

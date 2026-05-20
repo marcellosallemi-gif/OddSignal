@@ -146,6 +146,24 @@ Esempio prudente per piano Free:
 
 Il limite del piano provider non va aggirato: va configurato correttamente in base al piano acquistato.
 
+## Controllo consumo API provider
+
+Il software registra localmente le chiamate reali verso Odds-API.io nella tabella `provider_api_request_logs`.
+
+La dashboard espone una sezione “Consumo API provider” che mostra:
+
+- richieste usate nell’ultima ora;
+- limite richieste/ora del Piano API;
+- richieste residue;
+- stato OK o limite raggiunto;
+- messaggio operativo.
+
+Prima di ogni chiamata reale a Odds-API.io, il backend controlla il consumo locale dell’ultima ora. Se il limite locale è già raggiunto, la chiamata viene bloccata prima di contattare il provider.
+
+Questo evita di continuare a generare richieste quando il piano API è esaurito.
+
+Nota: se Odds-API.io segnala comunque rate limit o richieste perse, evitare refresh manuali e controlli quote finché il provider non resetta la finestra oraria. In caso di consumo anomalo con server spento, verificare processi esterni o rigenerare la API key.
+
 ## Bookmaker provider
 
 La dashboard include una sezione “Bookmaker provider” per configurare i bookmaker selezionati su Odds-API.io senza modificare file `.env` o codice.

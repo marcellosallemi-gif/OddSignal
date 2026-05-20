@@ -25,3 +25,34 @@ def test_get_system_status_returns_operational_summary():
     assert "odds_snapshots" in payload["database_counts"]
     assert "alerts" in payload["database_counts"]
     assert "notification_logs" in payload["database_counts"]
+
+
+def test_system_readiness_returns_operational_checks():
+    with TestClient(app) as client:
+        response = client.get("/system/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert "ready" in payload
+    assert "automatic_monitoring_ready" in payload
+    assert "scheduler_enabled" in payload
+    assert "checks" in payload
+    assert "issues" in payload
+    assert "warnings" in payload
+
+    checks = payload["checks"]
+
+    assert "provider_plan" in checks
+    assert "bookmakers" in checks
+    assert "competitions" in checks
+    assert "markets" in checks
+    assert "telegram" in checks
+    assert "scheduler" in checks
+
+    assert "ok" in checks["provider_plan"]
+    assert "ok" in checks["bookmakers"]
+    assert "ok" in checks["competitions"]
+    assert "ok" in checks["markets"]
+    assert "ok" in checks["telegram"]
+    assert "enabled" in checks["scheduler"]

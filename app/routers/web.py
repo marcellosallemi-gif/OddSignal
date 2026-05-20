@@ -1122,8 +1122,23 @@ function renderProviderUsage(data) {
     ? `${data.requests_used_last_hour}`
     : `${data.requests_used_last_hour}/${data.hourly_request_limit}`;
   const remainingLabel = data.requests_remaining === null ? "n/d" : data.requests_remaining;
-  const statusClass = data.limit_reached ? "badge warn" : "badge ok";
-  const statusLabel = data.limit_reached ? "Limite raggiunto" : "OK";
+  const cooldownLabel = data.cooldown_active ? "Attivo" : "Non attivo";
+
+  let statusClass = "badge ok";
+  let statusLabel = "OK";
+
+  if (data.cooldown_active) {
+    statusClass = "badge warn";
+    statusLabel = "Cooldown provider attivo";
+  } else if (data.limit_reached) {
+    statusClass = "badge warn";
+    statusLabel = "Limite raggiunto";
+  }
+
+  const cooldownDetails = data.cooldown_active
+    ? `<p class="muted"><strong>Cooldown fino a:</strong> ${escapeHtml(data.cooldown_until || "n/d")}</p>
+       <p class="muted"><strong>Motivo:</strong> ${escapeHtml(data.cooldown_reason || "n/d")}</p>`
+    : "";
 
   document.getElementById("provider-usage-summary").innerHTML = `
     <div class="summary-grid">
@@ -1131,9 +1146,11 @@ function renderProviderUsage(data) {
       ${summaryCard("Usate ultima ora", usedLabel)}
       ${summaryCard("Residue", remainingLabel)}
       ${summaryCard("Limite piano", limitLabel)}
+      ${summaryCard("Cooldown", cooldownLabel)}
     </div>
     <p><span class="${statusClass}">${statusLabel}</span></p>
     <p class="muted">${escapeHtml(data.message)}</p>
+    ${cooldownDetails}
   `;
 }
 

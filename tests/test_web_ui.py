@@ -10,6 +10,10 @@ def test_web_home_returns_html_page():
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Calcolo Quote - MVP" in response.text
+    assert "cooldown_active" in response.text
+    assert "cooldown_until" in response.text
+    assert "cooldown_reason" in response.text
+    assert "Cooldown provider attivo" in response.text
     assert "Navigazione dashboard" in response.text
     assert "Stato operativo" in response.text
     assert "Prontezza sistema" in response.text

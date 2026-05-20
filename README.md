@@ -33,7 +33,9 @@ http://127.0.0.1:8001/
 
 Copiare .env.example in .env e impostare almeno:
 
-ODDS_API_KEY=bb6614b4ef5597a834ff0d3bec709c0a82c6c747490b6a7eb36e3b1f1c34ac3a
+APP_USERNAME=admin
+APP_PASSWORD=change-me
+ODDS_API_KEY=
 ODDS_API_SPORT=football
 ODDS_API_BOOKMAKERS=Stake,Sbobet
 
@@ -51,6 +53,17 @@ Flusso Telegram:
 Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
 
 Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avviato il bot. TELEGRAM_CHAT_ID resta solo fallback opzionale.
+
+## Autenticazione
+
+Dashboard ed endpoint operativi richiedono HTTP Basic con `APP_USERNAME` e `APP_PASSWORD`.
+
+Se una delle due variabili manca, le route protette rispondono `401`.
+
+Restano pubblici solo:
+
+- `GET /health`
+- `/static/*`
 
 ## Alert
 

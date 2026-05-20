@@ -119,7 +119,10 @@ def _country_from_league_name(name: str):
 @router.post("/provider-leagues/refresh")
 def refresh_provider_leagues(db: Session = Depends(get_db)):
     try:
-        provider = OddsApiIoProvider()
+        provider = OddsApiIoProvider(
+            bookmakers_csv=get_configured_bookmakers_csv(db),
+            usage_db=db,
+        )
         provider_leagues = provider.get_leagues()
     except RuntimeError as exc:
         status_code, detail = classify_provider_error(exc)
@@ -194,7 +197,10 @@ def refresh_provider_competitions(
     safe_limit = max(1, min(limit, 50))
 
     try:
-        provider = OddsApiIoProvider()
+        provider = OddsApiIoProvider(
+            bookmakers_csv=get_configured_bookmakers_csv(db),
+            usage_db=db,
+        )
         first_bookmaker = provider.bookmakers.split(",")[0].strip()
         provider_events = provider.get_events(
             limit=safe_limit,
@@ -609,6 +615,7 @@ from app.services.provider_plan_settings_service import (
 )
 from app.services.provider_bookmaker_settings_service import (
     bookmakers_from_csv,
+    get_configured_bookmakers_csv,
     get_or_create_provider_bookmaker_settings,
     update_provider_bookmaker_settings,
 )

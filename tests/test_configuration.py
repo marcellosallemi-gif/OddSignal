@@ -85,7 +85,7 @@ def test_refresh_provider_competitions_upserts_available_competition(monkeypatch
     monkeypatch.setattr(
         configuration,
         "OddsApiIoProvider",
-        lambda: FakeProviderCompetitionRefresh(),
+        lambda **kwargs: FakeProviderCompetitionRefresh(),
     )
 
     with TestClient(app) as client:
@@ -122,7 +122,7 @@ def test_refresh_provider_competitions_returns_429_on_rate_limit(monkeypatch):
     monkeypatch.setattr(
         configuration,
         "OddsApiIoProvider",
-        lambda: RateLimitProviderCompetitionRefresh(),
+        lambda **kwargs: RateLimitProviderCompetitionRefresh(),
     )
 
     with TestClient(app) as client:
@@ -138,7 +138,7 @@ def test_refresh_provider_competitions_returns_404_on_league_not_found(monkeypat
     monkeypatch.setattr(
         configuration,
         "OddsApiIoProvider",
-        lambda: FailingProviderCompetitionRefresh(),
+        lambda **kwargs: FailingProviderCompetitionRefresh(),
     )
 
     with TestClient(app) as client:
@@ -579,7 +579,7 @@ def test_refresh_provider_leagues_upserts_competitions(monkeypatch):
     monkeypatch.setattr(
         configuration,
         "OddsApiIoProvider",
-        lambda: FakeProviderLeaguesRefresh(),
+        lambda **kwargs: FakeProviderLeaguesRefresh(),
     )
 
     with TestClient(app) as client:

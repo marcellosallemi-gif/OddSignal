@@ -5,6 +5,11 @@ from urllib.parse import urlencode
 
 import httpx
 
+from app.services.provider_usage_service import (
+    ensure_provider_request_allowed,
+    record_provider_request,
+)
+
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -28,7 +33,7 @@ def load_local_env():
 class OddsApiIoProvider:
     missing_key_message = "ODDS_API_KEY is missing. Add it to your local .env file."
 
-    def __init__(self, bookmakers_csv=None):
+    def __init__(self, bookmakers_csv=None, usage_db=None):
         if os.getenv("ODDS_API_SKIP_DOTENV") != "1":
             if load_dotenv is not None:
                 load_dotenv()
@@ -69,6 +74,7 @@ class OddsApiIoProvider:
             raise RuntimeError(self.missing_key_message)
 
         self.base_url = self.base_url.rstrip("/")
+        self.usage_db = usage_db
 
     def masked_api_key(self):
         visible_prefix = self.api_key[:4] if len(self.api_key) > 4 else ""
@@ -80,13 +86,27 @@ class OddsApiIoProvider:
 
         url = "{}/{}".format(self.base_url, path.lstrip("/"))
 
+        if self.usage_db is not None:
+            ensure_provider_request_allowed(self.usage_db, path)
+
         try:
             with httpx.Client(timeout=15.0) as client:
                 response = client.get(url, params=params)
         except httpx.TimeoutException as exc:
+            if self.usage_db is not None:
+                record_provider_request(self.usage_db, endpoint=path, status_code=None)
             raise RuntimeError("Odds-API.io timeout while calling {}".format(path)) from exc
         except httpx.RequestError as exc:
+            if self.usage_db is not None:
+                record_provider_request(self.usage_db, endpoint=path, status_code=None)
             raise RuntimeError("Odds-API.io request error while calling {}".format(path)) from exc
+
+        if self.usage_db is not None:
+            record_provider_request(
+                self.usage_db,
+                endpoint=path,
+                status_code=response.status_code,
+            )
 
         if response.status_code == 401:
             raise RuntimeError("Odds-API.io API key is invalid or unauthorized.")

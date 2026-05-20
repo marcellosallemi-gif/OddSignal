@@ -237,7 +237,10 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
     active_market_names = _get_active_monitored_market_names(db)
 
-    provider = OddsApiIoProvider(bookmakers_csv=get_configured_bookmakers_csv(db))
+    provider = OddsApiIoProvider(
+        bookmakers_csv=get_configured_bookmakers_csv(db),
+        usage_db=db,
+    )
     sample = provider.get_sample(
         limit=limit,
         league_slugs=active_provider_league_slugs,

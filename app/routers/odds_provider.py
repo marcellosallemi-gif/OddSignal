@@ -16,7 +16,10 @@ def get_provider_events(
     db: Session = Depends(get_db),
 ):
     try:
-        provider = OddsApiIoProvider(bookmakers_csv=get_configured_bookmakers_csv(db))
+        provider = OddsApiIoProvider(
+            bookmakers_csv=get_configured_bookmakers_csv(db),
+            usage_db=db,
+        )
         first_bookmaker = provider.bookmakers.split(",")[0].strip()
         return provider.get_events(limit=limit, bookmaker=first_bookmaker)
     except RuntimeError as exc:
@@ -29,7 +32,10 @@ def get_provider_event_odds(
     db: Session = Depends(get_db),
 ):
     try:
-        provider = OddsApiIoProvider(bookmakers_csv=get_configured_bookmakers_csv(db))
+        provider = OddsApiIoProvider(
+            bookmakers_csv=get_configured_bookmakers_csv(db),
+            usage_db=db,
+        )
         return provider.get_event_odds(event_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -41,7 +47,10 @@ def get_provider_sample(
     db: Session = Depends(get_db),
 ):
     try:
-        provider = OddsApiIoProvider(bookmakers_csv=get_configured_bookmakers_csv(db))
+        provider = OddsApiIoProvider(
+            bookmakers_csv=get_configured_bookmakers_csv(db),
+            usage_db=db,
+        )
         return provider.get_sample(limit=limit)
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

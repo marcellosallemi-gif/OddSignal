@@ -34,7 +34,7 @@ Dalla UI puoi:
 DATABASE_URL=sqlite:///./football_odds_monitor.db
 
 ODDS_PROVIDER=odds_api_io
-ODDS_API_KEY=your_api_key
+ODDS_API_KEY=
 ODDS_API_BASE_URL=https://api.odds-api.io/v3
 ODDS_API_SPORT=football
 ODDS_API_STATUS=pending

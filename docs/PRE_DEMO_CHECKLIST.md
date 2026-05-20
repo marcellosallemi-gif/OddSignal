@@ -40,7 +40,8 @@ curl "http://127.0.0.1:8001/system/status"
 8. Bookmaker provider.
    - verificare i bookmaker configurati;
    - verificare che il numero bookmaker non superi il limite del Piano API;
-   - per Free Plan usare massimo 2 bookmaker, ad esempio Stake,Sbobet.
+   - per Free Plan usare massimo 2 bookmaker, ad esempio Stake,Sbobet;
+   - se i bookmaker superano il limite del piano, lo scheduler non deve potersi attivare.
 9. Automazione scheduler.
 
 ## Regole demo

@@ -165,6 +165,8 @@ Se il Piano API consente massimo 2 bookmaker, il salvataggio di 3 o più bookmak
 
 Il file `.env` resta solo come fallback iniziale: dopo il salvataggio dalla dashboard, il provider usa i bookmaker persistiti nel database.
 
+Se i bookmaker configurati superano il limite del Piano API attivo, il backend blocca l’attivazione dello scheduler. Esempio: con Free Plan sono ammessi massimo 2 bookmaker; se sono configurati Stake,Sbobet,Bet365, lo scheduler non può essere acceso finché non riduci l’elenco bookmaker o selezioni un piano superiore.
+
 ## Scheduler automatico
 
 Lo scheduler è configurabile da dashboard e API.

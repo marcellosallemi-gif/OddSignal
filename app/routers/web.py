@@ -263,6 +263,7 @@ def web_home():
     <a href="#markets">Mercati</a>
     <a href="#automation">Automazione</a>
     <a href="#provider-plan">Piano API</a>
+    <a href="#provider-usage">Consumo API</a>
     <a href="#provider-bookmakers">Bookmaker</a>
     <a href="#recipients">Destinatari</a>
     <a href="#recent-alerts">Alert</a>
@@ -366,6 +367,24 @@ def web_home():
     <details>
       <summary>JSON tecnico piano API</summary>
       <pre id="provider-plan-result">Caricamento...</pre>
+    </details>
+  </section>
+
+  <section id="provider-usage">
+    <div class="section-header">
+      <div>
+        <h2>Consumo API provider</h2>
+        <p class="muted">Controlla quante richieste Odds-API.io sono state registrate localmente nell’ultima ora.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+      </div>
+    </div>
+    <div id="provider-usage-summary" class="info-box">Caricamento consumo API...</div>
+    <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API...</div>
+    <details>
+      <summary>JSON tecnico consumo API</summary>
+      <pre id="provider-usage-result">Caricamento...</pre>
     </details>
   </section>
 
@@ -955,6 +974,7 @@ async function saveProviderPlanSettings() {
     document.getElementById("provider-plan-result").textContent = JSON.stringify(data, null, 2);
     renderProviderPlanEstimate(data);
     syncProviderPlanPreset(data);
+    await loadProviderUsage();
     await loadProviderBookmakerSettings();
     setFeedback("provider-plan-feedback", "Piano API salvato.", "success");
   } catch (error) {
@@ -962,6 +982,42 @@ async function saveProviderPlanSettings() {
   }
 }
 
+
+
+
+function renderProviderUsage(data) {
+  const limitLabel = data.hourly_request_limit === null ? "Illimitato" : `${data.hourly_request_limit}/h`;
+  const usedLabel = data.hourly_request_limit === null
+    ? `${data.requests_used_last_hour}`
+    : `${data.requests_used_last_hour}/${data.hourly_request_limit}`;
+  const remainingLabel = data.requests_remaining === null ? "n/d" : data.requests_remaining;
+  const statusClass = data.limit_reached ? "badge warn" : "badge ok";
+  const statusLabel = data.limit_reached ? "Limite raggiunto" : "OK";
+
+  document.getElementById("provider-usage-summary").innerHTML = `
+    <div class="summary-grid">
+      ${summaryCard("Provider", data.provider)}
+      ${summaryCard("Usate ultima ora", usedLabel)}
+      ${summaryCard("Residue", remainingLabel)}
+      ${summaryCard("Limite piano", limitLabel)}
+    </div>
+    <p><span class="${statusClass}">${statusLabel}</span></p>
+    <p class="muted">${escapeHtml(data.message)}</p>
+  `;
+}
+
+
+async function loadProviderUsage() {
+  try {
+    const data = await api("/system/provider-usage");
+
+    document.getElementById("provider-usage-result").textContent = JSON.stringify(data, null, 2);
+    renderProviderUsage(data);
+    setFeedback("provider-usage-feedback", "Consumo API provider caricato.", "success");
+  } catch (error) {
+    setFeedback("provider-usage-feedback", "Consumo API provider non caricato: " + error.message, "error");
+  }
+}
 
 
 function renderProviderBookmakerSettings(data) {
@@ -1410,6 +1466,7 @@ loadStatus();
 loadAlertSettings();
 loadSchedulerSettings();
 loadProviderPlanSettings();
+loadProviderUsage();
 loadProviderBookmakerSettings();
 loadCompetitions();
 loadMonitoredMarkets();

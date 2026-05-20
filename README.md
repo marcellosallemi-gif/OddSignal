@@ -33,7 +33,7 @@ http://127.0.0.1:8001/
 
 Copiare .env.example in .env e impostare almeno:
 
-ODDS_API_KEY=your_api_key
+ODDS_API_KEY=bb6614b4ef5597a834ff0d3bec709c0a82c6c747490b6a7eb36e3b1f1c34ac3a
 ODDS_API_SPORT=football
 ODDS_API_BOOKMAKERS=Stake,Sbobet
 
@@ -163,6 +163,19 @@ Prima di ogni chiamata reale a Odds-API.io, il backend controlla il consumo loca
 Questo evita di continuare a generare richieste quando il piano API è esaurito.
 
 Nota: se Odds-API.io segnala comunque rate limit o richieste perse, evitare refresh manuali e controlli quote finché il provider non resetta la finestra oraria. In caso di consumo anomalo con server spento, verificare processi esterni o rigenerare la API key.
+
+### Cooldown rate limit provider
+
+Se Odds-API.io restituisce errore `429`, il software attiva un cooldown locale per il provider.
+
+Durante il cooldown:
+
+- le nuove chiamate a Odds-API.io vengono bloccate prima di contattare il provider;
+- la dashboard mostra `cooldown_active`, `cooldown_until` e `cooldown_reason`;
+- non bisogna usare refresh manuali, controllo quote o scheduler fino al reset;
+- il blocco protegge il piano API da ulteriori tentativi inutili durante una finestra già limitata.
+
+Questo cooldown è diverso dal conteggio locale richieste/ora: il conteggio locale previene il superamento del limite stimato; il cooldown reagisce invece a un rate limit effettivamente restituito dal provider.
 
 ## Bookmaker provider
 

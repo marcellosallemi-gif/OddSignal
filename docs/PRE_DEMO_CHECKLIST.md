@@ -40,8 +40,10 @@ curl "http://127.0.0.1:8001/system/status"
 8. Consumo API provider.
    - verificare richieste usate nell’ultima ora;
    - verificare richieste residue;
+   - verificare eventuale cooldown provider;
    - se il limite è raggiunto, non fare refresh provider o controllo quote;
-   - se Odds-API.io segnala rate limit, attendere il reset orario prima di test reali.
+   - se Odds-API.io segnala rate limit, attendere il reset orario prima di test reali;
+   - se `cooldown_active` è vero, non avviare scheduler e non eseguire chiamate manuali al provider.
 9. Bookmaker provider.
    - verificare i bookmaker configurati;
    - verificare che il numero bookmaker non superi il limite del Piano API;

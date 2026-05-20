@@ -15,6 +15,7 @@ from app.models import (
 from app.services.alert_engine import evaluate_alert
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.odds_api_io_provider import OddsApiIoProvider
+from app.services.provider_bookmaker_settings_service import get_configured_bookmakers_csv
 from app.services.telegram_notifier import send_telegram_alert_summary
 from app.services.variation_engine import calculate_variation
 
@@ -236,7 +237,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
     active_market_names = _get_active_monitored_market_names(db)
 
-    provider = OddsApiIoProvider()
+    provider = OddsApiIoProvider(bookmakers_csv=get_configured_bookmakers_csv(db))
     sample = provider.get_sample(
         limit=limit,
         league_slugs=active_provider_league_slugs,

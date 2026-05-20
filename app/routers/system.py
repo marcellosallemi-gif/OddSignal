@@ -8,6 +8,7 @@ from app.models import Alert, Event, NotificationLog, OddsSnapshot
 from app.services.telegram_notifier import is_telegram_configured
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.scheduler_settings_service import get_or_create_scheduler_settings
+from app.services.provider_bookmaker_settings_service import get_configured_bookmakers
 
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -15,11 +16,7 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 @router.get("/status")
 def get_system_status(db: Session = Depends(get_db)):
-    bookmakers = [
-        bookmaker.strip()
-        for bookmaker in os.getenv("ODDS_API_BOOKMAKERS", "").split(",")
-        if bookmaker.strip()
-    ]
+    bookmakers = get_configured_bookmakers(db)
 
     alert_settings = get_or_create_alert_settings(db)
     scheduler_settings = get_or_create_scheduler_settings(db)

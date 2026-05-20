@@ -101,7 +101,7 @@ def test_ingestion_inserts_first_snapshot_without_alert(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
@@ -122,7 +122,7 @@ def test_ingestion_creates_standard_alert_on_eligible_variation(monkeypatch, tmp
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         FakeProvider.odds_decimal = 1.80
@@ -153,7 +153,7 @@ def test_ingestion_skips_recent_duplicate_alert(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         FakeProvider.odds_decimal = 1.80
@@ -235,7 +235,7 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProviderWithIgnoredMarket(),
+            lambda **kwargs: FakeProviderWithIgnoredMarket(),
         )
 
         result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
@@ -260,7 +260,7 @@ def test_ingestion_ignores_inactive_monitored_market(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
@@ -282,7 +282,7 @@ def test_ingestion_accepts_active_monitored_market(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         FakeProvider.odds_decimal = 1.80
@@ -303,7 +303,7 @@ def test_ingestion_ignores_unmonitored_competitions(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
 
         result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
@@ -338,7 +338,7 @@ def test_ingestion_notifies_only_odds_decreases(monkeypatch, tmp_path):
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda: FakeProvider(),
+            lambda **kwargs: FakeProvider(),
         )
         monkeypatch.setattr(
             odds_ingestion_service,

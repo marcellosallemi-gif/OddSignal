@@ -28,7 +28,7 @@ def load_local_env():
 class OddsApiIoProvider:
     missing_key_message = "ODDS_API_KEY is missing. Add it to your local .env file."
 
-    def __init__(self):
+    def __init__(self, bookmakers_csv=None):
         if os.getenv("ODDS_API_SKIP_DOTENV") != "1":
             if load_dotenv is not None:
                 load_dotenv()
@@ -52,7 +52,8 @@ class OddsApiIoProvider:
             or "pending"
         )
         self.bookmakers = (
-            os.getenv("ODDS_API_IO_BOOKMAKERS")
+            bookmakers_csv
+            or os.getenv("ODDS_API_IO_BOOKMAKERS")
             or os.getenv("ODDS_API_BOOKMAKERS")
             or "Stake"
         )

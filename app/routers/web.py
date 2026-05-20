@@ -829,10 +829,21 @@ async function saveSchedulerSettings() {
     if (String(error.message).includes("troppo aggressiva per il piano API")) {
       setFeedback(
         "scheduler-settings-feedback",
-        "Scheduler non attivato: la configurazione supera il limite del Piano API. Riduci eventi per ciclo, aumenta l’intervallo di controllo oppure aggiorna il Piano API. Dettaglio tecnico: " + error.message,
+        "Scheduler non attivato: la configurazione supera il limite richieste del Piano API. Riduci eventi per ciclo, aumenta l’intervallo di controllo oppure aggiorna il Piano API. Dettaglio tecnico: " + error.message,
         "error"
       );
       await loadProviderPlanSettings();
+      return;
+    }
+
+    if (String(error.message).includes("Configurazione bookmaker non compatibile")) {
+      setFeedback(
+        "scheduler-settings-feedback",
+        "Scheduler non attivato: i bookmaker configurati superano il limite del Piano API. Riduci i bookmaker nella sezione Bookmaker provider oppure seleziona un piano superiore. Dettaglio tecnico: " + error.message,
+        "error"
+      );
+      await loadProviderPlanSettings();
+      await loadProviderBookmakerSettings();
       return;
     }
 

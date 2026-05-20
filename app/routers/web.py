@@ -12,67 +12,195 @@ def web_home():
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <title>Calcolo Quote - MVP</title>
+  <title>OddSignal - Dashboard</title>
   <style>
+    :root {
+      --bg: #f4faf7;
+      --panel: rgba(255, 255, 255, 0.72);
+      --text: #0d1f2d;
+      --muted: #617180;
+      --border: rgba(13, 31, 45, 0.10);
+      --sidebar: rgba(255, 255, 255, 0.58);
+      --sidebar-muted: #647482;
+      --accent: #1f9d69;
+      --accent-dark: #0d1f2d;
+      --accent-soft: rgba(31, 157, 105, 0.12);
+      --success-bg: #dcfce7;
+      --warning-bg: #fef3c7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      background: #eef2f7;
-      color: #1f2937;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(31, 157, 105, 0.18), transparent 32%),
+        radial-gradient(circle at 90% 12%, rgba(13, 31, 45, 0.10), transparent 30%),
+        linear-gradient(135deg, #f8fffb 0%, var(--bg) 46%, #eef6f7 100%);
+      color: var(--text);
     }
-    .page {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-    .hero {
-      background: #111827;
-      color: white;
-      border-radius: 12px;
-      padding: 22px;
-      margin-bottom: 16px;
-    }
-    .hero p {
-      color: #d1d5db;
-      margin: 8px 0 0;
-    }
+
     h1, h2, h3 {
       margin-bottom: 8px;
     }
+
     h1 {
       margin-top: 0;
+      font-size: 38px;
+      line-height: 1.1;
     }
-    section {
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 18px;
-      margin-bottom: 18px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+
+    h2 {
+      margin-top: 0;
+      font-size: 24px;
     }
-    .nav {
+
+    h3 {
+      font-size: 16px;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: fixed;
+      inset: 18px auto 18px 18px;
+      width: 280px;
+      background: var(--sidebar);
+      color: var(--text);
+      padding: 22px 16px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 28px;
+      box-shadow: 0 24px 70px rgba(13, 31, 45, 0.14);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+
+    .brand {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 16px 0 18px;
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: rgba(238, 242, 247, .96);
-      padding: 10px 0;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
     }
-    .nav a {
-      color: #1f2937;
-      text-decoration: none;
-      background: white;
-      border: 1px solid #d1d5db;
-      border-radius: 999px;
-      padding: 8px 12px;
+
+    .brand-logo {
+      display: block;
+      width: 190px;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--accent-dark);
+    }
+
+    .brand-subtitle {
+      color: var(--sidebar-muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .sidebar-nav {
+      display: grid;
+      gap: 7px;
+    }
+
+    .sidebar-link {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      border-radius: 14px;
+      padding: 11px 12px;
       font-size: 14px;
+      font-weight: 650;
+      box-shadow: none;
     }
-    .nav a:hover {
-      border-color: #111827;
+
+    .sidebar-link:hover,
+    .sidebar-link:focus,
+    .sidebar-link.active {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(31, 157, 105, 0.18);
+      color: var(--accent-dark);
+      outline: none;
     }
+
+    .sidebar-link.active {
+      box-shadow: inset 3px 0 0 var(--accent), 0 10px 24px rgba(13, 31, 45, 0.07);
+    }
+
+    .main-content {
+      margin-left: 316px;
+      padding: 28px;
+    }
+
+    .content-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .page-section {
+      display: none;
+    }
+
+    .page-section.active {
+      display: block;
+    }
+
+    .glass-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 26px;
+      padding: 24px;
+      box-shadow: 0 22px 60px rgba(13, 31, 45, 0.10);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .home-section {
+      min-height: calc(100vh - 56px);
+      display: none;
+      align-content: center;
+      text-align: center;
+    }
+
+    .home-section.active {
+      display: grid;
+    }
+
+    .home-logo {
+      display: block;
+      width: min(420px, 78vw);
+      height: auto;
+      margin: 0 auto 22px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .lead {
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.55;
+      margin: 0 auto 20px;
+    }
+
     .section-header {
       display: flex;
       align-items: flex-start;
@@ -80,105 +208,166 @@ def web_home():
       gap: 12px;
       margin-bottom: 12px;
     }
+
     .section-header h2 {
       margin: 0 0 4px;
     }
+
     .section-actions {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      justify-content: flex-end;
     }
+
+    .section-stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .subsection {
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+    }
+
+    .subsection:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 12px;
       margin-top: 12px;
     }
-    .summary-card {
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 12px;
-      background: #f9fafb;
+
+    .status-grid {
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
     }
+
+    .summary-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.64);
+      box-shadow: 0 12px 30px rgba(13, 31, 45, 0.06);
+    }
+
     .summary-label {
-      color: #6b7280;
+      color: var(--muted);
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .04em;
     }
+
     .summary-value {
       margin-top: 6px;
       font-size: 20px;
       font-weight: 700;
     }
-    .grid-two {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 18px;
-    }
+
     .form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px;
       align-items: end;
     }
+
     label {
       display: flex;
       flex-direction: column;
       gap: 5px;
-      color: #374151;
+      color: #344054;
       font-size: 13px;
       font-weight: 700;
     }
+
     button {
       cursor: pointer;
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #9ca3af;
-      background: #fff;
-      color: #111827;
+      padding: 9px 13px;
+      border-radius: 12px;
+      border: 1px solid rgba(13, 31, 45, 0.12);
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--text);
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(13, 31, 45, 0.06);
     }
+
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent-dark);
+    }
+
     button.primary {
-      background: #1f2937;
+      background: var(--accent);
       color: white;
-      border-color: #1f2937;
+      border-color: var(--accent);
     }
+
+    button.primary:hover {
+      background: var(--accent-dark);
+      color: white;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .55;
+    }
+
     button.compact {
       padding: 6px 10px;
       font-size: 13px;
     }
+
     input, select {
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid #bbb;
+      padding: 9px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(13, 31, 45, 0.14);
       min-width: 0;
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--text);
     }
+
     .table-wrap {
       overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.50);
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 12px;
-      background: white;
+      background: transparent;
     }
+
     th, td {
-      border-bottom: 1px solid #eee;
-      padding: 10px 8px;
+      border-bottom: 1px solid #edf2f7;
+      padding: 11px 10px;
       text-align: left;
       font-size: 14px;
+      vertical-align: top;
     }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
     th {
-      background: #f9fafb;
-      color: #374151;
+      background: rgba(255, 255, 255, 0.58);
+      color: #475467;
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .04em;
     }
+
     .muted {
-      color: #6b7280;
+      color: var(--muted);
       font-size: 13px;
     }
+
     .badge {
       display: inline-block;
       padding: 3px 9px;
@@ -187,12 +376,15 @@ def web_home():
       font-size: 12px;
       font-weight: 700;
     }
+
     .ok {
-      background: #dcfce7;
+      background: var(--success-bg);
     }
+
     .warn {
-      background: #fef3c7;
+      background: var(--warning-bg);
     }
+
     .feedback {
       margin-top: 10px;
       padding: 10px 12px;
@@ -211,35 +403,59 @@ def web_home():
       border-color: #fecaca;
       color: #991b1b;
     }
+
     .info-box {
       background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
       padding: 12px;
       margin: 10px 0;
     }
+
     .secondary-text {
-      color: #6b7280;
+      color: var(--muted);
       font-size: 12px;
     }
+
     .market-name {
       font-weight: 700;
     }
+
     .future-list {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 8px;
     }
+
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
     details {
+      background: rgba(255, 255, 255, 0.58);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 10px 12px;
+    }
+
+    .technical-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 12px;
       margin-top: 12px;
     }
+
     summary {
       cursor: pointer;
-      color: #374151;
+      color: #344054;
       font-size: 14px;
       font-weight: 700;
     }
+
     pre {
       white-space: pre-wrap;
       background: #111827;
@@ -247,130 +463,226 @@ def web_home():
       padding: 12px;
       border-radius: 8px;
       overflow-x: auto;
+      max-height: 420px;
+    }
+
+    @media (max-width: 980px) {
+      .sidebar {
+        position: static;
+        width: auto;
+        min-height: 0;
+        margin: 12px;
+      }
+
+      .main-content {
+        margin-left: 0;
+        padding: 18px;
+      }
+
+      .sidebar-nav {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
+      .status-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-  <div class="hero">
-    <h1>Calcolo Quote - MVP</h1>
-    <p>Dashboard locale per monitorare quote calcio e inviare alert Telegram sui cali quota.</p>
-  </div>
-
-  <nav class="nav" aria-label="Navigazione dashboard">
-    <a href="#overview">Panoramica</a>
-    <a href="#competitions">Campionati</a>
-    <a href="#markets">Mercati</a>
-    <a href="#automation">Automazione</a>
-    <a href="#provider-plan">Piano API</a>
-    <a href="#provider-usage">Consumo API</a>
-    <a href="#provider-bookmakers">Bookmaker</a>
-    <a href="#recipients">Destinatari</a>
-    <a href="#recent-alerts">Alert</a>
-    <a href="#notification-logs-section">Log notifiche</a>
-  </nav>
-
-  <section id="overview">
-    <div class="section-header">
+  <div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="brand-logo" src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
       <div>
-        <h2>Stato operativo</h2>
-        <p class="muted">Panoramica immediata di configurazione, automazione e attività recente.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadStatus()">Aggiorna stato</button>
+        <div class="brand-name">OddSignal</div>
+        <div class="brand-subtitle">Monitoraggio quote calcio</div>
       </div>
     </div>
-    <div id="dashboard-summary" class="summary-grid">
-      <div class="summary-card"><div class="summary-label">Provider</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Sport</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Scheduler</div><div class="summary-value">...</div></div>
+    <nav class="sidebar-nav" aria-label="Navigazione dashboard">
+      <button type="button" class="sidebar-link active" data-page="overview" onclick="showPage('overview', event)">Home</button>
+      <button type="button" class="sidebar-link" data-page="readiness" onclick="showPage('readiness', event)">Prontezza sistema</button>
+      <button type="button" class="sidebar-link" data-page="recent-alerts" onclick="showPage('recent-alerts', event)">Alert</button>
+      <button type="button" class="sidebar-link" data-page="competitions" onclick="showPage('competitions', event)">Campionati</button>
+      <button type="button" class="sidebar-link" data-page="markets" onclick="showPage('markets', event)">Mercati</button>
+      <button type="button" class="sidebar-link" data-page="provider-bookmakers" onclick="showPage('provider-bookmakers', event)">Bookmaker</button>
+      <button type="button" class="sidebar-link" data-page="provider-plan" onclick="showPage('provider-plan', event)">Piano API</button>
+      <button type="button" class="sidebar-link" data-page="automation" onclick="showPage('automation', event)">Automazione</button>
+      <button type="button" class="sidebar-link" data-page="recipients" onclick="showPage('recipients', event)">Telegram</button>
+      <button type="button" class="sidebar-link" data-page="notification-logs-section" onclick="showPage('notification-logs-section', event)">Storico / Log</button>
+      <button type="button" class="sidebar-link" data-page="technical-area" onclick="showPage('technical-area', event)">Area tecnica</button>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+  <div class="content-inner">
+  <section id="overview" class="page-section glass-card home-section active">
+    <img class="home-logo" src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
+    <div class="eyebrow">Dashboard operativa</div>
+    <h1>Benvenuto in OddSignal</h1>
+    <p class="lead">Software informativo per monitorare variazioni significative delle quote calcio, con alert configurabili, storico, notifiche Telegram e controlli sui limiti API.</p>
+    <div class="section-actions">
+      <button onclick="loadStatus()">Aggiorna stato</button>
+      <button onclick="loadReadiness()">Ricarica prontezza</button>
+      <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+    </div>
+    <div id="dashboard-summary" class="summary-grid status-grid">
+      <div class="summary-card"><div class="summary-label">Sistema</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Monitoraggio</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Consumo API</div><div class="summary-value">...</div></div>
+      <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
+    </div>
+    <div id="overview-metrics" class="summary-grid">
       <div class="summary-card"><div class="summary-label">Campionati attivi</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Mercati attivi</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Destinatari attivi</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Alert recenti</div><div class="summary-value">...</div></div>
       <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
     </div>
   </section>
 
-  <section id="automation">
+  <section id="readiness" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Automazione</h2>
-        <p class="muted">Definisce ogni quanto controllare le quote. Se la stima supera il Piano API, lo scheduler non può essere attivato.</p>
+        <h2>Prontezza sistema</h2>
+        <p class="muted">Riepilogo operativo per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadReadiness()">Ricarica prontezza</button>
       </div>
     </div>
-    <div id="automation-status" class="info-box">Caricamento automazione...</div>
+    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
+    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
+  </section>
+
+  <section id="recent-alerts" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Alert</h2>
+        <p class="muted">Soglie, cooldown e storico degli alert generati dal monitoraggio quote.</p>
+      </div>
+    </div>
+    <div class="section-stack">
+      <div id="alert-settings" class="subsection">
+        <div class="section-header">
+          <div>
+            <h3>Soglie alert e cooldown</h3>
+            <p class="muted">Configura le soglie. Telegram notifica solo i cali quota: Standard tra min/max, Critico oltre la soglia critica.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label>Min %
+            <input id="alert-min-percent" type="number" step="0.01" placeholder="8">
+          </label>
+          <label>Max %
+            <input id="alert-max-percent" type="number" step="0.01" placeholder="15">
+          </label>
+          <label>Critico %
+            <input id="alert-critical-percent" type="number" step="0.01" placeholder="15">
+          </label>
+          <label>Dedup minuti
+            <input id="alert-deduplication-minutes" type="number" step="1" placeholder="30">
+          </label>
+          <button class="primary" onclick="saveAlertSettings()">Salva soglie</button>
+          <button onclick="loadAlertSettings()">Ricarica</button>
+        </div>
+        <div id="alert-settings-feedback" class="feedback muted">Caricamento impostazioni...</div>
+      </div>
+
+      <div class="subsection">
+        <div class="section-header">
+          <div>
+            <h3>Alert recenti</h3>
+            <p class="muted">Storico completo degli alert. Gli aumenti restano nello storico, ma non vengono notificati via Telegram.</p>
+          </div>
+          <div class="section-actions">
+            <select id="alerts-filter" onchange="renderAlertsTable()">
+              <option value="all">Tutti</option>
+              <option value="notifiable">Solo cali notificabili</option>
+              <option value="increases">Aumenti non notificati</option>
+              <option value="critical">Critici</option>
+            </select>
+            <button onclick="loadAlerts()">Aggiorna alert</button>
+          </div>
+        </div>
+        <div id="alerts-filter-feedback" class="feedback muted">Gli alert Telegram vengono inviati solo sui cali quota.</div>
+        <div id="alerts"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="competitions" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Campionati da monitorare</h2>
+        <p class="muted">Scegli i campionati su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
+      </div>
+      <div class="section-actions">
+        <button class="primary" onclick="refreshProviderLeagues()">Aggiorna leghe/slug dal provider</button>
+        <button onclick="refreshProviderCompetitions()">Aggiorna campionati da eventi</button>
+        <button onclick="loadCompetitions()">Aggiorna campionati</button>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>Come usare questa sezione</strong>
+      <p class="muted">Attiva solo i campionati che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
+    </div>
+    <div id="competitions-summary" class="summary-grid"></div>
+    <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
+    <div id="competitions-table"></div>
+  </section>
+
+  <section id="markets" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Mercati</h2>
+        <p class="muted">Seleziona i mercati MVP supportati da monitorare.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>Mercati MVP supportati</strong>
+      <p class="muted">1X2, Over/Under, Goal/No Goal e Handicap sono collegati ai mercati provider normalizzati.</p>
+      <strong>Mercati futuri / da integrare</strong>
+      <div class="future-list">
+        <span class="badge">Doppia chance</span>
+        <span class="badge">Risultato esatto</span>
+        <span class="badge">Primo tempo/finale</span>
+        <span class="badge">Corner</span>
+        <span class="badge">Cartellini</span>
+        <span class="badge">Marcatori</span>
+      </div>
+    </div>
+    <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
+    <div id="monitored-markets"></div>
+  </section>
+
+  <section id="provider-bookmakers" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Bookmaker</h2>
+        <p class="muted">Configura i bookmaker selezionati su Odds-API.io senza modificare file .env o codice.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadProviderBookmakerSettings()">Ricarica bookmaker</button>
+      </div>
+    </div>
+    <div id="provider-bookmakers-summary" class="info-box">Caricamento bookmaker...</div>
     <div class="form-grid">
-      <label>Controllo automatico
-        <select id="scheduler-enabled">
-          <option value="false">Spento</option>
-          <option value="true">Attivo</option>
-        </select>
+      <label>Bookmaker configurati
+        <input id="provider-bookmakers-csv" type="text" placeholder="Stake,Sbobet">
       </label>
-      <label>Frequenza controllo
-        <select id="scheduler-poll-interval-seconds">
-          <option value="3">3 secondi - test locale</option>
-          <option value="30">30 secondi</option>
-          <option value="60">1 minuto</option>
-          <option value="300">5 minuti - consigliato</option>
-          <option value="900">15 minuti</option>
-        </select>
-      </label>
-      <label>Eventi per ciclo
-        <input id="scheduler-event-limit" type="number" min="1" max="10" step="1" placeholder="1">
-      </label>
-      <button class="primary" onclick="saveSchedulerSettings()">Salva automazione</button>
-      <button onclick="loadSchedulerSettings()">Ricarica automazione</button>
+      <button class="primary" onclick="saveProviderBookmakerSettings()">Salva bookmaker</button>
     </div>
-    <div id="scheduler-settings-feedback" class="feedback muted">Caricamento automazione...</div>
-    <div id="scheduler-status"></div>
-    <details>
-      <summary>Dettagli tecnici sistema</summary>
-      <pre id="system-status">Caricamento...</pre>
-    </details>
+    <div id="provider-bookmakers-feedback" class="feedback muted">Caricamento bookmaker...</div>
   </section>
 
-  <section id="readiness">
+  <section id="provider-plan" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Prontezza sistema</h2>
-        <p class="muted">Riepilogo tecnico per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadReadiness()">Ricarica prontezza</button>
-      </div>
-    </div>
-    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
-    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
-    <details>
-      <summary>JSON tecnico prontezza</summary>
-      <pre id="readiness-result">Caricamento...</pre>
-    </details>
-  </section>
-
-  <section id="readiness">
-    <div class="section-header">
-      <div>
-        <h2>Prontezza sistema</h2>
-        <p class="muted">Riepilogo tecnico per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadReadiness()">Ricarica prontezza</button>
-      </div>
-    </div>
-    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
-    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
-    <details>
-      <summary>JSON tecnico prontezza</summary>
-      <pre id="readiness-result">Caricamento...</pre>
-    </details>
-  </section>
-
-  <section id="provider-plan">
-    <div class="section-header">
-      <div>
-        <h2>Piano API provider</h2>
-        <p class="muted">Configura i limiti del piano Odds-API.io. Se la configurazione stimata supera il limite, l’attivazione dello scheduler viene bloccata.</p>
+        <h2>Piano API</h2>
+        <p class="muted">Configura i limiti del piano Odds-API.io. Se la configurazione stimata supera il limite, l'attivazione dello scheduler viene bloccata.</p>
       </div>
       <div class="section-actions">
         <button onclick="loadProviderPlanSettings()">Ricarica piano API</button>
@@ -400,153 +712,77 @@ def web_home():
       <button class="primary" onclick="saveProviderPlanSettings()">Salva piano API</button>
     </div>
     <div id="provider-plan-feedback" class="feedback muted">Caricamento piano API...</div>
-    <details>
-      <summary>JSON tecnico piano API</summary>
-      <pre id="provider-plan-result">Caricamento...</pre>
-    </details>
+
+    <div id="provider-usage" class="subsection">
+      <div class="section-header">
+        <div>
+          <h3>Consumo API provider</h3>
+          <p class="muted">Controlla quante richieste Odds-API.io sono state registrate localmente nell'ultima ora.</p>
+        </div>
+        <div class="section-actions">
+          <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+        </div>
+      </div>
+      <div id="provider-usage-summary" class="info-box">Caricamento consumo API...</div>
+      <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API...</div>
+    </div>
   </section>
 
-  <section id="provider-usage">
+  <section id="automation" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Consumo API provider</h2>
-        <p class="muted">Controlla quante richieste Odds-API.io sono state registrate localmente nell’ultima ora.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+        <h2>Automazione</h2>
+        <p class="muted">Definisce ogni quanto controllare le quote. Se la stima supera il Piano API, lo scheduler non può essere attivato.</p>
       </div>
     </div>
-    <div id="provider-usage-summary" class="info-box">Caricamento consumo API...</div>
-    <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API...</div>
-    <details>
-      <summary>JSON tecnico consumo API</summary>
-      <pre id="provider-usage-result">Caricamento...</pre>
-    </details>
+    <div class="section-stack">
+      <div class="subsection">
+        <div id="automation-status" class="info-box">Caricamento automazione...</div>
+        <div class="form-grid">
+          <label>Controllo automatico
+            <select id="scheduler-enabled">
+              <option value="false">Spento</option>
+              <option value="true">Attivo</option>
+            </select>
+          </label>
+          <label>Frequenza controllo
+            <select id="scheduler-poll-interval-seconds">
+              <option value="3">3 secondi - test locale</option>
+              <option value="30">30 secondi</option>
+              <option value="60">1 minuto</option>
+              <option value="300">5 minuti - consigliato</option>
+              <option value="900">15 minuti</option>
+            </select>
+          </label>
+          <label>Eventi per ciclo
+            <input id="scheduler-event-limit" type="number" min="1" max="10" step="1" placeholder="1">
+          </label>
+          <button class="primary" onclick="saveSchedulerSettings()">Salva automazione</button>
+          <button onclick="loadSchedulerSettings()">Ricarica automazione</button>
+        </div>
+        <div id="scheduler-settings-feedback" class="feedback muted">Caricamento automazione...</div>
+        <div id="scheduler-status"></div>
+      </div>
+
+      <div id="manual-check" class="subsection">
+        <div class="section-header">
+          <div>
+            <h3>Controllo quote manuale</h3>
+            <p class="muted">Esegue subito un controllo quote sui campionati attivi.</p>
+          </div>
+          <div class="section-actions">
+            <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
+          </div>
+        </div>
+        <div id="manual-odds-check-feedback" class="feedback muted">Nessun controllo eseguito.</div>
+      </div>
+    </div>
   </section>
 
-  <section id="provider-bookmakers">
+  <section id="recipients" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Bookmaker provider</h2>
-        <p class="muted">Configura i bookmaker selezionati su Odds-API.io senza modificare file .env o codice.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadProviderBookmakerSettings()">Ricarica bookmaker</button>
-      </div>
-    </div>
-    <div id="provider-bookmakers-summary" class="info-box">Caricamento bookmaker...</div>
-    <div class="form-grid">
-      <label>Bookmaker configurati
-        <input id="provider-bookmakers-csv" type="text" placeholder="Stake,Sbobet">
-      </label>
-      <button class="primary" onclick="saveProviderBookmakerSettings()">Salva bookmaker</button>
-    </div>
-    <div id="provider-bookmakers-feedback" class="feedback muted">Caricamento bookmaker...</div>
-    <details>
-      <summary>JSON tecnico bookmaker</summary>
-      <pre id="provider-bookmakers-result">Caricamento...</pre>
-    </details>
-  </section>
-
-  <section id="manual-check">
-    <div class="section-header">
-      <div>
-        <h2>Controllo quote manuale</h2>
-        <p class="muted">Esegue subito un controllo quote sui campionati attivi.</p>
-      </div>
-      <div class="section-actions">
-        <button class="primary" onclick="runManualOddsCheck()">Esegui controllo quote ora</button>
-      </div>
-    </div>
-    <div id="manual-odds-check-feedback" class="feedback muted">Nessun controllo eseguito.</div>
-    <details>
-      <summary>Risposta tecnica ultimo controllo</summary>
-      <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
-    </details>
-  </section>
-
-  <section id="alert-settings">
-    <div class="section-header">
-      <div>
-        <h2>Soglie alert e cooldown</h2>
-        <p class="muted">Configura le soglie. Telegram notifica solo i cali quota: Standard tra min/max, Critico oltre la soglia critica.</p>
-      </div>
-    </div>
-    <div class="form-grid">
-      <label>Min %
-        <input id="alert-min-percent" type="number" step="0.01" placeholder="8">
-      </label>
-      <label>Max %
-        <input id="alert-max-percent" type="number" step="0.01" placeholder="15">
-      </label>
-      <label>Critico %
-        <input id="alert-critical-percent" type="number" step="0.01" placeholder="15">
-      </label>
-      <label>Dedup minuti
-        <input id="alert-deduplication-minutes" type="number" step="1" placeholder="30">
-      </label>
-      <button class="primary" onclick="saveAlertSettings()">Salva soglie</button>
-      <button onclick="loadAlertSettings()">Ricarica</button>
-    </div>
-    <div id="alert-settings-feedback" class="feedback muted">Caricamento impostazioni...</div>
-    <details>
-      <summary>JSON tecnico impostazioni</summary>
-      <pre id="alert-settings-result">Caricamento...</pre>
-    </details>
-  </section>
-
-  <section id="competitions">
-    <div class="section-header">
-      <div>
-        <h2>Campionati da monitorare</h2>
-        <p class="muted">Scegli i campionati su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
-      </div>
-      <div class="section-actions">
-        <button class="primary" onclick="refreshProviderLeagues()">Aggiorna leghe/slug dal provider</button>
-        <button onclick="refreshProviderCompetitions()">Aggiorna campionati da eventi</button>
-        <button onclick="loadCompetitions()">Aggiorna campionati</button>
-      </div>
-    </div>
-    <div class="info-box">
-      <strong>Come usare questa sezione</strong>
-      <p class="muted">Attiva solo i campionati che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
-    </div>
-    <div id="competitions-summary" class="summary-grid"></div>
-    <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
-    <div id="competitions-table"></div>
-  </section>
-
-  <section id="markets">
-    <div class="section-header">
-      <div>
-        <h2>Mercati</h2>
-        <p class="muted">Seleziona i mercati MVP supportati da monitorare.</p>
-      </div>
-      <div class="section-actions">
-        <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
-      </div>
-    </div>
-    <div class="info-box">
-      <strong>Mercati MVP supportati</strong>
-      <p class="muted">1X2, Over/Under, Goal/No Goal e Handicap sono collegati ai mercati provider normalizzati.</p>
-      <strong>Mercati futuri / da integrare</strong>
-      <div class="future-list">
-        <span class="badge">Doppia chance</span>
-        <span class="badge">Risultato esatto</span>
-        <span class="badge">Primo tempo/finale</span>
-        <span class="badge">Corner</span>
-        <span class="badge">Cartellini</span>
-        <span class="badge">Marcatori</span>
-      </div>
-    </div>
-    <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
-    <div id="monitored-markets"></div>
-  </section>
-
-  <section id="recipients">
-    <div class="section-header">
-      <div>
-        <h2>Notifiche Telegram</h2>
+        <h2>Telegram</h2>
         <p class="muted">Rileva gli account che hanno scritto al bot. Solo gli account attivati manualmente ricevono alert.</p>
       </div>
     </div>
@@ -563,30 +799,10 @@ def web_home():
     <div id="recipients-table"></div>
   </section>
 
-  <section id="recent-alerts">
+  <section id="notification-logs-section" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Alert recenti</h2>
-        <p class="muted">Storico completo degli alert. Gli aumenti restano nello storico, ma non vengono notificati via Telegram.</p>
-      </div>
-      <div class="section-actions">
-        <select id="alerts-filter" onchange="renderAlertsTable()">
-          <option value="all">Tutti</option>
-          <option value="notifiable">Solo cali notificabili</option>
-          <option value="increases">Aumenti non notificati</option>
-          <option value="critical">Critici</option>
-        </select>
-        <button onclick="loadAlerts()">Aggiorna alert</button>
-      </div>
-    </div>
-    <div id="alerts-filter-feedback" class="feedback muted">Gli alert Telegram vengono inviati solo sui cali quota.</div>
-    <div id="alerts"></div>
-  </section>
-
-  <section id="notification-logs-section">
-    <div class="section-header">
-      <div>
-        <h2>Log notifiche recenti</h2>
+        <h2>Storico / Log</h2>
         <p class="muted">Esiti recenti degli invii verso destinatari configurati.</p>
       </div>
       <div class="section-actions">
@@ -596,7 +812,66 @@ def web_home():
     <div id="notification-logs"></div>
   </section>
 
+  <section id="technical-area" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Area tecnica</h2>
+        <p class="muted">JSON, risposte tecniche e dettagli diagnostici separati dalle pagine operative.</p>
+      </div>
+    </div>
+    <div class="technical-grid">
+      <details>
+        <summary>Dettagli tecnici sistema</summary>
+        <pre id="system-status">Caricamento...</pre>
+      </details>
+      <details>
+        <summary>JSON tecnico prontezza</summary>
+        <pre id="readiness-result">Caricamento...</pre>
+      </details>
+      <details>
+        <summary>JSON tecnico piano API</summary>
+        <pre id="provider-plan-result">Caricamento...</pre>
+      </details>
+      <details>
+        <summary>JSON tecnico consumo API</summary>
+        <pre id="provider-usage-result">Caricamento...</pre>
+      </details>
+      <details>
+        <summary>JSON tecnico bookmaker</summary>
+        <pre id="provider-bookmakers-result">Caricamento...</pre>
+      </details>
+      <details>
+        <summary>Risposta tecnica ultimo controllo</summary>
+        <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
+      </details>
+      <details>
+        <summary>JSON tecnico impostazioni alert</summary>
+        <pre id="alert-settings-result">Caricamento...</pre>
+      </details>
+    </div>
+  </section>
+
 <script>
+function showPage(pageId, event) {
+  if (event && typeof event.preventDefault === "function") {
+    event.preventDefault();
+  }
+
+  const target = document.getElementById(pageId);
+  if (!target) {
+    return;
+  }
+
+  document.querySelectorAll(".page-section").forEach((section) => {
+    section.classList.remove("active");
+  });
+  target.classList.add("active");
+
+  document.querySelectorAll(".sidebar-link").forEach((link) => {
+    link.classList.toggle("active", link.dataset.page === pageId);
+  });
+}
+
 async function api(path, options) {
   const response = await fetch(path, options || {});
   if (!response.ok) {
@@ -627,6 +902,8 @@ function escapeHtml(value) {
 
 const dashboardState = {
   system: {},
+  readiness: null,
+  providerUsage: null,
   activeCompetitions: "...",
   activeMarkets: "...",
   activeRecipients: "...",
@@ -751,18 +1028,47 @@ function renderDashboardSummary(data) {
   const scheduler = system.scheduler || {};
   const counts = system.database_counts || {};
   const schedulerValue = scheduler.enabled === true ? "Attivo" : "Spento";
+  const readiness = dashboardState.readiness;
+  const readinessValue = readiness
+    ? (readiness.ready ? "Pronto" : "Da verificare")
+    : "...";
+  const providerUsage = dashboardState.providerUsage;
+  let providerUsageValue = "...";
 
-  document.getElementById("dashboard-summary").innerHTML = [
-    summaryCard("Provider", system.provider || "n/d"),
-    summaryCard("Sport", system.sport || "n/d"),
-    summaryCard("Scheduler status", schedulerValue),
-    summaryCard("Campionati attivi", dashboardState.activeCompetitions),
-    summaryCard("Mercati attivi", dashboardState.activeMarkets),
-    summaryCard("Destinatari attivi", dashboardState.activeRecipients),
-    summaryCard("Ultimo controllo", dashboardState.lastManualCheck),
-    summaryCard("Alert recenti", counts.alerts ?? 0),
-    summaryCard("Log notifiche", counts.notification_logs ?? 0)
-  ].join("");
+  if (providerUsage) {
+    if (providerUsage.cooldown_active) {
+      providerUsageValue = "Cooldown";
+    } else if (providerUsage.limit_reached) {
+      providerUsageValue = "Limite raggiunto";
+    } else {
+      providerUsageValue = "OK";
+    }
+  }
+
+  const telegramValue = dashboardState.activeRecipients === "..."
+    ? "..."
+    : `${dashboardState.activeRecipients} attivi`;
+
+  const dashboardSummary = document.getElementById("dashboard-summary");
+  if (dashboardSummary) {
+    dashboardSummary.innerHTML = [
+      summaryCard("Sistema", readinessValue),
+      summaryCard("Monitoraggio", schedulerValue),
+      summaryCard("Consumo API", providerUsageValue),
+      summaryCard("Telegram", telegramValue)
+    ].join("");
+  }
+
+  const overviewMetrics = document.getElementById("overview-metrics");
+  if (overviewMetrics) {
+    overviewMetrics.innerHTML = [
+      summaryCard("Campionati attivi", dashboardState.activeCompetitions),
+      summaryCard("Mercati attivi", dashboardState.activeMarkets),
+      summaryCard("Ultimo controllo", dashboardState.lastManualCheck),
+      summaryCard("Alert recenti", counts.alerts ?? 0),
+      summaryCard("Log notifiche", counts.notification_logs ?? 0)
+    ].join("");
+  }
 }
 
 function renderAutomationStatus(data) {
@@ -1112,8 +1418,10 @@ async function loadReadiness() {
   try {
     const data = await api("/system/readiness");
 
+    dashboardState.readiness = data;
     document.getElementById("readiness-result").textContent = JSON.stringify(data, null, 2);
     renderReadiness(data);
+    renderDashboardSummary();
     setFeedback("readiness-feedback", "Prontezza sistema caricata.", "success");
   } catch (error) {
     setFeedback("readiness-feedback", "Prontezza sistema non caricata: " + error.message, "error");
@@ -1164,8 +1472,10 @@ async function loadProviderUsage() {
   try {
     const data = await api("/system/provider-usage");
 
+    dashboardState.providerUsage = data;
     document.getElementById("provider-usage-result").textContent = JSON.stringify(data, null, 2);
     renderProviderUsage(data);
+    renderDashboardSummary();
     setFeedback("provider-usage-feedback", "Consumo API provider caricato.", "success");
   } catch (error) {
     setFeedback("provider-usage-feedback", "Consumo API provider non caricato: " + error.message, "error");
@@ -1542,6 +1852,7 @@ async function toggleRecipient(recipientId, isActive) {
 async function loadAlerts() {
   const data = await api("/alerts?limit=20");
   dashboardState.recentAlerts = data;
+  renderDashboardSummary();
   renderAlertsTable();
 }
 
@@ -1627,6 +1938,8 @@ loadRecipients();
 loadAlerts();
 loadNotificationLogs();
 </script>
+  </div>
+  </main>
   </div>
 </body>
 </html>

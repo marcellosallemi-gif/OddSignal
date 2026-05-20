@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, SessionLocal, engine
 from app.models import Competition, Event, OddsSnapshot, Team
@@ -166,6 +167,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Football Odds Monitor", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web_router)
 app.include_router(health_router)
 app.include_router(configuration_router)

@@ -330,6 +330,24 @@ def web_home():
     </details>
   </section>
 
+  <section id="readiness">
+    <div class="section-header">
+      <div>
+        <h2>Prontezza sistema</h2>
+        <p class="muted">Riepilogo tecnico per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
+      </div>
+      <div class="section-actions">
+        <button onclick="loadReadiness()">Ricarica prontezza</button>
+      </div>
+    </div>
+    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
+    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
+    <details>
+      <summary>JSON tecnico prontezza</summary>
+      <pre id="readiness-result">Caricamento...</pre>
+    </details>
+  </section>
+
   <section id="provider-plan">
     <div class="section-header">
       <div>
@@ -983,6 +1001,101 @@ async function saveProviderPlanSettings() {
 }
 
 
+
+
+
+function readinessBadge(ok) {
+  return ok ? '<span class="badge ok">OK</span>' : '<span class="badge warn">Da verificare</span>';
+}
+
+
+function renderReadiness(data) {
+  const readyStatus = data.ready ? '<span class="badge ok">Sistema pronto</span>' : '<span class="badge warn">Sistema non pronto</span>';
+  const autoStatus = data.automatic_monitoring_ready
+    ? '<span class="badge ok">Monitoraggio automatico attivo</span>'
+    : '<span class="badge warn">Monitoraggio automatico non attivo</span>';
+
+  const checks = data.checks || {};
+  const issues = data.issues || [];
+  const warnings = data.warnings || [];
+
+  const issueHtml = issues.length
+    ? `<ul>${issues.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : '<p class="muted">Nessun problema bloccante.</p>';
+
+  const warningHtml = warnings.length
+    ? `<ul>${warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : '<p class="muted">Nessun avviso.</p>';
+
+  document.getElementById("readiness-summary").innerHTML = `
+    <div class="summary-grid">
+      ${summaryCard("Sistema", data.ready ? "Pronto" : "Non pronto")}
+      ${summaryCard("Monitoraggio", data.automatic_monitoring_ready ? "Attivo" : "Non attivo")}
+      ${summaryCard("Scheduler", data.scheduler_enabled ? "Acceso" : "Spento")}
+    </div>
+    <p>${readyStatus} ${autoStatus}</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Controllo</th>
+          <th>Stato</th>
+          <th>Messaggio</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Piano API</td>
+          <td>${readinessBadge(checks.provider_plan && checks.provider_plan.ok)}</td>
+          <td>${escapeHtml(checks.provider_plan ? checks.provider_plan.message : "n/d")}</td>
+        </tr>
+        <tr>
+          <td>Bookmaker</td>
+          <td>${readinessBadge(checks.bookmakers && checks.bookmakers.ok)}</td>
+          <td>${escapeHtml(checks.bookmakers ? checks.bookmakers.message : "n/d")}</td>
+        </tr>
+        <tr>
+          <td>Campionati</td>
+          <td>${readinessBadge(checks.competitions && checks.competitions.ok)}</td>
+          <td>${escapeHtml(checks.competitions ? checks.competitions.message : "n/d")}</td>
+        </tr>
+        <tr>
+          <td>Mercati</td>
+          <td>${readinessBadge(checks.markets && checks.markets.ok)}</td>
+          <td>${escapeHtml(checks.markets ? checks.markets.message : "n/d")}</td>
+        </tr>
+        <tr>
+          <td>Telegram</td>
+          <td>${readinessBadge(checks.telegram && checks.telegram.ok)}</td>
+          <td>${escapeHtml(checks.telegram ? checks.telegram.message : "n/d")}</td>
+        </tr>
+        <tr>
+          <td>Scheduler</td>
+          <td>${readinessBadge(checks.scheduler && checks.scheduler.enabled)}</td>
+          <td>${escapeHtml(checks.scheduler ? checks.scheduler.message : "n/d")}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Problemi bloccanti</h3>
+    ${issueHtml}
+    <h3>Avvisi</h3>
+    ${warningHtml}
+  `;
+}
+
+
+async function loadReadiness() {
+  try {
+    const data = await api("/system/readiness");
+
+    document.getElementById("readiness-result").textContent = JSON.stringify(data, null, 2);
+    renderReadiness(data);
+    setFeedback("readiness-feedback", "Prontezza sistema caricata.", "success");
+  } catch (error) {
+    setFeedback("readiness-feedback", "Prontezza sistema non caricata: " + error.message, "error");
+  }
+}
 
 
 function renderProviderUsage(data) {

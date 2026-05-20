@@ -103,6 +103,18 @@ CREATE TABLE IF NOT EXISTS provider_api_request_logs (
 )
 """
 
+
+CREATE_PROVIDER_API_RATE_LIMIT_STATE_SQL = """
+CREATE TABLE IF NOT EXISTS provider_api_rate_limit_state (
+    id INTEGER PRIMARY KEY,
+    provider VARCHAR NOT NULL DEFAULT 'odds_api_io',
+    blocked_until DATETIME NOT NULL,
+    reason VARCHAR NOT NULL DEFAULT 'provider_rate_limit',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+)
+"""
+
 CREATE_NOTIFICATION_RECIPIENTS_SQL = """
 CREATE TABLE IF NOT EXISTS notification_recipients (
     id INTEGER PRIMARY KEY,
@@ -232,6 +244,7 @@ def run_runtime_migrations() -> dict:
         conn.exec_driver_sql(CREATE_PROVIDER_PLAN_SETTINGS_SQL)
         conn.exec_driver_sql(CREATE_PROVIDER_BOOKMAKER_SETTINGS_SQL)
         conn.exec_driver_sql(CREATE_PROVIDER_API_REQUEST_LOGS_SQL)
+        conn.exec_driver_sql(CREATE_PROVIDER_API_RATE_LIMIT_STATE_SQL)
 
         existing_provider_plan_settings = conn.exec_driver_sql(
             "SELECT COUNT(*) FROM provider_plan_settings"

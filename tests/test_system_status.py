@@ -70,4 +70,7 @@ def test_provider_usage_returns_usage_status():
     assert "requests_used_last_hour" in payload
     assert "requests_remaining" in payload
     assert "limit_reached" in payload
+    assert "cooldown_active" in payload
+    assert "cooldown_until" in payload
+    assert "cooldown_reason" in payload
     assert "message" in payload

@@ -195,3 +195,15 @@ class ProviderApiRequestLog(Base):
     endpoint = Column(String, nullable=False)
     status_code = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False)
+
+
+
+class ProviderApiRateLimitState(Base):
+    __tablename__ = "provider_api_rate_limit_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, nullable=False, default="odds_api_io")
+    blocked_until = Column(DateTime, nullable=False)
+    reason = Column(String, nullable=False, default="provider_rate_limit")
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)

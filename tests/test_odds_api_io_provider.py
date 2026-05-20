@@ -103,3 +103,63 @@ def test_masked_api_key_never_returns_full_key(monkeypatch):
 
     assert provider.masked_api_key() != TEST_API_KEY
     assert TEST_API_KEY not in provider.masked_api_key()
+
+
+def test_provider_blocks_request_when_rate_limit_cooldown_is_active(monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    import httpx
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from app.models import Base, ProviderApiRateLimitState, ProviderPlanSetting
+    from app.services.odds_api_io_provider import OddsApiIoProvider
+
+    engine = create_engine(
+        "sqlite:///" + str(tmp_path / "cooldown.db"),
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    class ClientShouldNotBeCalled:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("HTTP client should not be called during cooldown.")
+
+    try:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        db.add(
+            ProviderPlanSetting(
+                plan_name="Free Plan",
+                hourly_request_limit=100,
+                max_bookmakers=2,
+                created_at=now,
+            )
+        )
+        db.add(
+            ProviderApiRateLimitState(
+                provider="odds_api_io",
+                blocked_until=now + timedelta(minutes=30),
+                reason="test cooldown",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.commit()
+
+        monkeypatch.setenv("ODDS_API_SKIP_DOTENV", "1")
+        monkeypatch.setenv("ODDS_API_KEY", "test-key")
+        monkeypatch.setattr(httpx, "Client", ClientShouldNotBeCalled)
+
+        provider = OddsApiIoProvider(bookmakers_csv="Stake,Sbobet", usage_db=db)
+
+        try:
+            provider.get_events(limit=1, bookmaker="Stake")
+        except RuntimeError as exc:
+            assert "cooldown active" in str(exc)
+        else:
+            raise AssertionError("Expected provider cooldown to block request.")
+    finally:
+        db.close()

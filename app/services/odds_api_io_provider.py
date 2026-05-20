@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 import httpx
 
 from app.services.provider_usage_service import (
+    activate_provider_rate_limit_cooldown,
     ensure_provider_request_allowed,
     record_provider_request,
 )
@@ -111,6 +112,11 @@ class OddsApiIoProvider:
         if response.status_code == 401:
             raise RuntimeError("Odds-API.io API key is invalid or unauthorized.")
         if response.status_code == 429:
+            if self.usage_db is not None:
+                activate_provider_rate_limit_cooldown(
+                    self.usage_db,
+                    endpoint=path,
+                )
             raise RuntimeError("Odds-API.io rate limit reached.")
         if response.status_code >= 400:
             raise RuntimeError(

@@ -1,7 +1,12 @@
+import base64
+import binascii
+import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, SessionLocal, engine
@@ -18,6 +23,50 @@ from app.routers.system import router as system_router
 from app.routers.web import router as web_router
 from app.services.mock_odds_provider import MockOddsProvider
 from app.services.odds_scheduler import odds_scheduler
+
+
+def is_auth_exempt_path(path):
+    return path == "/health" or path == "/static" or path.startswith("/static/")
+
+
+def unauthorized_response():
+    return Response(
+        content="Authentication required",
+        status_code=401,
+        headers={"WWW-Authenticate": "Basic"},
+    )
+
+
+def decode_basic_credentials(authorization):
+    if not authorization:
+        return None, None
+
+    scheme, _, credentials = authorization.partition(" ")
+    if scheme.lower() != "basic" or not credentials:
+        return None, None
+
+    try:
+        decoded = base64.b64decode(credentials).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        return None, None
+
+    username, separator, password = decoded.partition(":")
+    if not separator:
+        return None, None
+
+    return username, password
+
+
+def credentials_are_valid(username, password):
+    expected_username = os.getenv("APP_USERNAME")
+    expected_password = os.getenv("APP_PASSWORD")
+
+    if not expected_username or not expected_password:
+        return False
+
+    username_matches = secrets.compare_digest(username, expected_username)
+    password_matches = secrets.compare_digest(password, expected_password)
+    return username_matches and password_matches
 
 
 def get_or_create_competition(db, name, country):
@@ -167,6 +216,22 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Football Odds Monitor", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_basic_auth(request: Request, call_next):
+    if is_auth_exempt_path(request.url.path):
+        return await call_next(request)
+
+    username, password = decode_basic_credentials(
+        request.headers.get("Authorization")
+    )
+    if username is None or not credentials_are_valid(username, password):
+        return unauthorized_response()
+
+    return await call_next(request)
+
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web_router)
 app.include_router(health_router)

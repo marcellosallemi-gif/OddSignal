@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS scheduler_settings (
 CREATE_PROVIDER_PLAN_SETTINGS_SQL = """
 CREATE TABLE IF NOT EXISTS provider_plan_settings (
     id INTEGER PRIMARY KEY,
-    plan_name VARCHAR NOT NULL DEFAULT 'Free',
+    plan_name VARCHAR NOT NULL DEFAULT 'Free Plan',
     hourly_request_limit INTEGER,
     max_bookmakers INTEGER NOT NULL DEFAULT 2,
     created_at DATETIME NOT NULL
@@ -218,6 +218,56 @@ def run_runtime_migrations() -> dict:
 
         conn.exec_driver_sql(CREATE_ALERT_SETTINGS_SQL)
         conn.exec_driver_sql(CREATE_SCHEDULER_SETTINGS_SQL)
+        conn.exec_driver_sql(CREATE_PROVIDER_PLAN_SETTINGS_SQL)
+        conn.exec_driver_sql(CREATE_PROVIDER_BOOKMAKER_SETTINGS_SQL)
+
+        existing_provider_plan_settings = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM provider_plan_settings"
+        ).scalar()
+        if existing_provider_plan_settings == 0:
+            conn.exec_driver_sql(
+                """
+                INSERT INTO provider_plan_settings (
+                    plan_name,
+                    hourly_request_limit,
+                    max_bookmakers,
+                    created_at
+                )
+                VALUES ('Free Plan', 100, 2, CURRENT_TIMESTAMP)
+                """
+            )
+
+        conn.exec_driver_sql(
+            """
+            UPDATE provider_plan_settings
+            SET plan_name = 'Free Plan'
+            WHERE plan_name = 'Free'
+              AND hourly_request_limit = 100
+              AND max_bookmakers = 2
+            """
+        )
+
+        existing_provider_bookmaker_settings = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM provider_bookmaker_settings"
+        ).scalar()
+        if existing_provider_bookmaker_settings == 0:
+            conn.exec_driver_sql(
+                """
+                INSERT INTO provider_bookmaker_settings (
+                    bookmakers_csv,
+                    created_at
+                )
+                VALUES (
+                    COALESCE(NULLIF(?, ''), 'Stake,Sbobet'),
+                    CURRENT_TIMESTAMP
+                )
+                """,
+                (
+                    os.getenv("ODDS_API_IO_BOOKMAKERS")
+                    or os.getenv("ODDS_API_BOOKMAKERS")
+                    or "Stake,Sbobet",
+                ),
+            )
 
         existing_scheduler_settings = conn.exec_driver_sql(
             "SELECT COUNT(*) FROM scheduler_settings"

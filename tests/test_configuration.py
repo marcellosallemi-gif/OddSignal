@@ -723,3 +723,47 @@ def test_update_provider_bookmaker_settings_rejects_above_plan_limit():
 
     assert response.status_code == 400
     assert "Troppi bookmaker" in response.json()["detail"]
+
+
+def test_scheduler_activation_rejects_bookmakers_above_provider_plan_limit():
+    with TestClient(app) as client:
+        pro_plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Pro",
+                "hourly_request_limit": 5000,
+                "max_bookmakers": 15,
+            },
+        )
+        assert pro_plan_response.status_code == 200
+
+        bookmakers_response = client.put(
+            "/configuration/provider-bookmaker-settings",
+            json={
+                "bookmakers_csv": "Stake,Sbobet,Bet365",
+            },
+        )
+        assert bookmakers_response.status_code == 200
+        assert bookmakers_response.json()["bookmaker_count"] == 3
+
+        free_plan_response = client.put(
+            "/configuration/provider-plan-settings",
+            json={
+                "plan_name": "Free Plan",
+                "hourly_request_limit": 100000,
+                "max_bookmakers": 2,
+            },
+        )
+        assert free_plan_response.status_code == 200
+
+        scheduler_response = client.put(
+            "/configuration/scheduler-settings",
+            json={
+                "enabled": True,
+                "poll_interval_seconds": 300,
+                "event_limit": 1,
+            },
+        )
+
+    assert scheduler_response.status_code == 400
+    assert "Configurazione bookmaker non compatibile" in scheduler_response.json()["detail"]

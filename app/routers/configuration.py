@@ -605,6 +605,7 @@ from app.services.provider_plan_settings_service import (
     get_or_create_provider_plan_settings,
     update_provider_plan_settings,
     validate_scheduler_against_provider_plan,
+    validate_bookmakers_against_provider_plan,
 )
 from app.services.provider_bookmaker_settings_service import (
     bookmakers_from_csv,
@@ -650,6 +651,10 @@ def put_scheduler_settings(
             enabled=payload.enabled,
             poll_interval_seconds=payload.poll_interval_seconds,
             event_limit=payload.event_limit,
+        )
+        validate_bookmakers_against_provider_plan(
+            db=db,
+            enabled=payload.enabled,
         )
         return update_scheduler_settings(
             db=db,

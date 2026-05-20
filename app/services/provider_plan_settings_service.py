@@ -9,7 +9,7 @@ def _utc_now_naive():
 
 
 def _default_plan_name() -> str:
-    return os.getenv("PROVIDER_PLAN_NAME", "Free")
+    return os.getenv("PROVIDER_PLAN_NAME", "Free Plan")
 
 
 def _default_hourly_request_limit():
@@ -164,5 +164,33 @@ def validate_scheduler_against_provider_plan(
             plan_name=plan.plan_name,
             estimated=estimated_requests_per_hour,
             limit=plan.hourly_request_limit,
+        )
+    )
+
+
+
+def validate_bookmakers_against_provider_plan(
+    db,
+    enabled: bool,
+):
+    if not enabled:
+        return None
+
+    from app.services.provider_bookmaker_settings_service import get_configured_bookmakers
+
+    plan = get_or_create_provider_plan_settings(db)
+    bookmakers = get_configured_bookmakers(db)
+
+    if len(bookmakers) <= plan.max_bookmakers:
+        return None
+
+    raise ValueError(
+        "Configurazione bookmaker non compatibile con il piano API {plan_name}: "
+        "{current} bookmaker configurati su massimo {limit}. "
+        "Riduci i bookmaker configurati oppure aggiorna il Piano API."
+        .format(
+            plan_name=plan.plan_name,
+            current=len(bookmakers),
+            limit=plan.max_bookmakers,
         )
     )

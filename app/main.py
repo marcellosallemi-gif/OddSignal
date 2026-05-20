@@ -245,7 +245,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
 AUTH_EXEMPT_PATHS = {"/health", "/health/", "/auth-debug"}
-AUTH_EXEMPT_PREFIXES = ("/static/",)
+AUTH_EXEMPT_PREFIXES = ("/static/", "/public/")
 
 
 def is_auth_enabled() -> bool:
@@ -315,6 +315,19 @@ app.include_router(system_router)
 
 @app.get("/auth-debug")
 def auth_debug():
+    username = os.getenv("APP_USERNAME", "")
+    password = os.getenv("APP_PASSWORD", "")
+    return {
+        "auth_enabled": os.getenv("APP_AUTH_ENABLED", ""),
+        "username": username,
+        "username_length": len(username),
+        "password_present": bool(password),
+        "password_length": len(password),
+    }
+
+
+@app.get("/public/auth-debug")
+def public_auth_debug():
     username = os.getenv("APP_USERNAME", "")
     password = os.getenv("APP_PASSWORD", "")
     return {

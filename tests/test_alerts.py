@@ -73,3 +73,55 @@ def test_get_alerts_returns_readable_alert_fields():
     assert "created_at" in alert
 
     clear_alerts()
+
+
+def test_delete_recent_alerts_removes_only_alert_rows():
+    with TestClient(app) as client:
+        clear_alerts()
+        db = SessionLocal()
+        try:
+            event = db.query(Event).order_by(Event.id).first()
+            for selection, created_at in [
+                ("Over 2.5", datetime(2026, 5, 17, 10, 0)),
+                ("Under 2.5", datetime(2026, 5, 17, 11, 0)),
+            ]:
+                save_alert(
+                    db,
+                    {
+                        "event_id": event.id,
+                        "provider": "MockProvider A",
+                        "bookmaker": "MockBook A",
+                        "market": "Over/Under 2.5",
+                        "selection": selection,
+                        "previous_odds": 1.80,
+                        "current_odds": 2.00,
+                        "variation_percent": 11.11,
+                        "direction": "increase",
+                        "alert_type": "standard_alert",
+                        "created_at": created_at,
+                    },
+                )
+        finally:
+            db.close()
+
+        response = client.delete("/alerts/recent?limit=1")
+
+    assert response.status_code == 200
+    assert response.json()["deleted_count"] == 1
+
+    db = SessionLocal()
+    try:
+        assert db.query(Alert).count() == 1
+    finally:
+        db.close()
+        clear_alerts()
+
+
+
+def test_delete_recent_alerts_endpoint_returns_deleted_count():
+    with TestClient(app) as client:
+        response = client.delete("/alerts/recent?limit=20")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "deleted_count" in payload

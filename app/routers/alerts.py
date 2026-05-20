@@ -65,3 +65,31 @@ def get_alerts(
         }
         for alert in alerts
     ]
+
+
+@router.delete("/alerts/recent")
+def delete_recent_alerts(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    safe_limit = max(1, min(limit, 100))
+
+    alerts_to_delete = (
+        db.query(Alert)
+        .order_by(Alert.created_at.desc(), Alert.id.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+    deleted_count = len(alerts_to_delete)
+
+    for alert in alerts_to_delete:
+        db.delete(alert)
+
+    db.commit()
+
+    return {
+        "deleted_count": deleted_count,
+        "message": "Alert recenti cancellati.",
+    }
+

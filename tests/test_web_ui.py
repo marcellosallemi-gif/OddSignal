@@ -11,6 +11,11 @@ def test_web_home_returns_html_page():
     assert "text/html" in response.headers["content-type"]
     assert "OddSignal" in response.text
     assert "Benvenuto in OddSignal" in response.text
+    assert "Consumo API locale" in response.text
+    assert "Il dato può differire dal pannello ufficiale Odds-API.io" in response.text
+    assert "Cancella alert recenti" in response.text
+    assert "Mercati MVP supportati" not in response.text
+    assert "Mercati futuri / da integrare" not in response.text
     assert "/static/brand/oddsignal-horizontal.png" in response.text
     assert "Software informativo per monitorare variazioni significative delle quote calcio" in response.text
     assert "cooldown_active" in response.text
@@ -23,12 +28,12 @@ def test_web_home_returns_html_page():
     assert "sidebar-link" in response.text
     assert "data-page" in response.text
     assert "Home" in response.text
-    assert "Prontezza sistema" in response.text
+    assert "data-page=\"readiness\" onclick=\"showPage('readiness', event)\">Sistema</button>" in response.text
     assert "Alert" in response.text
     assert "Bookmaker" in response.text
     assert "Storico / Log" in response.text
     assert "Area tecnica" in response.text
-    assert "Consumo API provider" in response.text
+    assert "Consumo API provider" not in response.text
     assert "checks.provider_usage" in response.text
     assert "readiness-summary" in response.text
     assert "loadReadiness" in response.text
@@ -45,6 +50,8 @@ def test_web_home_returns_html_page():
     assert "Mercati attivi" in response.text
     assert "Telegram" in response.text
     assert "Automazione" in response.text
+    assert "Come funziona" in response.text
+    assert "eventi per ciclo" in response.text
     assert "Frequenza controllo" in response.text
     assert "Cooldown notifiche" in response.text
     assert "Salva automazione" in response.text
@@ -56,13 +63,20 @@ def test_web_home_returns_html_page():
     assert "Esegui controllo quote ora" in response.text
     assert "Soglie alert" in response.text
     assert "Salva soglie" in response.text
+    assert "Dedup minuti" in response.text
+    assert "evita di generare alert duplicati" in response.text
+    assert "Cancella alert recenti" in response.text
     assert "Campionati" in response.text
+    assert "competition-search" in response.text
+    assert "Cerca campionati" in response.text
     assert "Campionati rilevati dagli eventi disponibili ora" in response.text
     assert "Aggiorna leghe/slug dal provider" in response.text
     assert "Aggiorna campionati da eventi" in response.text
     assert "refreshProviderCompetitions" in response.text
-    assert "Mercati MVP supportati" in response.text
-    assert "Mercati futuri / da integrare" in response.text
+    assert "Mercati MVP supportati" not in response.text
+    assert "Mercati futuri / da integrare" not in response.text
+    assert "Carica mercati suggeriti" in response.text
+    assert "Doppia chance" in response.text
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
     assert "Rileva account Telegram" in response.text

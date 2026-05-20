@@ -15,15 +15,15 @@ def web_home():
   <title>OddSignal - Dashboard</title>
   <style>
     :root {
-      --bg: #f4faf7;
+      --bg: #f5faf8;
       --panel: rgba(255, 255, 255, 0.72);
-      --text: #0d1f2d;
-      --muted: #617180;
+      --text: #0b2540;
+      --muted: #526b80;
       --border: rgba(13, 31, 45, 0.10);
-      --sidebar: rgba(255, 255, 255, 0.58);
-      --sidebar-muted: #647482;
+      --sidebar: rgba(255, 255, 255, 0.66);
+      --sidebar-muted: #5f7487;
       --accent: #1f9d69;
-      --accent-dark: #0d1f2d;
+      --accent-dark: #0b2540;
       --accent-soft: rgba(31, 157, 105, 0.12);
       --success-bg: #dcfce7;
       --warning-bg: #fef3c7;
@@ -45,6 +45,7 @@ def web_home():
 
     h1, h2, h3 {
       margin-bottom: 8px;
+      color: var(--accent-dark);
     }
 
     h1 {
@@ -72,7 +73,7 @@ def web_home():
       width: 280px;
       background: var(--sidebar);
       color: var(--text);
-      padding: 22px 16px;
+      padding: 24px 16px;
       overflow-y: auto;
       border: 1px solid rgba(255, 255, 255, 0.72);
       border-radius: 28px;
@@ -82,29 +83,15 @@ def web_home():
     }
 
     .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 28px;
+      display: block;
+      margin: 2px 8px 30px;
     }
 
     .brand-logo {
       display: block;
-      width: 190px;
+      width: 205px;
       max-width: 100%;
       height: auto;
-    }
-
-    .brand-name {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--accent-dark);
-    }
-
-    .brand-subtitle {
-      color: var(--sidebar-muted);
-      font-size: 12px;
-      margin-top: 2px;
     }
 
     .sidebar-nav {
@@ -119,7 +106,7 @@ def web_home():
       color: var(--text);
       text-align: left;
       border-radius: 14px;
-      padding: 11px 12px;
+      padding: 10px 12px;
       font-size: 14px;
       font-weight: 650;
       box-shadow: none;
@@ -169,19 +156,42 @@ def web_home():
     .home-section {
       min-height: calc(100vh - 56px);
       display: none;
-      align-content: center;
-      text-align: center;
+      align-content: start;
+      gap: 18px;
     }
 
     .home-section.active {
       display: grid;
     }
 
+    .home-hero {
+      text-align: center;
+      padding: 34px 28px 30px;
+    }
+
     .home-logo {
       display: block;
-      width: min(420px, 78vw);
+      width: min(360px, 72vw);
       height: auto;
-      margin: 0 auto 22px;
+      margin: 0 auto 18px;
+    }
+
+    .home-dashboard {
+      display: grid;
+      gap: 12px;
+    }
+
+    .home-status-panel {
+      padding: 18px;
+    }
+
+    .home-toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      text-align: left;
     }
 
     .eyebrow {
@@ -198,7 +208,7 @@ def web_home():
       color: var(--muted);
       font-size: 17px;
       line-height: 1.55;
-      margin: 0 auto 20px;
+      margin: 0 auto 18px;
     }
 
     .section-header {
@@ -237,19 +247,19 @@ def web_home():
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
     }
 
     .status-grid {
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
     }
 
     .summary-card {
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px;
+      border-radius: 16px;
+      padding: 13px 14px;
       background: rgba(255, 255, 255, 0.64);
       box-shadow: 0 12px 30px rgba(13, 31, 45, 0.06);
     }
@@ -262,9 +272,10 @@ def web_home():
     }
 
     .summary-value {
-      margin-top: 6px;
-      font-size: 20px;
+      margin-top: 5px;
+      font-size: 18px;
       font-weight: 700;
+      color: var(--accent-dark);
     }
 
     .form-grid {
@@ -274,11 +285,18 @@ def web_home():
       align-items: end;
     }
 
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 420px);
+      gap: 8px;
+      margin: 12px 0;
+    }
+
     label {
       display: flex;
       flex-direction: column;
       gap: 5px;
-      color: #344054;
+      color: var(--accent-dark);
       font-size: 13px;
       font-weight: 700;
     }
@@ -297,6 +315,7 @@ def web_home():
     button:hover {
       border-color: var(--accent);
       color: var(--accent-dark);
+      background: rgba(255, 255, 255, 0.92);
     }
 
     button.primary {
@@ -344,11 +363,12 @@ def web_home():
     }
 
     th, td {
-      border-bottom: 1px solid #edf2f7;
+      border-bottom: 1px solid rgba(13, 31, 45, 0.08);
       padding: 11px 10px;
       text-align: left;
       font-size: 14px;
       vertical-align: top;
+      color: var(--text);
     }
 
     tr:last-child td {
@@ -357,7 +377,7 @@ def web_home():
 
     th {
       background: rgba(255, 255, 255, 0.58);
-      color: #475467;
+      color: var(--muted);
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .04em;
@@ -375,6 +395,7 @@ def web_home():
       background: #e5e7eb;
       font-size: 12px;
       font-weight: 700;
+      color: var(--accent-dark);
     }
 
     .ok {
@@ -392,6 +413,7 @@ def web_home():
       background: #f3f4f6;
       border: 1px solid #e5e7eb;
       font-size: 14px;
+      color: var(--text);
     }
     .feedback.success {
       background: #ecfdf5;
@@ -405,7 +427,7 @@ def web_home():
     }
 
     .info-box {
-      background: #f8fafc;
+      background: rgba(255, 255, 255, 0.62);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 12px;
@@ -451,7 +473,7 @@ def web_home():
 
     summary {
       cursor: pointer;
-      color: #344054;
+      color: var(--accent-dark);
       font-size: 14px;
       font-weight: 700;
     }
@@ -486,6 +508,10 @@ def web_home():
       .status-grid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       }
+
+      .home-toolbar {
+        display: grid;
+      }
     }
   </style>
 </head>
@@ -494,20 +520,16 @@ def web_home():
   <aside class="sidebar">
     <div class="brand">
       <img class="brand-logo" src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
-      <div>
-        <div class="brand-name">OddSignal</div>
-        <div class="brand-subtitle">Monitoraggio quote calcio</div>
-      </div>
     </div>
     <nav class="sidebar-nav" aria-label="Navigazione dashboard">
       <button type="button" class="sidebar-link active" data-page="overview" onclick="showPage('overview', event)">Home</button>
-      <button type="button" class="sidebar-link" data-page="readiness" onclick="showPage('readiness', event)">Prontezza sistema</button>
-      <button type="button" class="sidebar-link" data-page="recent-alerts" onclick="showPage('recent-alerts', event)">Alert</button>
+      <button type="button" class="sidebar-link" data-page="automation" onclick="showPage('automation', event)">Automazione</button>
+      <button type="button" class="sidebar-link" data-page="readiness" onclick="showPage('readiness', event)">Sistema</button>
       <button type="button" class="sidebar-link" data-page="competitions" onclick="showPage('competitions', event)">Campionati</button>
       <button type="button" class="sidebar-link" data-page="markets" onclick="showPage('markets', event)">Mercati</button>
+      <button type="button" class="sidebar-link" data-page="recent-alerts" onclick="showPage('recent-alerts', event)">Alert</button>
       <button type="button" class="sidebar-link" data-page="provider-bookmakers" onclick="showPage('provider-bookmakers', event)">Bookmaker</button>
       <button type="button" class="sidebar-link" data-page="provider-plan" onclick="showPage('provider-plan', event)">Piano API</button>
-      <button type="button" class="sidebar-link" data-page="automation" onclick="showPage('automation', event)">Automazione</button>
       <button type="button" class="sidebar-link" data-page="recipients" onclick="showPage('recipients', event)">Telegram</button>
       <button type="button" class="sidebar-link" data-page="notification-logs-section" onclick="showPage('notification-logs-section', event)">Storico / Log</button>
       <button type="button" class="sidebar-link" data-page="technical-area" onclick="showPage('technical-area', event)">Area tecnica</button>
@@ -516,42 +538,52 @@ def web_home():
 
   <main class="main-content">
   <div class="content-inner">
-  <section id="overview" class="page-section glass-card home-section active">
-    <img class="home-logo" src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
-    <div class="eyebrow">Dashboard operativa</div>
-    <h1>Benvenuto in OddSignal</h1>
-    <p class="lead">Software informativo per monitorare variazioni significative delle quote calcio, con alert configurabili, storico, notifiche Telegram e controlli sui limiti API.</p>
-    <div class="section-actions">
-      <button onclick="loadStatus()">Aggiorna stato</button>
-      <button onclick="loadReadiness()">Ricarica prontezza</button>
-      <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+  <section id="overview" class="page-section home-section active">
+    <div class="home-hero glass-card">
+      <img class="home-logo" src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
+      <div class="eyebrow">Dashboard operativa</div>
+      <h1>Benvenuto in OddSignal</h1>
+      <p class="lead">Software informativo per monitorare variazioni significative delle quote calcio, con alert configurabili, storico, notifiche Telegram e controlli sui limiti API.</p>
     </div>
-    <div id="dashboard-summary" class="summary-grid status-grid">
-      <div class="summary-card"><div class="summary-label">Sistema</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Monitoraggio</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Consumo API</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
-    </div>
-    <div id="overview-metrics" class="summary-grid">
-      <div class="summary-card"><div class="summary-label">Campionati attivi</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Mercati attivi</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Alert recenti</div><div class="summary-value">...</div></div>
-      <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
+    <div class="home-dashboard glass-card home-status-panel">
+      <div class="home-toolbar">
+        <div>
+          <h2>Riepilogo operativo</h2>
+          <p class="muted">Stato corrente del sistema e delle configurazioni principali.</p>
+        </div>
+        <div class="section-actions">
+          <button onclick="loadStatus()">Aggiorna stato</button>
+          <button onclick="loadReadiness()">Ricarica sistema</button>
+          <button onclick="loadProviderUsage()">Ricarica consumo API locale</button>
+        </div>
+      </div>
+      <div id="dashboard-summary" class="summary-grid status-grid">
+        <div class="summary-card"><div class="summary-label">Sistema</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Monitoraggio</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Consumo API</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
+      </div>
+      <div id="overview-metrics" class="summary-grid">
+        <div class="summary-card"><div class="summary-label">Campionati attivi</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Mercati attivi</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Alert recenti</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
+      </div>
     </div>
   </section>
 
   <section id="readiness" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Prontezza sistema</h2>
+        <h2>Sistema</h2>
         <p class="muted">Riepilogo operativo per capire se il sistema è pronto a monitorare senza controllare manualmente tutte le sezioni.</p>
       </div>
       <div class="section-actions">
-        <button onclick="loadReadiness()">Ricarica prontezza</button>
+        <button onclick="loadReadiness()">Ricarica sistema</button>
       </div>
     </div>
-    <div id="readiness-summary" class="info-box">Caricamento prontezza sistema...</div>
-    <div id="readiness-feedback" class="feedback muted">Caricamento prontezza sistema...</div>
+    <div id="readiness-summary" class="info-box">Caricamento sistema...</div>
+    <div id="readiness-feedback" class="feedback muted">Caricamento sistema...</div>
   </section>
 
   <section id="recent-alerts" class="page-section glass-card">
@@ -585,6 +617,11 @@ def web_home():
           <button class="primary" onclick="saveAlertSettings()">Salva soglie</button>
           <button onclick="loadAlertSettings()">Ricarica</button>
         </div>
+        <div class="info-box">
+          <strong>Dedup minuti</strong>
+          <p class="muted">Indica per quanti minuti il sistema evita di generare alert duplicati sulla stessa combinazione evento, mercato, selezione, bookmaker e provider.</p>
+          <p class="muted">Serve a non ricevere notifiche ripetute per lo stesso movimento quota. Esempio: se dedup minuti = 30, lo stesso alert non viene ripetuto per 30 minuti.</p>
+        </div>
         <div id="alert-settings-feedback" class="feedback muted">Caricamento impostazioni...</div>
       </div>
 
@@ -602,6 +639,7 @@ def web_home():
               <option value="critical">Critici</option>
             </select>
             <button onclick="loadAlerts()">Aggiorna alert</button>
+            <button onclick="clearRecentAlerts()">Cancella alert recenti</button>
           </div>
         </div>
         <div id="alerts-filter-feedback" class="feedback muted">Gli alert Telegram vengono inviati solo sui cali quota.</div>
@@ -626,6 +664,11 @@ def web_home():
       <strong>Come usare questa sezione</strong>
       <p class="muted">Attiva solo i campionati che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
     </div>
+    <div class="filter-row">
+      <label>Cerca campionati
+        <input id="competition-search" type="search" placeholder="Cerca per nome, paese, slug o stato" oninput="renderCompetitionsTable()">
+      </label>
+    </div>
     <div id="competitions-summary" class="summary-grid"></div>
     <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
     <div id="competitions-table"></div>
@@ -639,19 +682,7 @@ def web_home():
       </div>
       <div class="section-actions">
         <button onclick="loadMonitoredMarkets()">Aggiorna mercati</button>
-      </div>
-    </div>
-    <div class="info-box">
-      <strong>Mercati MVP supportati</strong>
-      <p class="muted">1X2, Over/Under, Goal/No Goal e Handicap sono collegati ai mercati provider normalizzati.</p>
-      <strong>Mercati futuri / da integrare</strong>
-      <div class="future-list">
-        <span class="badge">Doppia chance</span>
-        <span class="badge">Risultato esatto</span>
-        <span class="badge">Primo tempo/finale</span>
-        <span class="badge">Corner</span>
-        <span class="badge">Cartellini</span>
-        <span class="badge">Marcatori</span>
+        <button onclick="addSuggestedMarkets()">Carica mercati suggeriti</button>
       </div>
     </div>
     <div id="markets-feedback" class="feedback muted">Caricamento mercati...</div>
@@ -716,15 +747,15 @@ def web_home():
     <div id="provider-usage" class="subsection">
       <div class="section-header">
         <div>
-          <h3>Consumo API provider</h3>
-          <p class="muted">Controlla quante richieste Odds-API.io sono state registrate localmente nell'ultima ora.</p>
+          <h3>Consumo API locale</h3>
+          <p class="muted">Questo contatore mostra solo le chiamate registrate localmente da OddSignal nell’ultima ora. Il dato può differire dal pannello ufficiale Odds-API.io, che resta la fonte ufficiale del consumo del piano.</p>
         </div>
         <div class="section-actions">
-          <button onclick="loadProviderUsage()">Ricarica consumo API</button>
+          <button onclick="loadProviderUsage()">Ricarica consumo API locale</button>
         </div>
       </div>
-      <div id="provider-usage-summary" class="info-box">Caricamento consumo API...</div>
-      <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API...</div>
+      <div id="provider-usage-summary" class="info-box">Caricamento consumo API locale...</div>
+      <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API locale...</div>
     </div>
   </section>
 
@@ -737,6 +768,11 @@ def web_home():
     </div>
     <div class="section-stack">
       <div class="subsection">
+        <div id="scheduler-status"></div>
+      </div>
+
+      <div class="subsection">
+        <h3>Configurazione automazione</h3>
         <div id="automation-status" class="info-box">Caricamento automazione...</div>
         <div class="form-grid">
           <label>Controllo automatico
@@ -761,7 +797,6 @@ def web_home():
           <button onclick="loadSchedulerSettings()">Ricarica automazione</button>
         </div>
         <div id="scheduler-settings-feedback" class="feedback muted">Caricamento automazione...</div>
-        <div id="scheduler-status"></div>
       </div>
 
       <div id="manual-check" class="subsection">
@@ -833,7 +868,7 @@ def web_home():
         <pre id="provider-plan-result">Caricamento...</pre>
       </details>
       <details>
-        <summary>JSON tecnico consumo API</summary>
+        <summary>JSON tecnico consumo API locale</summary>
         <pre id="provider-usage-result">Caricamento...</pre>
       </details>
       <details>
@@ -904,11 +939,33 @@ const dashboardState = {
   system: {},
   readiness: null,
   providerUsage: null,
+  competitions: [],
   activeCompetitions: "...",
   activeMarkets: "...",
   activeRecipients: "...",
   lastManualCheck: "Nessuno"
 };
+
+const suggestedFootballMarkets = [
+  "1X2",
+  "Doppia chance",
+  "Over/Under 0.5",
+  "Over/Under 1.5",
+  "Over/Under 2.5",
+  "Over/Under 3.5",
+  "Goal/No Goal",
+  "Handicap principale",
+  "Handicap asiatico",
+  "Risultato esatto",
+  "Primo tempo/finale",
+  "Risultato primo tempo",
+  "Totale corner",
+  "Handicap corner",
+  "Totale cartellini",
+  "Marcatori",
+  "Primo marcatore",
+  "Entrambe le squadre segnano primo tempo"
+];
 
 function setFeedback(elementId, message, type) {
   const element = document.getElementById(elementId);
@@ -1054,7 +1111,7 @@ function renderDashboardSummary(data) {
     dashboardSummary.innerHTML = [
       summaryCard("Sistema", readinessValue),
       summaryCard("Monitoraggio", schedulerValue),
-      summaryCard("Consumo API", providerUsageValue),
+      summaryCard("API locale", providerUsageValue),
       summaryCard("Telegram", telegramValue)
     ].join("");
   }
@@ -1092,15 +1149,25 @@ function renderAutomationStatus(data) {
     <div class="info-box">
       <strong>Come funziona</strong>
       <p class="muted">
-        Il sistema confronta le nuove quote con lo storico salvato. Genera alert solo quando la variazione rientra nelle soglie configurate.
+        Lo scheduler controlla periodicamente le quote e confronta i nuovi valori con lo storico salvato.
       </p>
       <p class="muted">
-        Il cooldown evita notifiche ripetute per lo stesso evento, mercato, selezione e bookmaker entro ${escapeHtml(cooldownMinutes)} minuti.
+        La frequenza controllo indica ogni quanti secondi o minuti viene eseguito il ciclo; eventi per ciclo indica quanti eventi vengono analizzati a ogni ciclo di controllo.
       </p>
       <p class="muted">
-        ${schedulerEnabled
-          ? `Il controllo automatico è attivo e verifica fino a ${escapeHtml(eventLimit)} evento/i ogni ${escapeHtml(intervalLabel)}.`
-          : "Il controllo automatico è spento. Puoi usare il controllo manuale oppure abilitarlo nella configurazione server e riavviare l'app."}
+        Aumentare eventi per ciclo aumenta il consumo API. Con Free Plan conviene tenere pochi eventi per ciclo.
+      </p>
+      <p class="muted">
+        Se lo scheduler è spento non partono controlli automatici e non vengono generate notifiche automatiche.
+      </p>
+      <p class="muted">
+        Il controllo quote manuale serve per test o verifiche occasionali e può consumare richieste API.
+      </p>
+      <p class="muted">
+        Stato attuale: ${schedulerEnabled
+          ? `attivo, fino a ${escapeHtml(eventLimit)} evento/i ogni ${escapeHtml(intervalLabel)}.`
+          : "spento."}
+        Cooldown notifiche: ${escapeHtml(cooldownMinutes)} minuti.
       </p>
     </div>
   `;
@@ -1369,7 +1436,7 @@ function renderReadiness(data) {
       </thead>
       <tbody>
         <tr>
-          <td>Consumo API provider</td>
+          <td>Consumo API locale</td>
           <td>${readinessBadge(checks.provider_usage && checks.provider_usage.ok)}</td>
           <td>${escapeHtml(checks.provider_usage ? checks.provider_usage.message : "n/d")}</td>
         </tr>
@@ -1422,9 +1489,9 @@ async function loadReadiness() {
     document.getElementById("readiness-result").textContent = JSON.stringify(data, null, 2);
     renderReadiness(data);
     renderDashboardSummary();
-    setFeedback("readiness-feedback", "Prontezza sistema caricata.", "success");
+    setFeedback("readiness-feedback", "Sistema caricato.", "success");
   } catch (error) {
-    setFeedback("readiness-feedback", "Prontezza sistema non caricata: " + error.message, "error");
+    setFeedback("readiness-feedback", "Sistema non caricato: " + error.message, "error");
   }
 }
 
@@ -1476,9 +1543,9 @@ async function loadProviderUsage() {
     document.getElementById("provider-usage-result").textContent = JSON.stringify(data, null, 2);
     renderProviderUsage(data);
     renderDashboardSummary();
-    setFeedback("provider-usage-feedback", "Consumo API provider caricato.", "success");
+    setFeedback("provider-usage-feedback", "Consumo API locale caricato.", "success");
   } catch (error) {
-    setFeedback("provider-usage-feedback", "Consumo API provider non caricato: " + error.message, "error");
+    setFeedback("provider-usage-feedback", "Consumo API locale non caricato: " + error.message, "error");
   }
 }
 
@@ -1568,9 +1635,9 @@ async function saveAlertSettings() {
 
 async function loadCompetitions() {
   const data = await api("/configuration/available-competitions");
+  dashboardState.competitions = data;
   const activeCompetitions = data.filter((item) => item.is_active);
   const inactiveCompetitions = data.filter((item) => !item.is_active);
-  const orderedCompetitions = activeCompetitions.concat(inactiveCompetitions);
 
   dashboardState.activeCompetitions = activeCompetitions.length;
   renderDashboardSummary();
@@ -1581,9 +1648,35 @@ async function loadCompetitions() {
     summaryCard("Non attivi", inactiveCompetitions.length)
   ].join("");
 
+  renderCompetitionsTable();
+  setFeedback("competitions-feedback", `Campionati disponibili: ${data.length}. Attivi: ${activeCompetitions.length}.`, "success");
+}
+
+function renderCompetitionsTable() {
+  const data = dashboardState.competitions || [];
+  const query = (document.getElementById("competition-search")?.value || "").trim().toLowerCase();
+  const activeCompetitions = data.filter((item) => item.is_active);
+  const inactiveCompetitions = data.filter((item) => !item.is_active);
+  const orderedCompetitions = activeCompetitions.concat(inactiveCompetitions);
+  const filteredCompetitions = orderedCompetitions.filter((item) => {
+    const isMapped = Boolean(item.provider_league_slug);
+    const status = isMapped ? (item.is_active ? "Attivo" : "Non attivo") : "Non monitorabile";
+    const normalizedCountry = item.country && item.country !== "Unknown"
+      ? item.country
+      : ((item.name || "").includes(" - ") ? (item.name || "").split(" - ")[0] : "");
+    const searchable = [
+      item.name,
+      normalizedCountry,
+      item.provider_league_slug,
+      status
+    ].join(" ").toLowerCase();
+
+    return !query || searchable.includes(query);
+  });
+
   let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
 
-  for (const item of orderedCompetitions) {
+  for (const item of filteredCompetitions) {
     const isMapped = Boolean(item.provider_league_slug);
     const active = isMapped ? (item.is_active ? "Attivo" : "Non attivo") : "Non monitorabile";
     const badgeClass = item.is_active && isMapped ? "badge ok" : "badge";
@@ -1622,7 +1715,10 @@ async function loadCompetitions() {
 
   html += "</tbody></table></div>";
   document.getElementById("competitions-table").innerHTML = html;
-  setFeedback("competitions-feedback", `Campionati disponibili: ${data.length}. Attivi: ${activeCompetitions.length}.`, "success");
+
+  if (query) {
+    setFeedback("competitions-feedback", `Filtro campionati: ${filteredCompetitions.length} risultati su ${data.length}.`, "");
+  }
 }
 
 async function monitorCompetition(name, country, slug, isActive) {
@@ -1723,6 +1819,8 @@ async function refreshProviderLeagues() {
 
 async function loadMonitoredMarkets() {
   const data = await api("/configuration/monitored-markets");
+  const existingNames = new Set(data.map((item) => item.market_name));
+  const missingSuggestedMarkets = suggestedFootballMarkets.filter((marketName) => !existingNames.has(marketName));
   dashboardState.activeMarkets = data.filter((item) => item.is_active).length;
   renderDashboardSummary();
 
@@ -1740,9 +1838,45 @@ async function loadMonitoredMarkets() {
       </td>
     </tr>`;
   }
+
+  for (const marketName of missingSuggestedMarkets) {
+    html += `<tr>
+      <td><span class="market-name">${escapeHtml(readableMarketName(marketName))}</span></td>
+      <td><span class="secondary-text">${escapeHtml(marketName)}</span></td>
+      <td><span class="badge">Da caricare</span></td>
+      <td><button class="compact" onclick="addSuggestedMarkets()">Carica mercati suggeriti</button></td>
+    </tr>`;
+  }
+
   html += "</tbody></table></div>";
   document.getElementById("monitored-markets").innerHTML = html;
-  setFeedback("markets-feedback", `Mercati caricati: ${data.length}.`, "success");
+  setFeedback("markets-feedback", `Mercati configurati: ${data.length}. Suggeriti da caricare: ${missingSuggestedMarkets.length}.`, "success");
+}
+
+async function addSuggestedMarkets() {
+  setFeedback("markets-feedback", "Caricamento mercati suggeriti...", "");
+
+  try {
+    const currentMarkets = await api("/configuration/monitored-markets");
+    const existingNames = new Set(currentMarkets.map((item) => item.market_name));
+    const marketsToCreate = suggestedFootballMarkets.filter((marketName) => !existingNames.has(marketName));
+
+    for (const marketName of marketsToCreate) {
+      await api("/configuration/monitored-markets", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          market_name: marketName,
+          is_active: false
+        })
+      });
+    }
+
+    await loadMonitoredMarkets();
+    setFeedback("markets-feedback", `Mercati suggeriti caricati: ${marketsToCreate.length}. Attivali solo se vuoi monitorarli.`, "success");
+  } catch (error) {
+    setFeedback("markets-feedback", "Mercati suggeriti non caricati: " + error.message, "error");
+  }
 }
 
 async function toggleMonitoredMarket(marketId, isActive) {
@@ -1899,6 +2033,27 @@ function renderAlertsTable() {
   html += "</tbody></table></div>";
   document.getElementById("alerts").innerHTML = html;
   setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "success");
+}
+
+async function clearRecentAlerts() {
+  const confirmed = window.confirm("Cancellare gli alert recenti visualizzati? Quote, configurazioni e log notifiche non verranno cancellati.");
+  if (!confirmed) {
+    return;
+  }
+
+  setFeedback("alerts-filter-feedback", "Cancellazione alert recenti...", "");
+
+  try {
+    const data = await api("/alerts/recent?limit=20", {
+      method: "DELETE"
+    });
+
+    await loadAlerts();
+    await loadStatus();
+    setFeedback("alerts-filter-feedback", `Alert recenti cancellati: ${data.deleted_count}.`, "success");
+  } catch (error) {
+    setFeedback("alerts-filter-feedback", "Alert recenti non cancellati: " + error.message, "error");
+  }
 }
 
 async function loadNotificationLogs() {

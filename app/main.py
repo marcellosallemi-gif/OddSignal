@@ -2,10 +2,16 @@ import base64
 import binascii
 import os
 import secrets
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        return False
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
@@ -215,6 +221,8 @@ async def lifespan(app):
         await odds_scheduler.stop()
 
 
+load_dotenv()
+
 app = FastAPI(title="Football Odds Monitor", lifespan=lifespan)
 
 
@@ -233,6 +241,67 @@ async def require_basic_auth(request: Request, call_next):
 
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
+AUTH_EXEMPT_PATHS = {"/health", "/health/"}
+AUTH_EXEMPT_PREFIXES = ("/static/",)
+
+
+def is_auth_enabled() -> bool:
+    return os.getenv("APP_AUTH_ENABLED", "0").strip().lower() in AUTH_ENABLED_VALUES
+
+
+def unauthorized_response() -> Response:
+    return Response(
+        content="Autenticazione richiesta",
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="OddSignal"'},
+    )
+
+
+def valid_basic_auth_header(authorization) -> bool:
+    expected_username = os.getenv("APP_USERNAME", "")
+    expected_password = os.getenv("APP_PASSWORD", "")
+
+    if not expected_username or not expected_password:
+        return False
+
+    if not authorization or not authorization.startswith("Basic "):
+        return False
+
+    token = authorization.removeprefix("Basic ").strip()
+
+    try:
+        decoded = base64.b64decode(token).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        return False
+
+    if ":" not in decoded:
+        return False
+
+    username, password = decoded.split(":", 1)
+
+    return (
+        secrets.compare_digest(username, expected_username)
+        and secrets.compare_digest(password, expected_password)
+    )
+
+
+@app.middleware("http")
+async def require_dashboard_auth(request: Request, call_next):
+    path = request.url.path
+
+    if not is_auth_enabled():
+        return await call_next(request)
+
+    if path in AUTH_EXEMPT_PATHS or path.startswith(AUTH_EXEMPT_PREFIXES):
+        return await call_next(request)
+
+    if not valid_basic_auth_header(request.headers.get("authorization")):
+        return unauthorized_response()
+
+    return await call_next(request)
 app.include_router(web_router)
 app.include_router(health_router)
 app.include_router(configuration_router)

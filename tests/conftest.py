@@ -1,4 +1,6 @@
 import os
+
+os.environ["APP_AUTH_ENABLED"] = "0"
 import tempfile
 from urllib.parse import urlsplit
 

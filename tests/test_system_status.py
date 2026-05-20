@@ -56,3 +56,18 @@ def test_system_readiness_returns_operational_checks():
     assert "ok" in checks["markets"]
     assert "ok" in checks["telegram"]
     assert "enabled" in checks["scheduler"]
+
+
+def test_provider_usage_returns_usage_status():
+    with TestClient(app) as client:
+        response = client.get("/system/provider-usage")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["provider"] == "odds_api_io"
+    assert "hourly_request_limit" in payload
+    assert "requests_used_last_hour" in payload
+    assert "requests_remaining" in payload
+    assert "limit_reached" in payload
+    assert "message" in payload

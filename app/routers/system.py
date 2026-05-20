@@ -12,6 +12,7 @@ from app.services.telegram_notifier import (
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.scheduler_settings_service import get_or_create_scheduler_settings
 from app.services.provider_bookmaker_settings_service import get_configured_bookmakers
+from app.services.provider_usage_service import get_provider_usage_status
 from app.services.provider_plan_settings_service import (
     estimate_provider_hourly_requests,
     get_active_mapped_competitions_count,
@@ -190,3 +191,9 @@ def get_system_readiness(db: Session = Depends(get_db)):
         "issues": issues,
         "warnings": warnings,
     }
+
+
+
+@router.get("/provider-usage")
+def get_provider_usage(db: Session = Depends(get_db)):
+    return get_provider_usage_status(db)

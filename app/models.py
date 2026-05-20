@@ -184,3 +184,14 @@ class ProviderBookmakerSetting(Base):
     id = Column(Integer, primary_key=True, index=True)
     bookmakers_csv = Column(String, nullable=False, default="Stake,Sbobet")
     created_at = Column(DateTime, nullable=False)
+
+
+
+class ProviderApiRequestLog(Base):
+    __tablename__ = "provider_api_request_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, nullable=False, default="odds_api_io")
+    endpoint = Column(String, nullable=False)
+    status_code = Column(Integer, nullable=True)
+    created_at = Column(DateTime, nullable=False)

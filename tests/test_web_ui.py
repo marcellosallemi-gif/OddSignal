@@ -17,6 +17,8 @@ def test_web_home_returns_html_page():
     assert "Navigazione dashboard" in response.text
     assert "Stato operativo" in response.text
     assert "Prontezza sistema" in response.text
+    assert "Consumo API provider" in response.text
+    assert "checks.provider_usage" in response.text
     assert "readiness-summary" in response.text
     assert "loadReadiness" in response.text
     assert "/system/readiness" in response.text

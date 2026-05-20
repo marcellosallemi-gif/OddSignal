@@ -1063,6 +1063,11 @@ function renderReadiness(data) {
       </thead>
       <tbody>
         <tr>
+          <td>Consumo API provider</td>
+          <td>${readinessBadge(checks.provider_usage && checks.provider_usage.ok)}</td>
+          <td>${escapeHtml(checks.provider_usage ? checks.provider_usage.message : "n/d")}</td>
+        </tr>
+        <tr>
           <td>Piano API</td>
           <td>${readinessBadge(checks.provider_plan && checks.provider_plan.ok)}</td>
           <td>${escapeHtml(checks.provider_plan ? checks.provider_plan.message : "n/d")}</td>

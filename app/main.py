@@ -1,7 +1,9 @@
 import base64
-import binascii
+import hashlib
+import hmac
 import os
 import secrets
+import time
 
 try:
     from dotenv import load_dotenv
@@ -10,9 +12,10 @@ except ImportError:
         return False
 from contextlib import asynccontextmanager
 from datetime import datetime
+from urllib.parse import parse_qs
 
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import Response
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.database import Base, SessionLocal, engine
@@ -31,36 +34,34 @@ from app.services.mock_odds_provider import MockOddsProvider
 from app.services.odds_scheduler import odds_scheduler
 
 
+AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
+AUTH_EXEMPT_PATHS = {"/health", "/health/", "/login", "/login/"}
+AUTH_EXEMPT_PREFIXES = ("/static/",)
+SESSION_COOKIE_NAME = "oddsignal_session"
+
+
+def is_auth_enabled():
+    return os.getenv("APP_AUTH_ENABLED", "0").strip().lower() in AUTH_ENABLED_VALUES
+
+
+def is_secure_cookie():
+    return os.getenv("APP_ENV", "").strip().lower() == "production"
+
+
 def is_auth_exempt_path(path):
-    return path == "/health" or path == "/static" or path.startswith("/static/")
+    return path in AUTH_EXEMPT_PATHS or path.startswith(AUTH_EXEMPT_PREFIXES)
 
 
-def unauthorized_response():
-    return Response(
-        content="Authentication required",
-        status_code=401,
-        headers={"WWW-Authenticate": "Basic"},
-    )
+def get_session_secret():
+    session_secret = os.getenv("APP_SESSION_SECRET")
+    if session_secret:
+        return session_secret
 
+    password = os.getenv("APP_PASSWORD", "")
+    if password:
+        return "password-fallback:{}".format(password)
 
-def decode_basic_credentials(authorization):
-    if not authorization:
-        return None, None
-
-    scheme, _, credentials = authorization.partition(" ")
-    if scheme.lower() != "basic" or not credentials:
-        return None, None
-
-    try:
-        decoded = base64.b64decode(credentials).decode("utf-8")
-    except (binascii.Error, UnicodeDecodeError):
-        return None, None
-
-    username, separator, password = decoded.partition(":")
-    if not separator:
-        return None, None
-
-    return username, password
+    return ""
 
 
 def credentials_are_valid(username, password):
@@ -73,6 +74,161 @@ def credentials_are_valid(username, password):
     username_matches = secrets.compare_digest(username, expected_username)
     password_matches = secrets.compare_digest(password, expected_password)
     return username_matches and password_matches
+
+
+def create_session_token(username):
+    payload = "{}:{}".format(username, int(time.time()))
+    payload_token = base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+    payload_token = payload_token.rstrip("=")
+    signature = hmac.new(
+        get_session_secret().encode("utf-8"),
+        payload_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return "{}.{}".format(payload_token, signature)
+
+
+def session_token_is_valid(token):
+    session_secret = get_session_secret()
+    expected_username = os.getenv("APP_USERNAME", "")
+
+    if not token or not session_secret or not expected_username or "." not in token:
+        return False
+
+    payload_token, signature = token.rsplit(".", 1)
+    expected_signature = hmac.new(
+        session_secret.encode("utf-8"),
+        payload_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not secrets.compare_digest(signature, expected_signature):
+        return False
+
+    padding = "=" * (-len(payload_token) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(
+            (payload_token + padding).encode("ascii")
+        ).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return False
+
+    username, separator, _created_at = decoded.partition(":")
+    if not separator:
+        return False
+
+    return secrets.compare_digest(username, expected_username)
+
+
+def request_has_valid_session(request):
+    return session_token_is_valid(request.cookies.get(SESSION_COOKIE_NAME))
+
+
+def set_session_cookie(response, username):
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_session_token(username),
+        httponly=True,
+        secure=is_secure_cookie(),
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_session_cookie(response):
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+
+
+def login_page(error_message=None, status_code=200):
+    error_html = ""
+    if error_message:
+        error_html = '<p class="error">{}</p>'.format(error_message)
+
+    html = """
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OddSignal - Login</title>
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5faf8;
+      color: #0b2540;
+    }
+    main {
+      width: min(420px, calc(100vw - 32px));
+      background: #ffffff;
+      border: 1px solid rgba(13, 31, 45, 0.12);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 22px 60px rgba(13, 31, 45, 0.10);
+    }
+    img {
+      display: block;
+      width: 240px;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto 24px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 14px;
+      font-weight: 700;
+    }
+    input {
+      padding: 11px 12px;
+      border: 1px solid rgba(13, 31, 45, 0.18);
+      border-radius: 10px;
+      font: inherit;
+    }
+    button {
+      width: 100%;
+      margin-top: 8px;
+      padding: 11px 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #1f9d69;
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .error {
+      margin: 0 0 14px;
+      color: #b42318;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/static/brand/oddsignal-horizontal.png" alt="OddSignal">
+    __ERROR_HTML__
+    <form method="post" action="/login">
+      <label>
+        Username
+        <input name="username" autocomplete="username" required>
+      </label>
+      <label>
+        Password
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">Accedi</button>
+    </form>
+  </main>
+</body>
+</html>
+"""
+    return HTMLResponse(
+        html.replace("__ERROR_HTML__", error_html),
+        status_code=status_code,
+    )
 
 
 def get_or_create_competition(db, name, country):
@@ -226,82 +382,56 @@ load_dotenv()
 app = FastAPI(title="Football Odds Monitor", lifespan=lifespan)
 
 
-@app.middleware("http")
-async def require_basic_auth(request: Request, call_next):
-    if is_auth_exempt_path(request.url.path):
-        return await call_next(request)
-
-    username, password = decode_basic_credentials(
-        request.headers.get("Authorization")
-    )
-    if username is None or not credentials_are_valid(username, password):
-        return unauthorized_response()
-
-    return await call_next(request)
+@app.get("/login", response_class=HTMLResponse)
+async def get_login():
+    return login_page()
 
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+@app.post("/login")
+async def post_login(request: Request):
+    body = (await request.body()).decode("utf-8")
+    form = parse_qs(body)
+    username = form.get("username", [""])[0]
+    password = form.get("password", [""])[0]
+
+    if credentials_are_valid(username, password):
+        response = RedirectResponse(url="/", status_code=303)
+        set_session_cookie(response, username)
+        return response
+
+    return login_page("Credenziali non valide.", status_code=401)
 
 
-AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
-AUTH_EXEMPT_PATHS = {"/health", "/health/"}
-AUTH_EXEMPT_PREFIXES = ("/static/",)
-
-
-def is_auth_enabled() -> bool:
-    return os.getenv("APP_AUTH_ENABLED", "0").strip().lower() in AUTH_ENABLED_VALUES
-
-
-def unauthorized_response() -> Response:
-    return Response(
-        content="Autenticazione richiesta",
-        status_code=401,
-        headers={"WWW-Authenticate": 'Basic realm="OddSignal"'},
-    )
-
-
-def valid_basic_auth_header(authorization) -> bool:
-    expected_username = os.getenv("APP_USERNAME", "")
-    expected_password = os.getenv("APP_PASSWORD", "")
-
-    if not expected_username or not expected_password:
-        return False
-
-    if not authorization or not authorization.startswith("Basic "):
-        return False
-
-    token = authorization.removeprefix("Basic ").strip()
-
-    try:
-        decoded = base64.b64decode(token).decode("utf-8")
-    except (binascii.Error, UnicodeDecodeError):
-        return False
-
-    if ":" not in decoded:
-        return False
-
-    username, password = decoded.split(":", 1)
-
-    return (
-        secrets.compare_digest(username, expected_username)
-        and secrets.compare_digest(password, expected_password)
-    )
+@app.get("/logout")
+@app.post("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    clear_session_cookie(response)
+    return response
 
 
 @app.middleware("http")
-async def require_dashboard_auth(request: Request, call_next):
+async def require_session_auth(request: Request, call_next):
     path = request.url.path
 
     if not is_auth_enabled():
         return await call_next(request)
 
-    if path in AUTH_EXEMPT_PATHS or path.startswith(AUTH_EXEMPT_PREFIXES):
+    if is_auth_exempt_path(path):
         return await call_next(request)
 
-    if not valid_basic_auth_header(request.headers.get("authorization")):
-        return unauthorized_response()
+    if request_has_valid_session(request):
+        return await call_next(request)
 
-    return await call_next(request)
+    if request.method in {"GET", "HEAD"}:
+        return RedirectResponse(url="/login", status_code=303)
+
+    return Response(content="Autenticazione richiesta", status_code=401)
+
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
 app.include_router(web_router)
 app.include_router(health_router)
 app.include_router(configuration_router)
@@ -311,4 +441,3 @@ app.include_router(odds_provider_router)
 app.include_router(alerts_router)
 app.include_router(notification_logs_router)
 app.include_router(system_router)
-

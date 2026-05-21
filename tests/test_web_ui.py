@@ -5,26 +5,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-AUTH = ("admin", "change-me")
-
-
-def test_web_home_without_auth_returns_401():
-    with TestClient(app) as client:
-        response = client.get("/", auth=None)
-
-    assert response.status_code == 401
-
-
-def test_web_home_with_wrong_auth_returns_401():
-    with TestClient(app) as client:
-        response = client.get("/", auth=("wrong", "wrong"))
-
-    assert response.status_code == 401
-
-
 def test_web_home_returns_html_page():
     with TestClient(app) as client:
-        response = client.get("/", auth=AUTH)
+        response = client.get("/")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -52,6 +35,8 @@ def test_web_home_returns_html_page():
     assert "Bookmaker" in response.text
     assert "Storico / Log" in response.text
     assert "Area tecnica" in response.text
+    assert "Esci" in response.text
+    assert "/logout" in response.text
     assert "Consumo API provider" not in response.text
     assert "checks.provider_usage" in response.text
     assert "readiness-summary" in response.text
@@ -116,12 +101,3 @@ def test_static_logo_is_accessible_without_auth_if_file_exists():
         )
 
     assert response.status_code == 200
-
-
-def test_system_readiness_requires_auth_and_accepts_valid_auth():
-    with TestClient(app) as client:
-        unauthenticated_response = client.get("/system/readiness", auth=None)
-        authenticated_response = client.get("/system/readiness", auth=AUTH)
-
-    assert unauthenticated_response.status_code == 401
-    assert authenticated_response.status_code == 200

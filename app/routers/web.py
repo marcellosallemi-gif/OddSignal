@@ -100,11 +100,13 @@ def web_home():
     }
 
     .sidebar-link {
+      display: block;
       width: 100%;
       border: 1px solid transparent;
       background: transparent;
       color: var(--text);
       text-align: left;
+      text-decoration: none;
       border-radius: 14px;
       padding: 10px 12px;
       font-size: 14px;
@@ -533,6 +535,7 @@ def web_home():
       <button type="button" class="sidebar-link" data-page="recipients" onclick="showPage('recipients', event)">Telegram</button>
       <button type="button" class="sidebar-link" data-page="notification-logs-section" onclick="showPage('notification-logs-section', event)">Storico / Log</button>
       <button type="button" class="sidebar-link" data-page="technical-area" onclick="showPage('technical-area', event)">Area tecnica</button>
+      <a class="sidebar-link" href="/logout">Esci</a>
     </nav>
   </aside>
 

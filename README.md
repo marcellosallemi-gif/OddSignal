@@ -35,6 +35,7 @@ Copiare .env.example in .env e impostare almeno:
 
 APP_USERNAME=admin
 APP_PASSWORD=change-me
+APP_SESSION_SECRET=change-me-random-secret
 ODDS_API_KEY=
 ODDS_API_SPORT=football
 ODDS_API_BOOKMAKERS=Stake,Sbobet
@@ -56,12 +57,13 @@ Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avv
 
 ## Autenticazione
 
-Dashboard ed endpoint operativi richiedono HTTP Basic con `APP_USERNAME` e `APP_PASSWORD`.
+Con `APP_AUTH_ENABLED=1`, dashboard ed endpoint operativi richiedono login con `APP_USERNAME` e `APP_PASSWORD`.
 
-Se una delle due variabili manca, le route protette rispondono `401`.
+Il login imposta un cookie di sessione HttpOnly. `APP_SESSION_SECRET` firma il cookie; se manca, per l’MVP viene usato un fallback derivato da `APP_PASSWORD`.
 
 Restano pubblici solo:
 
+- `GET /login`
 - `GET /health`
 - `/static/*`
 

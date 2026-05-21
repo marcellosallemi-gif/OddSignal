@@ -208,6 +208,13 @@ def test_manual_odds_check_response_contains_executed_at(monkeypatch):
         lambda db, limit: {
             "status": "completed",
             "limit": limit,
+            "ignored_odds_breakdown": {
+                "inactive_market": 0,
+                "missing_event_mapping": 0,
+            },
+            "ignored_events_breakdown": {
+                "inactive_competition": 0,
+            },
         },
     )
 
@@ -219,3 +226,5 @@ def test_manual_odds_check_response_contains_executed_at(monkeypatch):
     assert isinstance(data["executed_at"], str)
     assert data["executed_at"]
     assert datetime.fromisoformat(data["executed_at"]).tzinfo is not None
+    assert "ignored_odds_breakdown" in data
+    assert "ignored_events_breakdown" in data

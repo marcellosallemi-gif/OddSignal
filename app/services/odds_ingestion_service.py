@@ -138,6 +138,31 @@ DEFAULT_MONITORED_MARKETS = {
 }
 
 
+def _empty_ignored_odds_breakdown() -> Dict[str, int]:
+    return {
+        "inactive_competition": 0,
+        "missing_provider_league_slug": 0,
+        "inactive_market": 0,
+        "unsupported_market": 0,
+        "inactive_bookmaker": 0,
+        "missing_previous_snapshot": 0,
+        "unchanged_odds": 0,
+        "invalid_odds": 0,
+        "missing_event_mapping": 0,
+        "below_alert_threshold": 0,
+        "outside_alert_range": 0,
+        "other": 0,
+    }
+
+
+def _empty_ignored_events_breakdown() -> Dict[str, int]:
+    return {
+        "inactive_competition": 0,
+        "missing_provider_league_slug": 0,
+        "other": 0,
+    }
+
+
 def _get_active_monitored_market_names(db) -> set:
     market_names = {
         item.market_name
@@ -152,6 +177,13 @@ def _get_active_monitored_market_names(db) -> set:
     return market_names
 
 
+def _get_configured_monitored_market_names(db) -> set:
+    return {
+        item.market_name
+        for item in db.query(MonitoredMarket).all()
+    }
+
+
 def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:
     market_name = odd_data.get("market_name") or ""
 
@@ -162,6 +194,37 @@ def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:
         return False
 
     return market_name in active_market_names
+
+
+def _ignored_market_reason(
+    odd_data: Dict,
+    active_market_names: set,
+    configured_market_names: set,
+) -> Optional[str]:
+    market_name = odd_data.get("market_name") or ""
+
+    if "HT" in market_name:
+        return "unsupported_market"
+
+    if market_name.startswith("Team Total"):
+        return "unsupported_market"
+
+    if market_name in active_market_names:
+        return None
+
+    if market_name in configured_market_names or market_name in DEFAULT_MONITORED_MARKETS:
+        return "inactive_market"
+
+    return "unsupported_market"
+
+
+def _odds_value_is_valid(odd_data: Dict) -> bool:
+    odds_decimal = odd_data.get("odds_decimal")
+
+    try:
+        return float(odds_decimal) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _get_active_monitored_competitions(db):
@@ -236,6 +299,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
     active_market_names = _get_active_monitored_market_names(db)
+    configured_market_names = _get_configured_monitored_market_names(db)
 
     provider = OddsApiIoProvider(
         bookmakers_csv=get_configured_bookmakers_csv(db),
@@ -248,10 +312,13 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
 
     events_by_provider_id = {}
     ignored_events = 0
+    ignored_events_breakdown = _empty_ignored_events_breakdown()
+    ignored_odds_breakdown = _empty_ignored_odds_breakdown()
 
     for event_data in sample["events"]:
         if not _is_monitored_competition(event_data, active_competition_names):
             ignored_events += 1
+            ignored_events_breakdown["inactive_competition"] += 1
             continue
 
         event = _get_or_create_event(db, event_data)
@@ -271,18 +338,32 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     ignored_odds = 0
 
     for odd_data in sample["odds"]:
-        if not _is_monitored_market(odd_data, active_market_names):
+        ignored_market_reason = _ignored_market_reason(
+            odd_data,
+            active_market_names,
+            configured_market_names,
+        )
+        if ignored_market_reason:
             ignored_odds += 1
+            ignored_odds_breakdown[ignored_market_reason] += 1
             continue
 
         event = events_by_provider_id.get(odd_data["provider_event_id"])
         if not event:
+            ignored_odds += 1
+            ignored_odds_breakdown["missing_event_mapping"] += 1
+            continue
+
+        if not _odds_value_is_valid(odd_data):
+            ignored_odds += 1
+            ignored_odds_breakdown["invalid_odds"] += 1
             continue
 
         previous_snapshot = _find_previous_snapshot(db, event.id, odd_data)
 
         if previous_snapshot and previous_snapshot.odds_decimal == odd_data["odds_decimal"]:
             unchanged_snapshots += 1
+            ignored_odds_breakdown["unchanged_odds"] += 1
             continue
 
         snapshot = OddsSnapshot(
@@ -343,6 +424,10 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
                 created_alert_records.append(alert)
 
                 created_alerts += 1
+            else:
+                ignored_odds_breakdown["below_alert_threshold"] += 1
+        else:
+            ignored_odds_breakdown["missing_previous_snapshot"] += 1
 
     alert_records_to_notify = [
         alert
@@ -363,10 +448,12 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "provider": sample["provider"],
         "events_received": sample["events_count"],
         "events_ignored": ignored_events,
+        "ignored_events_breakdown": ignored_events_breakdown,
         "active_competitions_count": len(active_competitions),
         "active_provider_league_slugs_count": len(active_provider_league_slugs),
         "odds_received": sample["odds_count"],
         "odds_ignored": ignored_odds,
+        "ignored_odds_breakdown": ignored_odds_breakdown,
         "active_markets_count": len(active_market_names),
         "snapshots_inserted": inserted_snapshots,
         "snapshots_unchanged": unchanged_snapshots,

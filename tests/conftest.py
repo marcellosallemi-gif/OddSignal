@@ -1,4 +1,7 @@
 import os
+os.environ["ODDS_SCHEDULER_ENABLED"] = "0"
+os.environ["TELEGRAM_AUTO_SYNC_ENABLED"] = "0"
+os.environ["PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED"] = "0"
 import tempfile
 
 os.environ["APP_AUTH_ENABLED"] = "0"

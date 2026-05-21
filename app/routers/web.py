@@ -2009,22 +2009,23 @@ async function syncTelegramRecipients() {
       method: "POST"
     });
 
-    const syncedRecipients = Array.isArray(data.recipients) ? data.recipients : null;
-    await loadRecipients(syncedRecipients);
+    await loadRecipients();
     await loadStatus();
 
-    if (data.synced_count === 0) {
+    const newRecipientsCount = Number(data.new_recipients_count || 0);
+
+    if (newRecipientsCount === 0) {
       setFeedback(
         "recipients-feedback",
-        "Nessun account rilevato. Apri il bot Telegram, premi Start e riprova.",
-        "error"
+        "Nessun nuovo account Telegram rilevato. Gli account già configurati restano invariati.",
+        "success"
       );
       return;
     }
 
     setFeedback(
       "recipients-feedback",
-      `Account Telegram rilevati/sincronizzati: ${data.synced_count}. Attivali manualmente per abilitarli alle notifiche.`,
+      `Nuovi account Telegram rilevati: ${newRecipientsCount}. Attivali manualmente per abilitarli alle notifiche.`,
       "success"
     );
   } catch (error) {
@@ -2032,35 +2033,9 @@ async function syncTelegramRecipients() {
   }
 }
 
-async function sendTelegramTestMessage() {
-  setFeedback("recipients-feedback", "Invio test Telegram in corso...", "");
 
-  try {
-    const data = await api("/configuration/telegram-test-message", {
-      method: "POST"
-    });
-
-    if (data.failed > 0) {
-      setFeedback(
-        "recipients-feedback",
-        `Test Telegram completato con errori. Inviati: ${data.sent}. Falliti: ${data.failed}.`,
-        "error"
-      );
-      return;
-    }
-
-    setFeedback(
-      "recipients-feedback",
-      `Test Telegram inviato correttamente a ${data.sent} destinatari attivi.`,
-      "success"
-    );
-  } catch (error) {
-    setFeedback("recipients-feedback", "Test Telegram non completato: " + error.message, "error");
-  }
-}
-
-async function loadRecipients(providedData = null) {
-  const data = providedData || await api("/configuration/notification-recipients");
+async function loadRecipients() {
+  const data = await api("/configuration/notification-recipients");
   const telegramRecipients = data.filter((item) => item.channel === "telegram");
   const activeRecipients = telegramRecipients.filter((item) => item.status === "active");
   const pendingRecipients = telegramRecipients.filter((item) => item.status === "pending");

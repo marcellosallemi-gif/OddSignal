@@ -244,27 +244,8 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
-AUTH_EXEMPT_PATHS = {"/health", "/health/", "/auth-debug"}
-AUTH_EXEMPT_PREFIXES = ("/static/", "/public/")
-
-
-def log_auth_configuration_once():
-    if os.getenv("APP_AUTH_DEBUG_LOGGED") == "1":
-        return
-
-    os.environ["APP_AUTH_DEBUG_LOGGED"] = "1"
-
-    username = os.getenv("APP_USERNAME", "")
-    password = os.getenv("APP_PASSWORD", "")
-
-    print(
-        "[auth-debug] "
-        f"APP_AUTH_ENABLED={os.getenv('APP_AUTH_ENABLED', '')!r} "
-        f"APP_USERNAME={username!r} "
-        f"APP_USERNAME_LEN={len(username)} "
-        f"APP_PASSWORD_PRESENT={bool(password)} "
-        f"APP_PASSWORD_LEN={len(password)}"
-    )
+AUTH_EXEMPT_PATHS = {"/health", "/health/"}
+AUTH_EXEMPT_PREFIXES = ("/static/",)
 
 
 def is_auth_enabled() -> bool:
@@ -311,8 +292,6 @@ def valid_basic_auth_header(authorization) -> bool:
 async def require_dashboard_auth(request: Request, call_next):
     path = request.url.path
 
-    log_auth_configuration_once()
-
     if not is_auth_enabled():
         return await call_next(request)
 
@@ -333,28 +312,3 @@ app.include_router(alerts_router)
 app.include_router(notification_logs_router)
 app.include_router(system_router)
 
-
-@app.get("/auth-debug")
-def auth_debug():
-    username = os.getenv("APP_USERNAME", "")
-    password = os.getenv("APP_PASSWORD", "")
-    return {
-        "auth_enabled": os.getenv("APP_AUTH_ENABLED", ""),
-        "username": username,
-        "username_length": len(username),
-        "password_present": bool(password),
-        "password_length": len(password),
-    }
-
-
-@app.get("/public/auth-debug")
-def public_auth_debug():
-    username = os.getenv("APP_USERNAME", "")
-    password = os.getenv("APP_PASSWORD", "")
-    return {
-        "auth_enabled": os.getenv("APP_AUTH_ENABLED", ""),
-        "username": username,
-        "username_length": len(username),
-        "password_present": bool(password),
-        "password_length": len(password),
-    }

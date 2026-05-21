@@ -752,12 +752,14 @@ def web_home():
         <div>
           <h3>Consumo API locale</h3>
           <p class="muted">Questo contatore mostra solo le chiamate registrate localmente da OddSignal nell’ultima ora. Il dato può differire dal pannello ufficiale Odds-API.io, che resta la fonte ufficiale del consumo del piano.</p>
+          <p class="muted">Il consumo API locale si aggiorna automaticamente ogni 10 minuti quando la dashboard è aperta.</p>
         </div>
         <div class="section-actions">
           <button onclick="loadProviderUsage()">Ricarica consumo API locale</button>
         </div>
       </div>
       <div id="provider-usage-summary" class="info-box">Caricamento consumo API locale...</div>
+      <div id="provider-usage-last-updated" class="feedback muted">Ultimo aggiornamento: n/d</div>
       <div id="provider-usage-feedback" class="feedback muted">Caricamento consumo API locale...</div>
     </div>
   </section>
@@ -786,7 +788,7 @@ def web_home():
           </label>
           <label>Frequenza controllo
             <select id="scheduler-poll-interval-seconds">
-              <option value="3">3 secondi - test locale</option>
+              <option value="3">3 secondi</option>
               <option value="30">30 secondi</option>
               <option value="60">1 minuto</option>
               <option value="300">5 minuti - consigliato</option>
@@ -881,6 +883,7 @@ def web_home():
       </details>
       <details>
         <summary>Risposta tecnica ultimo controllo</summary>
+        <div id="manual-odds-check-executed-at" class="feedback muted">Ultimo controllo eseguito: n/d</div>
         <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
       </details>
       <details>
@@ -949,6 +952,9 @@ const dashboardState = {
   activeRecipients: "...",
   lastManualCheck: "Nessuno"
 };
+
+const PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 600000;
+let providerUsageAutoRefreshIntervalId = null;
 
 const suggestedFootballMarkets = [
   "1X2",
@@ -1188,8 +1194,10 @@ async function loadStatus() {
 
 async function runManualOddsCheck() {
   const resultBox = document.getElementById("manual-odds-check-result");
+  const executedAtBox = document.getElementById("manual-odds-check-executed-at");
   setFeedback("manual-odds-check-feedback", "Controllo quote in corso...", "");
   resultBox.textContent = "Controllo in corso...";
+  executedAtBox.textContent = "Ultimo controllo eseguito: controllo in corso...";
 
   try {
     const data = await api("/api/odds-provider/ingest-sample?limit=1", {
@@ -1197,6 +1205,7 @@ async function runManualOddsCheck() {
     });
 
     resultBox.textContent = JSON.stringify(data, null, 2);
+    executedAtBox.textContent = `Ultimo controllo eseguito: ${formatDateTime(data.executed_at)}`;
     dashboardState.lastManualCheck = "OK";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote completato. Dashboard aggiornata.", "success");
@@ -1206,6 +1215,7 @@ async function runManualOddsCheck() {
     await loadNotificationLogs();
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
+    executedAtBox.textContent = "Ultimo controllo eseguito: errore";
     dashboardState.lastManualCheck = "Errore";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + error.message, "error");
@@ -1539,7 +1549,9 @@ function renderProviderUsage(data) {
 }
 
 
-async function loadProviderUsage() {
+async function loadProviderUsage(options) {
+  const isAutoRefresh = options && options.auto === true;
+
   try {
     const data = await api("/system/provider-usage");
 
@@ -1547,10 +1559,35 @@ async function loadProviderUsage() {
     document.getElementById("provider-usage-result").textContent = JSON.stringify(data, null, 2);
     renderProviderUsage(data);
     renderDashboardSummary();
-    setFeedback("provider-usage-feedback", "Consumo API locale caricato.", "success");
+    document.getElementById("provider-usage-last-updated").textContent =
+      `Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}`;
+    setFeedback(
+      "provider-usage-feedback",
+      isAutoRefresh
+        ? "Consumo API locale aggiornato automaticamente."
+        : "Consumo API locale caricato.",
+      "success"
+    );
   } catch (error) {
-    setFeedback("provider-usage-feedback", "Consumo API locale non caricato: " + error.message, "error");
+    setFeedback(
+      "provider-usage-feedback",
+      isAutoRefresh
+        ? "Aggiornamento automatico consumo API locale non completato: " + error.message
+        : "Consumo API locale non caricato: " + error.message,
+      "error"
+    );
   }
+}
+
+
+function startProviderUsageAutoRefresh() {
+  if (providerUsageAutoRefreshIntervalId !== null) {
+    return;
+  }
+
+  providerUsageAutoRefreshIntervalId = window.setInterval(() => {
+    loadProviderUsage({auto: true});
+  }, PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS);
 }
 
 
@@ -2117,6 +2154,7 @@ loadAlertSettings();
 loadSchedulerSettings();
 loadProviderPlanSettings();
 loadProviderUsage();
+startProviderUsageAutoRefresh();
 loadProviderBookmakerSettings();
 loadCompetitions();
 loadMonitoredMarkets();

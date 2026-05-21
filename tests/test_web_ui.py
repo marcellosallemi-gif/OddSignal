@@ -15,6 +15,11 @@ def test_web_home_returns_html_page():
     assert "Benvenuto in OddSignal" in response.text
     assert "Consumo API locale" in response.text
     assert "Il dato può differire dal pannello ufficiale Odds-API.io" in response.text
+    assert "Il consumo API locale si aggiorna automaticamente ogni 10 minuti quando la dashboard è aperta." in response.text
+    assert "Ricarica consumo API locale" in response.text
+    assert "PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 600000" in response.text
+    assert "startProviderUsageAutoRefresh" in response.text
+    assert "Ultimo aggiornamento" in response.text
     assert "Cancella alert recenti" in response.text
     assert "Mercati MVP supportati" not in response.text
     assert "Mercati futuri / da integrare" not in response.text
@@ -60,11 +65,12 @@ def test_web_home_returns_html_page():
     assert "Cooldown notifiche" in response.text
     assert "Salva automazione" in response.text
     assert "Frequenza controllo" in response.text
-    assert "3 secondi - test locale" in response.text
+    assert "3 secondi" in response.text
     assert "Definisce ogni quanto controllare le quote" in response.text
     assert "Dettagli tecnici sistema" in response.text
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
+    assert "Ultimo controllo eseguito" in response.text
     assert "Soglie alert" in response.text
     assert "Salva soglie" in response.text
     assert "Dedup minuti" in response.text

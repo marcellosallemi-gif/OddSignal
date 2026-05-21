@@ -1,7 +1,10 @@
+from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.main import app
 from app.services.odds_api_io_provider import OddsApiIoProvider
 
 
@@ -194,3 +197,25 @@ def test_classify_provider_error_handles_local_hourly_limit():
     assert status_code == 429
     assert detail["error"] == "provider_local_rate_limit"
     assert "Limite locale" in detail["message"]
+
+
+def test_manual_odds_check_response_contains_executed_at(monkeypatch):
+    from app.routers import odds_provider
+
+    monkeypatch.setattr(
+        odds_provider,
+        "ingest_odds_sample",
+        lambda db, limit: {
+            "status": "completed",
+            "limit": limit,
+        },
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/odds-provider/ingest-sample?limit=1")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data["executed_at"], str)
+    assert data["executed_at"]
+    assert datetime.fromisoformat(data["executed_at"]).tzinfo is not None

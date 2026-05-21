@@ -43,6 +43,8 @@ ODDS_API_BOOKMAKERS=Stake,Sbobet
 Telegram:
 
 TELEGRAM_BOT_TOKEN=
+TELEGRAM_AUTO_SYNC_ENABLED=0
+TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS=300
 
 Flusso Telegram:
 
@@ -55,11 +57,13 @@ Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
 
 Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avviato il bot. TELEGRAM_CHAT_ID resta solo fallback opzionale.
 
+Con `TELEGRAM_AUTO_SYNC_ENABLED=1`, il backend sincronizza i destinatari Telegram ogni `TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS` secondi. Se il token manca, il sync viene saltato senza bloccare l’app.
+
 ## Autenticazione
 
 Con `APP_AUTH_ENABLED=1`, dashboard ed endpoint operativi richiedono login con `APP_USERNAME` e `APP_PASSWORD`.
 
-Il login imposta un cookie di sessione HttpOnly. `APP_SESSION_SECRET` firma il cookie; se manca, per l’MVP viene usato un fallback derivato da `APP_PASSWORD`.
+Il login imposta un cookie di sessione HttpOnly persistente. `APP_SESSION_SECRET` firma il cookie; se manca, per l’MVP viene usato un fallback derivato da `APP_PASSWORD`.
 
 Restano pubblici solo:
 

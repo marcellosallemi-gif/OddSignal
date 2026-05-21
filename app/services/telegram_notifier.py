@@ -34,6 +34,126 @@ def get_active_telegram_recipients(db, include_fallback: bool = True) -> List[st
     return recipients
 
 
+def telegram_label_from_chat(chat):
+    first_name = chat.get("first_name") or ""
+    last_name = chat.get("last_name") or ""
+    username = chat.get("username")
+
+    full_name = " ".join([part for part in [first_name, last_name] if part]).strip()
+
+    if full_name and username:
+        return f"{full_name} (@{username})"
+
+    if username:
+        return f"@{username}"
+
+    if full_name:
+        return full_name
+
+    return "Account Telegram"
+
+
+def sync_telegram_recipients_from_payload(db, payload):
+    chats_by_id = {}
+
+    for update in payload.get("result", []):
+        message = update.get("message") or {}
+        chat = message.get("chat") or {}
+
+        if chat.get("type") != "private":
+            continue
+
+        chat_id = chat.get("id")
+        if chat_id is None:
+            continue
+
+        chats_by_id[str(chat_id)] = chat
+
+    synced = []
+
+    for recipient_value, chat in chats_by_id.items():
+        label = telegram_label_from_chat(chat)
+
+        existing = (
+            db.query(NotificationRecipient)
+            .filter(
+                NotificationRecipient.channel == "telegram",
+                NotificationRecipient.recipient_value == recipient_value,
+            )
+            .first()
+        )
+
+        if existing:
+            existing.label = label
+            recipient = existing
+        else:
+            recipient = NotificationRecipient(
+                channel="telegram",
+                recipient_value=recipient_value,
+                label=label,
+                is_active=False,
+                status="pending",
+                created_at=_utc_now_naive(),
+            )
+            db.add(recipient)
+
+        db.flush()
+        synced.append(
+            {
+                "id": recipient.id,
+                "label": label,
+                "is_active": recipient.is_active,
+            }
+        )
+
+    db.commit()
+
+    return {
+        "status": "completed",
+        "synced_count": len(synced),
+        "recipients": synced,
+    }
+
+
+def sync_telegram_recipients_from_telegram(db):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return {
+            "status": "skipped",
+            "error": "telegram_not_configured",
+            "message": "TELEGRAM_BOT_TOKEN non configurato: sync Telegram saltato.",
+            "synced_count": 0,
+            "recipients": [],
+        }
+
+    try:
+        response = httpx.get(
+            f"https://api.telegram.org/bot{bot_token}/getUpdates",
+            timeout=15,
+        )
+    except httpx.RequestError as exc:
+        return {
+            "status": "failed",
+            "error": "telegram_request_failed",
+            "message": "Impossibile contattare Telegram. Riprova tra poco.",
+            "detail": str(exc),
+            "synced_count": 0,
+            "recipients": [],
+        }
+
+    if response.status_code >= 400:
+        return {
+            "status": "failed",
+            "error": "telegram_api_error",
+            "message": "Telegram ha rifiutato la richiesta. Verifica il token del bot.",
+            "http_status": response.status_code,
+            "synced_count": 0,
+            "recipients": [],
+        }
+
+    return sync_telegram_recipients_from_payload(db, response.json())
+
+
 def readable_market_label(market_name: str) -> str:
     if not market_name:
         return "Mercato non specificato"

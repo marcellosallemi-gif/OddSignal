@@ -400,11 +400,11 @@ def count_odds_and_alerts():
 
 
 def test_sync_telegram_recipients_detects_private_chat(monkeypatch):
-    from app.routers import configuration
+    from app.services import telegram_notifier
 
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
     monkeypatch.setattr(
-        configuration.httpx,
+        telegram_notifier.httpx,
         "get",
         lambda *args, **kwargs: FakeTelegramResponse(),
     )
@@ -427,6 +427,58 @@ def test_sync_telegram_recipients_requires_bot_token(monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["detail"]["error"] == "telegram_not_configured"
+
+
+def test_telegram_auto_sync_service_skips_without_token(monkeypatch):
+    from app.services.telegram_notifier import sync_telegram_recipients_from_telegram
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
+
+    db = SessionLocal()
+    try:
+        result = sync_telegram_recipients_from_telegram(db)
+    finally:
+        db.close()
+
+    assert result["status"] == "skipped"
+    assert result["error"] == "telegram_not_configured"
+
+
+def test_telegram_auto_sync_service_upserts_without_duplicates(monkeypatch):
+    from app.services import telegram_notifier
+    from app.services.telegram_notifier import sync_telegram_recipients_from_telegram
+
+    deactivate_telegram_recipients()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr(
+        telegram_notifier.httpx,
+        "get",
+        lambda *args, **kwargs: FakeTelegramResponse(),
+    )
+    counts_before = count_odds_and_alerts()
+
+    db = SessionLocal()
+    try:
+        first_result = sync_telegram_recipients_from_telegram(db)
+        second_result = sync_telegram_recipients_from_telegram(db)
+        recipients_count = (
+            db.query(NotificationRecipient)
+            .filter(
+                NotificationRecipient.channel == "telegram",
+                NotificationRecipient.recipient_value == "987654321",
+            )
+            .count()
+        )
+    finally:
+        db.close()
+    counts_after = count_odds_and_alerts()
+
+    assert first_result["status"] == "completed"
+    assert second_result["status"] == "completed"
+    assert first_result["synced_count"] == 1
+    assert second_result["synced_count"] == 1
+    assert recipients_count == 1
+    assert counts_after == counts_before
 
 
 def test_telegram_test_message_requires_bot_token(monkeypatch):
@@ -535,11 +587,11 @@ def test_update_scheduler_settings_rejects_invalid_event_limit():
 
 
 def test_sync_telegram_recipients_preserves_existing_active_recipient(monkeypatch):
-    from app.routers import configuration
+    from app.services import telegram_notifier
 
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
     monkeypatch.setattr(
-        configuration.httpx,
+        telegram_notifier.httpx,
         "get",
         lambda *args, **kwargs: FakeTelegramResponse(),
     )

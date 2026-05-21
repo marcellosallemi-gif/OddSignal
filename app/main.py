@@ -1,16 +1,18 @@
+import asyncio
 import base64
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import time
+from contextlib import asynccontextmanager, suppress
 
 try:
     from dotenv import load_dotenv
 except ImportError:
     def load_dotenv(*args, **kwargs):
         return False
-from contextlib import asynccontextmanager
 from datetime import datetime
 from urllib.parse import parse_qs
 
@@ -32,12 +34,18 @@ from app.routers.system import router as system_router
 from app.routers.web import router as web_router
 from app.services.mock_odds_provider import MockOddsProvider
 from app.services.odds_scheduler import odds_scheduler
+from app.services.telegram_notifier import sync_telegram_recipients_from_telegram
 
 
+logger = logging.getLogger(__name__)
 AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}
 AUTH_EXEMPT_PATHS = {"/health", "/health/", "/login", "/login/"}
 AUTH_EXEMPT_PREFIXES = ("/static/",)
 SESSION_COOKIE_NAME = "oddsignal_session"
+SESSION_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60
+TELEGRAM_AUTO_SYNC_ENABLED_VALUES = {"1", "true", "yes", "on"}
+DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS = 300
+telegram_auto_sync_task = None
 
 
 def is_auth_enabled():
@@ -128,6 +136,7 @@ def set_session_cookie(response, username):
     response.set_cookie(
         SESSION_COOKIE_NAME,
         create_session_token(username),
+        max_age=SESSION_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
         secure=is_secure_cookie(),
         samesite="lax",
@@ -366,14 +375,84 @@ def init_db():
         seed_initial_data()
 
 
+def is_telegram_auto_sync_enabled():
+    return (
+        os.getenv("TELEGRAM_AUTO_SYNC_ENABLED", "0").strip().lower()
+        in TELEGRAM_AUTO_SYNC_ENABLED_VALUES
+    )
+
+
+def get_telegram_auto_sync_interval_seconds():
+    raw_value = os.getenv(
+        "TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS",
+        str(DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS),
+    )
+    try:
+        interval = int(raw_value)
+    except (TypeError, ValueError):
+        return DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS
+
+    return interval if interval > 0 else DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS
+
+
+def run_telegram_auto_sync_once():
+    db = SessionLocal()
+    try:
+        result = sync_telegram_recipients_from_telegram(db)
+    finally:
+        db.close()
+
+    if result["status"] == "skipped":
+        logger.info(result["message"])
+    elif result["status"] == "failed":
+        logger.warning(result["message"])
+    else:
+        logger.info("Sync automatico Telegram completato: %s account.", result["synced_count"])
+
+    return result
+
+
+async def telegram_auto_sync_loop():
+    while True:
+        try:
+            await asyncio.to_thread(run_telegram_auto_sync_once)
+        except Exception:
+            logger.exception("Sync automatico Telegram non completato.")
+
+        await asyncio.sleep(get_telegram_auto_sync_interval_seconds())
+
+
+async def start_telegram_auto_sync():
+    global telegram_auto_sync_task
+
+    if not is_telegram_auto_sync_enabled() or telegram_auto_sync_task is not None:
+        return
+
+    telegram_auto_sync_task = asyncio.create_task(telegram_auto_sync_loop())
+
+
+async def stop_telegram_auto_sync():
+    global telegram_auto_sync_task
+
+    if telegram_auto_sync_task is None:
+        return
+
+    telegram_auto_sync_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await telegram_auto_sync_task
+    telegram_auto_sync_task = None
+
+
 @asynccontextmanager
 async def lifespan(app):
     load_environment()
     init_db()
     await odds_scheduler.start()
+    await start_telegram_auto_sync()
     try:
         yield
     finally:
+        await stop_telegram_auto_sync()
         await odds_scheduler.stop()
 
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -62,7 +64,9 @@ def ingest_provider_sample(
     db: Session = Depends(get_db),
 ):
     try:
-        return ingest_odds_sample(db=db, limit=limit)
+        result = ingest_odds_sample(db=db, limit=limit)
+        result["executed_at"] = datetime.now(timezone.utc).isoformat()
+        return result
     except RuntimeError as exc:
         status_code, detail = classify_provider_error(exc)
         raise HTTPException(status_code=status_code, detail=detail) from exc

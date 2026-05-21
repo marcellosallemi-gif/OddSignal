@@ -71,6 +71,7 @@ def test_login_sets_cookie_and_allows_dashboard(monkeypatch):
     assert login_response.status_code == 303
     assert login_response.headers["location"] == "/"
     assert "oddsignal_session=" in login_response.headers["set-cookie"]
+    assert "Max-Age=31536000" in login_response.headers["set-cookie"]
     assert "HttpOnly" in login_response.headers["set-cookie"]
     assert "SameSite=lax" in login_response.headers["set-cookie"]
     assert dashboard_response.status_code == 200

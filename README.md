@@ -39,6 +39,8 @@ APP_SESSION_SECRET=change-me-random-secret
 ODDS_API_KEY=
 ODDS_API_SPORT=football
 ODDS_API_BOOKMAKERS=Stake,Sbobet
+PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED=0
+PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS=300
 
 Telegram:
 
@@ -58,6 +60,8 @@ Il canale telefono/SMS/WhatsApp non è incluso nell’MVP.
 Gli account Telegram vengono rilevati dalla dashboard dopo che l’utente ha avviato il bot. TELEGRAM_CHAT_ID resta solo fallback opzionale.
 
 Con `TELEGRAM_AUTO_SYNC_ENABLED=1`, il backend sincronizza i destinatari Telegram ogni `TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS` secondi. Se il token manca, il sync viene saltato senza bloccare l’app.
+
+Con `PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED=1`, il backend può aggiornare automaticamente i metadati campionati provider ogni `PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS` secondi. Questa automazione non esegue controlli quote e non crea snapshot o alert.
 
 ## Autenticazione
 

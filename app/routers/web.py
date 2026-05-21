@@ -1,13 +1,24 @@
+import os
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 
 router = APIRouter()
+ENABLED_VALUES = {"1", "true", "yes", "on"}
+
+
+def _env_status_label(name):
+    return (
+        "Attivo"
+        if os.getenv(name, "0").strip().lower() in ENABLED_VALUES
+        else "Disattivo"
+    )
 
 
 @router.get("/", response_class=HTMLResponse)
 def web_home():
-    return """
+    html = """
 <!doctype html>
 <html lang="it">
 <head>
@@ -752,7 +763,7 @@ def web_home():
         <div>
           <h3>Consumo API locale</h3>
           <p class="muted">Questo contatore mostra solo le chiamate registrate localmente da OddSignal nell’ultima ora. Il dato può differire dal pannello ufficiale Odds-API.io, che resta la fonte ufficiale del consumo del piano.</p>
-          <p class="muted">Il consumo API locale si aggiorna automaticamente ogni 10 minuti quando la dashboard è aperta.</p>
+          <p class="muted">I dati della dashboard si aggiornano automaticamente ogni 5 minuti quando la pagina è aperta.</p>
         </div>
         <div class="section-actions">
           <button onclick="loadProviderUsage()">Ricarica consumo API locale</button>
@@ -861,6 +872,17 @@ def web_home():
         <p class="muted">JSON, risposte tecniche e dettagli diagnostici separati dalle pagine operative.</p>
       </div>
     </div>
+    <div class="info-box">
+      <h3>Automazioni automatiche</h3>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-label">Dashboard auto refresh</div><div class="summary-value">Attivo</div></div>
+        <div class="summary-card"><div class="summary-label">Telegram auto sync</div><div class="summary-value">__TELEGRAM_AUTO_SYNC_STATUS__</div></div>
+        <div class="summary-card"><div class="summary-label">Provider competitions auto refresh</div><div class="summary-value">__PROVIDER_COMPETITIONS_AUTO_REFRESH_STATUS__</div></div>
+        <div class="summary-card"><div class="summary-label">Odds scheduler</div><div class="summary-value">Separato</div></div>
+      </div>
+      <p class="muted">I dati della dashboard si aggiornano automaticamente ogni 5 minuti quando la pagina è aperta. Il refresh automatico della dashboard usa solo endpoint locali e non esegue controlli quote.</p>
+      <div id="dashboard-auto-refresh-feedback" class="feedback muted">Auto refresh dashboard attivo ogni 5 minuti.</div>
+    </div>
     <div class="technical-grid">
       <details>
         <summary>Dettagli tecnici sistema</summary>
@@ -954,8 +976,9 @@ const dashboardState = {
   lastManualCheck: "Nessuno"
 };
 
-const PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 600000;
-let providerUsageAutoRefreshIntervalId = null;
+const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 300000;
+const PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 300000;
+let dashboardAutoRefreshIntervalId = null;
 
 const suggestedFootballMarkets = [
   "1X2",
@@ -1582,13 +1605,54 @@ async function loadProviderUsage(options) {
 
 
 function startProviderUsageAutoRefresh() {
-  if (providerUsageAutoRefreshIntervalId !== null) {
+  startDashboardAutoRefresh();
+}
+
+
+async function refreshDashboardDataAutomatically() {
+  const refreshTasks = [
+    loadStatus(),
+    loadReadiness(),
+    loadProviderUsage({auto: true}),
+    loadAlertSettings(),
+    loadSchedulerSettings(),
+    loadProviderPlanSettings(),
+    loadProviderBookmakerSettings(),
+    loadCompetitions(),
+    loadMonitoredMarkets(),
+    loadRecipients(),
+    loadAlerts(),
+    loadNotificationLogs()
+  ];
+
+  const results = await Promise.allSettled(refreshTasks);
+  const failures = results.filter((item) => item.status === "rejected");
+
+  if (failures.length > 0) {
+    setFeedback(
+      "dashboard-auto-refresh-feedback",
+      `Auto refresh dashboard completato con ${failures.length} errori non bloccanti.`,
+      "error"
+    );
     return;
   }
 
-  providerUsageAutoRefreshIntervalId = window.setInterval(() => {
-    loadProviderUsage({auto: true});
-  }, PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS);
+  setFeedback(
+    "dashboard-auto-refresh-feedback",
+    `Auto refresh dashboard completato: ${new Date().toLocaleString("it-IT")}.`,
+    "success"
+  );
+}
+
+
+function startDashboardAutoRefresh() {
+  if (dashboardAutoRefreshIntervalId !== null) {
+    return;
+  }
+
+  dashboardAutoRefreshIntervalId = window.setInterval(() => {
+    refreshDashboardDataAutomatically();
+  }, DASHBOARD_AUTO_REFRESH_INTERVAL_MS);
 }
 
 
@@ -2157,7 +2221,7 @@ loadAlertSettings();
 loadSchedulerSettings();
 loadProviderPlanSettings();
 loadProviderUsage();
-startProviderUsageAutoRefresh();
+startDashboardAutoRefresh();
 loadProviderBookmakerSettings();
 loadCompetitions();
 loadMonitoredMarkets();
@@ -2171,3 +2235,11 @@ loadNotificationLogs();
 </body>
 </html>
 """
+    return (
+        html
+        .replace("__TELEGRAM_AUTO_SYNC_STATUS__", _env_status_label("TELEGRAM_AUTO_SYNC_ENABLED"))
+        .replace(
+            "__PROVIDER_COMPETITIONS_AUTO_REFRESH_STATUS__",
+            _env_status_label("PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED"),
+        )
+    )

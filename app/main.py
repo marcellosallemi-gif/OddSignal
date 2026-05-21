@@ -24,7 +24,10 @@ from app.database import Base, SessionLocal, engine
 from app.models import Competition, Event, OddsSnapshot, Team
 from app.runtime import load_environment, run_runtime_migrations, should_seed_demo_data
 from app.routers.alerts import router as alerts_router
-from app.routers.configuration import router as configuration_router
+from app.routers.configuration import (
+    refresh_provider_competitions_from_provider,
+    router as configuration_router,
+)
 from app.routers.events import router as events_router
 from app.routers.health import router as health_router
 from app.routers.odds import router as odds_router
@@ -33,6 +36,7 @@ from app.routers.notification_logs import router as notification_logs_router
 from app.routers.system import router as system_router
 from app.routers.web import router as web_router
 from app.services.mock_odds_provider import MockOddsProvider
+from app.services.odds_api_io_provider import classify_provider_error
 from app.services.odds_scheduler import odds_scheduler
 from app.services.telegram_notifier import sync_telegram_recipients_from_telegram
 
@@ -45,7 +49,10 @@ SESSION_COOKIE_NAME = "oddsignal_session"
 SESSION_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60
 TELEGRAM_AUTO_SYNC_ENABLED_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS = 300
+PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED_VALUES = {"1", "true", "yes", "on"}
+DEFAULT_PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS = 300
 telegram_auto_sync_task = None
+provider_competitions_auto_refresh_task = None
 
 
 def is_auth_enabled():
@@ -395,6 +402,30 @@ def get_telegram_auto_sync_interval_seconds():
     return interval if interval > 0 else DEFAULT_TELEGRAM_AUTO_SYNC_INTERVAL_SECONDS
 
 
+def is_provider_competitions_auto_refresh_enabled():
+    return (
+        os.getenv("PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED", "0").strip().lower()
+        in PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED_VALUES
+    )
+
+
+def get_provider_competitions_auto_refresh_interval_seconds():
+    raw_value = os.getenv(
+        "PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS",
+        str(DEFAULT_PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS),
+    )
+    try:
+        interval = int(raw_value)
+    except (TypeError, ValueError):
+        return DEFAULT_PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS
+
+    return (
+        interval
+        if interval > 0
+        else DEFAULT_PROVIDER_COMPETITIONS_AUTO_REFRESH_INTERVAL_SECONDS
+    )
+
+
 def run_telegram_auto_sync_once():
     db = SessionLocal()
     try:
@@ -443,15 +474,87 @@ async def stop_telegram_auto_sync():
     telegram_auto_sync_task = None
 
 
+def run_provider_competitions_auto_refresh_once():
+    db = SessionLocal()
+    try:
+        result = refresh_provider_competitions_from_provider(db=db, limit=10)
+    except RuntimeError as exc:
+        if "ODDS_API_KEY is missing" in str(exc):
+            status_code, detail = 401, {
+                "error": "provider_auth_error",
+                "message": "API key Odds-API.io mancante, non valida o non autorizzata.",
+            }
+        else:
+            status_code, detail = classify_provider_error(exc)
+        status = "skipped" if status_code in {401, 429} else "failed"
+        result = {
+            "status": status,
+            "error": detail["error"],
+            "message": detail["message"],
+        }
+    finally:
+        db.close()
+
+    if result.get("status") == "skipped":
+        logger.info("Refresh automatico campionati provider saltato: %s", result["message"])
+    elif result.get("status") == "failed":
+        logger.warning("Refresh automatico campionati provider non completato: %s", result["message"])
+    else:
+        logger.info(
+            "Refresh automatico campionati provider completato: %s campionati.",
+            result.get("competitions_upserted", 0),
+        )
+
+    return result
+
+
+async def provider_competitions_auto_refresh_loop():
+    while True:
+        try:
+            await asyncio.to_thread(run_provider_competitions_auto_refresh_once)
+        except Exception:
+            logger.exception("Refresh automatico campionati provider non completato.")
+
+        await asyncio.sleep(get_provider_competitions_auto_refresh_interval_seconds())
+
+
+async def start_provider_competitions_auto_refresh():
+    global provider_competitions_auto_refresh_task
+
+    if (
+        not is_provider_competitions_auto_refresh_enabled()
+        or provider_competitions_auto_refresh_task is not None
+    ):
+        return
+
+    provider_competitions_auto_refresh_task = asyncio.create_task(
+        provider_competitions_auto_refresh_loop()
+    )
+
+
+async def stop_provider_competitions_auto_refresh():
+    global provider_competitions_auto_refresh_task
+
+    if provider_competitions_auto_refresh_task is None:
+        return
+
+    provider_competitions_auto_refresh_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await provider_competitions_auto_refresh_task
+    provider_competitions_auto_refresh_task = None
+
+
 @asynccontextmanager
 async def lifespan(app):
     load_environment()
     init_db()
     await odds_scheduler.start()
     await start_telegram_auto_sync()
+    await start_provider_competitions_auto_refresh()
     try:
         yield
     finally:
+        await stop_provider_competitions_auto_refresh()
         await stop_telegram_auto_sync()
         await odds_scheduler.stop()
 

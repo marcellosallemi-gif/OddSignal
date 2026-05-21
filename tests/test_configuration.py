@@ -481,6 +481,69 @@ def test_telegram_auto_sync_service_upserts_without_duplicates(monkeypatch):
     assert counts_after == counts_before
 
 
+def test_telegram_auto_sync_background_helper_can_run_with_mock(monkeypatch):
+    from app import main as app_main
+    from app.services import telegram_notifier
+
+    deactivate_telegram_recipients()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setattr(
+        telegram_notifier.httpx,
+        "get",
+        lambda *args, **kwargs: FakeTelegramResponse(),
+    )
+
+    result = app_main.run_telegram_auto_sync_once()
+
+    assert result["status"] == "completed"
+    assert result["synced_count"] == 1
+
+
+def test_provider_competitions_auto_refresh_default_disabled(monkeypatch):
+    from app import main as app_main
+
+    monkeypatch.delenv("PROVIDER_COMPETITIONS_AUTO_REFRESH_ENABLED", raising=False)
+
+    assert app_main.is_provider_competitions_auto_refresh_enabled() is False
+
+
+def test_provider_competitions_auto_refresh_skips_without_api_key(monkeypatch):
+    from app import main as app_main
+
+    monkeypatch.setenv("ODDS_API_SKIP_DOTENV", "1")
+    monkeypatch.delenv("ODDS_API_KEY", raising=False)
+    monkeypatch.delenv("ODDS_API_IO_KEY", raising=False)
+
+    result = app_main.run_provider_competitions_auto_refresh_once()
+
+    assert result["status"] == "skipped"
+    assert result["error"] == "provider_auth_error"
+
+
+def test_provider_competitions_auto_refresh_does_not_run_odds_ingestion(monkeypatch):
+    from app import main as app_main
+
+    counts_before = count_odds_and_alerts()
+
+    monkeypatch.setattr(
+        app_main,
+        "refresh_provider_competitions_from_provider",
+        lambda db, limit: {
+            "provider": "odds_api_io",
+            "events_received": 0,
+            "competitions_found": 0,
+            "competitions_upserted": 0,
+            "competitions": [],
+        },
+    )
+
+    result = app_main.run_provider_competitions_auto_refresh_once()
+    counts_after = count_odds_and_alerts()
+
+    assert result["competitions_upserted"] == 0
+    assert counts_after == counts_before
+
+
 def test_telegram_test_message_requires_bot_token(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "")

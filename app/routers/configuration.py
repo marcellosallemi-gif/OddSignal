@@ -201,22 +201,26 @@ def refresh_provider_competitions(
     limit: int = 10,
     db: Session = Depends(get_db),
 ):
-    safe_limit = max(1, min(limit, 50))
-
     try:
-        provider = OddsApiIoProvider(
-            bookmakers_csv=get_configured_bookmakers_csv(db),
-            usage_db=db,
-        )
-        first_bookmaker = provider.bookmakers.split(",")[0].strip()
-        provider_events = provider.get_events(
-            limit=safe_limit,
-            bookmaker=first_bookmaker,
-        )
-        events = [provider.normalize_event(event) for event in provider_events]
+        return refresh_provider_competitions_from_provider(db=db, limit=limit)
     except RuntimeError as exc:
         status_code, detail = classify_provider_error(exc)
         raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+def refresh_provider_competitions_from_provider(db, limit: int = 10):
+    safe_limit = max(1, min(limit, 50))
+
+    provider = OddsApiIoProvider(
+        bookmakers_csv=get_configured_bookmakers_csv(db),
+        usage_db=db,
+    )
+    first_bookmaker = provider.bookmakers.split(",")[0].strip()
+    provider_events = provider.get_events(
+        limit=safe_limit,
+        bookmaker=first_bookmaker,
+    )
+    events = [provider.normalize_event(event) for event in provider_events]
 
     competitions_by_name = {}
     for event in events:

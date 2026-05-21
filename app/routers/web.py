@@ -837,6 +837,7 @@ def web_home():
       <button onclick="loadRecipients()">Aggiorna Telegram</button>
     </div>
     <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
+    <div id="recipients-last-updated" class="feedback muted">Ultimo aggiornamento: n/d</div>
     <div id="recipients-table"></div>
   </section>
 
@@ -2003,6 +2004,8 @@ async function loadRecipients() {
 
   dashboardState.activeRecipients = activeRecipients.length;
   renderDashboardSummary();
+  document.getElementById("recipients-last-updated").textContent =
+    `Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}`;
 
   if (telegramRecipients.length === 0) {
     document.getElementById("recipients-table").innerHTML = "<p class='muted'>Nessun destinatario Telegram configurato.</p>";

@@ -92,6 +92,7 @@ def test_web_home_returns_html_page():
     assert "Rileva account Telegram" in response.text
     assert "Invia test Telegram" in response.text
     assert "sendTelegramTestMessage" in response.text
+    assert "recipients-last-updated" in response.text
     assert "Alert recenti" in response.text
     assert "notification-logs-section" in response.text
     assert "toggleRecipient" in response.text

@@ -93,6 +93,9 @@ def test_web_home_returns_html_page():
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
     assert "Rileva account Telegram" in response.text
+    assert "Test Telegram non inviato" in response.text
+    assert "Test Telegram inviato correttamente" in response.text
+    assert "/configuration/telegram-test-message" in response.text
     assert "loadRecipients()" in response.text
     assert "loadRecipients(syncedRecipients)" not in response.text
     assert "Nessun nuovo account Telegram rilevato. Gli account già configurati restano invariati." in response.text

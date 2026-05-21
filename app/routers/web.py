@@ -2001,6 +2001,42 @@ async function toggleMonitoredMarket(marketId, isActive) {
   }
 }
 
+async function sendTelegramTestMessage() {
+  setFeedback("recipients-feedback", "Invio test Telegram in corso...", "");
+
+  try {
+    const data = await api("/configuration/telegram-test-message", {
+      method: "POST"
+    });
+
+    await loadRecipients();
+    await loadStatus();
+
+    const sent = Number(data.sent || 0);
+    const failed = Number(data.failed || 0);
+    const recipientsCount = Number(data.recipients_count || 0);
+
+    if (sent > 0) {
+      setFeedback(
+        "recipients-feedback",
+        `Test Telegram inviato correttamente. Inviati: ${sent}. Falliti: ${failed}. Destinatari: ${recipientsCount}.`,
+        "success"
+      );
+      return;
+    }
+
+    setFeedback(
+      "recipients-feedback",
+      `Test Telegram completato ma nessun messaggio risulta inviato. Falliti: ${failed}. Destinatari: ${recipientsCount}.`,
+      "error"
+    );
+  } catch (error) {
+    await loadRecipients();
+    setFeedback("recipients-feedback", "Test Telegram non inviato: " + error.message, "error");
+  }
+}
+
+
 async function syncTelegramRecipients() {
   setFeedback("recipients-feedback", "Rilevamento account Telegram in corso...", "");
 

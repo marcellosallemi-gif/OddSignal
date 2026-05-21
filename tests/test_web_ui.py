@@ -93,6 +93,9 @@ def test_web_home_returns_html_page():
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
     assert "Rileva account Telegram" in response.text
+    assert "loadRecipients(providedData = null)" in response.text
+    assert "loadRecipients(syncedRecipients)" in response.text
+    assert "Account Telegram rilevati/sincronizzati" in response.text
     assert "Invia test Telegram" in response.text
     assert "sendTelegramTestMessage" in response.text
     assert "recipients-last-updated" in response.text

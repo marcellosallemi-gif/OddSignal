@@ -2009,7 +2009,8 @@ async function syncTelegramRecipients() {
       method: "POST"
     });
 
-    await loadRecipients();
+    const syncedRecipients = Array.isArray(data.recipients) ? data.recipients : null;
+    await loadRecipients(syncedRecipients);
     await loadStatus();
 
     if (data.synced_count === 0) {
@@ -2023,7 +2024,7 @@ async function syncTelegramRecipients() {
 
     setFeedback(
       "recipients-feedback",
-      `Account Telegram rilevati: ${data.synced_count}. Attivali manualmente per abilitarli alle notifiche.`,
+      `Account Telegram rilevati/sincronizzati: ${data.synced_count}. Attivali manualmente per abilitarli alle notifiche.`,
       "success"
     );
   } catch (error) {
@@ -2058,8 +2059,8 @@ async function sendTelegramTestMessage() {
   }
 }
 
-async function loadRecipients() {
-  const data = await api("/configuration/notification-recipients");
+async function loadRecipients(providedData = null) {
+  const data = providedData || await api("/configuration/notification-recipients");
   const telegramRecipients = data.filter((item) => item.channel === "telegram");
   const activeRecipients = telegramRecipients.filter((item) => item.status === "active");
   const pendingRecipients = telegramRecipients.filter((item) => item.status === "pending");

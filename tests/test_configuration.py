@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from app.database import SessionLocal
 from app.main import app
+from app.models import Alert, NotificationRecipient, OddsSnapshot
 
 
 class FakeProviderCompetitionRefresh:
@@ -322,7 +325,6 @@ class FakeTelegramResponse:
                 }
             }
         }
-
         return {
             "ok": True,
             "result": [
@@ -330,6 +332,71 @@ class FakeTelegramResponse:
                 private_chat_update,
             ],
         }
+
+
+class FakeTelegramSendResponse:
+    status_code = 200
+    text = "ok"
+
+
+class FakeTelegramClient:
+    sent_payloads = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def post(self, url, json):
+        self.sent_payloads.append(
+            {
+                "url": url,
+                "json": json,
+            }
+        )
+        return FakeTelegramSendResponse()
+
+
+def deactivate_telegram_recipients():
+    db = SessionLocal()
+    try:
+        for recipient in db.query(NotificationRecipient).filter(
+            NotificationRecipient.channel == "telegram"
+        ):
+            recipient.is_active = False
+            recipient.status = "disabled"
+        db.commit()
+    finally:
+        db.close()
+
+
+def create_active_telegram_recipient(recipient_value):
+    db = SessionLocal()
+    try:
+        recipient = NotificationRecipient(
+            channel="telegram",
+            recipient_value=recipient_value,
+            label="Test Telegram",
+            is_active=True,
+            status="active",
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        db.add(recipient)
+        db.commit()
+    finally:
+        db.close()
+
+
+def count_odds_and_alerts():
+    db = SessionLocal()
+    try:
+        return db.query(OddsSnapshot).count(), db.query(Alert).count()
+    finally:
+        db.close()
 
 
 def test_sync_telegram_recipients_detects_private_chat(monkeypatch):
@@ -360,6 +427,59 @@ def test_sync_telegram_recipients_requires_bot_token(monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["detail"]["error"] == "telegram_not_configured"
+
+
+def test_telegram_test_message_requires_bot_token(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/telegram-test-message")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == "telegram_not_configured"
+
+
+def test_telegram_test_message_requires_active_recipients(monkeypatch):
+    deactivate_telegram_recipients()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/telegram-test-message")
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == "telegram_no_active_recipients"
+
+
+def test_telegram_test_message_sends_to_active_recipient(monkeypatch):
+    from app.services import telegram_notifier
+
+    deactivate_telegram_recipients()
+    create_active_telegram_recipient("987654321")
+    FakeTelegramClient.sent_payloads = []
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
+    monkeypatch.setattr(telegram_notifier.httpx, "Client", FakeTelegramClient)
+    counts_before = count_odds_and_alerts()
+
+    with TestClient(app) as client:
+        response = client.post("/configuration/telegram-test-message")
+
+    counts_after = count_odds_and_alerts()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sent"] == 1
+    assert data["failed"] == 0
+    assert data["recipients_count"] == 1
+    assert counts_after == counts_before
+    assert len(FakeTelegramClient.sent_payloads) == 1
+    assert FakeTelegramClient.sent_payloads[0]["json"]["chat_id"] == "987654321"
+    assert (
+        FakeTelegramClient.sent_payloads[0]["json"]["text"]
+        == "OddSignal - test notifiche Telegram. Se ricevi questo messaggio, il bot online è configurato correttamente."
+    )
 
 
 def test_get_scheduler_settings():

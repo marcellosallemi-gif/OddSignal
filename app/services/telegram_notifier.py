@@ -15,7 +15,7 @@ def is_telegram_configured() -> bool:
     return bool(os.getenv("TELEGRAM_BOT_TOKEN"))
 
 
-def get_active_telegram_recipients(db) -> List[str]:
+def get_active_telegram_recipients(db, include_fallback: bool = True) -> List[str]:
     recipients = [
         item.recipient_value
         for item in db.query(NotificationRecipient)
@@ -28,7 +28,7 @@ def get_active_telegram_recipients(db) -> List[str]:
     ]
 
     fallback_chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if fallback_chat_id and fallback_chat_id not in recipients:
+    if include_fallback and fallback_chat_id and fallback_chat_id not in recipients:
         recipients.append(fallback_chat_id)
 
     return recipients
@@ -228,6 +228,38 @@ def _send_single_telegram_message(
         message=message,
         error_message=None,
     )
+
+    return {
+        "status": "sent",
+        "recipient": recipient,
+    }
+
+
+def send_telegram_message(bot_token: str, recipient: str, message: str):
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": recipient,
+        "text": message,
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(url, json=payload)
+    except httpx.RequestError as exc:
+        return {
+            "status": "failed",
+            "recipient": recipient,
+            "error": str(exc),
+        }
+
+    if response.status_code >= 400:
+        return {
+            "status": "failed",
+            "recipient": recipient,
+            "http_status": response.status_code,
+            "error": response.text[:500],
+        }
 
     return {
         "status": "sent",

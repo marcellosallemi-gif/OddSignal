@@ -19,9 +19,17 @@ from app.schemas import (
     NotificationRecipientResponse,
 )
 from app.services.odds_api_io_provider import OddsApiIoProvider, classify_provider_error
+from app.services.telegram_notifier import (
+    get_active_telegram_recipients,
+    send_telegram_message,
+)
 
 
 router = APIRouter(prefix="/configuration", tags=["configuration"])
+TELEGRAM_TEST_MESSAGE = (
+    "OddSignal - test notifiche Telegram. Se ricevi questo messaggio, "
+    "il bot online è configurato correttamente."
+)
 
 
 def _utc_now_naive():
@@ -571,6 +579,51 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
     return {
         "synced_count": len(synced),
         "recipients": synced,
+    }
+
+
+@router.post("/telegram-test-message")
+def send_telegram_test_message(db: Session = Depends(get_db)):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "telegram_not_configured",
+                "message": "Configura TELEGRAM_BOT_TOKEN prima di inviare il test Telegram.",
+            },
+        )
+
+    recipients = get_active_telegram_recipients(db, include_fallback=False)
+    if not recipients:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "telegram_no_active_recipients",
+                "message": "Nessun destinatario Telegram attivo configurato.",
+            },
+        )
+
+    results = [
+        send_telegram_message(
+            bot_token=bot_token,
+            recipient=recipient,
+            message=TELEGRAM_TEST_MESSAGE,
+        )
+        for recipient in recipients
+    ]
+
+    sent = len([item for item in results if item["status"] == "sent"])
+    failed = len([item for item in results if item["status"] == "failed"])
+
+    return {
+        "status": "completed",
+        "channel": "telegram",
+        "message": "Test Telegram completato.",
+        "recipients_count": len(recipients),
+        "sent": sent,
+        "failed": failed,
+        "results": results,
     }
 
 

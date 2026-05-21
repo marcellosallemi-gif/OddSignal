@@ -831,6 +831,7 @@ def web_home():
     </div>
     <div class="form-grid">
       <button class="primary" onclick="syncTelegramRecipients()">Rileva account Telegram</button>
+      <button onclick="sendTelegramTestMessage()">Invia test Telegram</button>
       <button onclick="loadRecipients()">Aggiorna Telegram</button>
     </div>
     <div id="recipients-feedback" class="feedback muted">Caricamento destinatari...</div>
@@ -1925,6 +1926,33 @@ async function syncTelegramRecipients() {
     );
   } catch (error) {
     setFeedback("recipients-feedback", "Rilevamento Telegram non completato: " + error.message, "error");
+  }
+}
+
+async function sendTelegramTestMessage() {
+  setFeedback("recipients-feedback", "Invio test Telegram in corso...", "");
+
+  try {
+    const data = await api("/configuration/telegram-test-message", {
+      method: "POST"
+    });
+
+    if (data.failed > 0) {
+      setFeedback(
+        "recipients-feedback",
+        `Test Telegram completato con errori. Inviati: ${data.sent}. Falliti: ${data.failed}.`,
+        "error"
+      );
+      return;
+    }
+
+    setFeedback(
+      "recipients-feedback",
+      `Test Telegram inviato correttamente a ${data.sent} destinatari attivi.`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback("recipients-feedback", "Test Telegram non completato: " + error.message, "error");
   }
 }
 

@@ -7,6 +7,10 @@ import httpx
 from app.models import Alert, NotificationLog, NotificationRecipient
 
 
+TELEGRAM_SAFE_MESSAGE_LIMIT = 3500
+TELEGRAM_TRUNCATION_SUFFIX = "\n…contenuto abbreviato"
+
+
 def _utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -214,59 +218,108 @@ def _alert_competition_label(alert: Alert) -> str:
     return event.competition.name if event and event.competition else "Unknown competition"
 
 
-def build_alerts_summary_message(alerts: List[Alert], max_items: int = 50) -> str:
-    if not alerts:
-        return "Nessun alert quote calcio rilevato."
+def build_alerts_summary_message(alerts: List[Alert], max_items: int = 500) -> str:
+    return "\n\n".join(build_alerts_summary_messages(alerts, max_items=max_items))
 
-    critical_count = len([alert for alert in alerts if alert.alert_type == "critical_alert"])
-    standard_count = len([alert for alert in alerts if alert.alert_type == "standard_alert"])
 
+def _truncate_text(value: str, limit: int = TELEGRAM_SAFE_MESSAGE_LIMIT) -> str:
+    if len(value) <= limit:
+        return value
+
+    available_length = max(0, limit - len(TELEGRAM_TRUNCATION_SUFFIX))
+    return value[:available_length].rstrip() + TELEGRAM_TRUNCATION_SUFFIX
+
+
+def _compact_alert_summary_block(alert: Alert, index: int) -> str:
+    direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
+
+    block = "\n".join(
+        [
+            f"{index}. Evento: {_alert_event_label(alert)}",
+            f"Mercato: {readable_market_label(alert.market)}",
+            f"Selezione: {alert.selection}",
+            f"Bookmaker: {alert.bookmaker}",
+            f"Quota precedente: {alert.previous_odds}",
+            f"Quota attuale: {alert.current_odds}",
+            f"Variazione: {alert.variation_percent}% ({direction_label})",
+        ]
+    )
+
+    return _truncate_text(block, TELEGRAM_SAFE_MESSAGE_LIMIT - 500)
+
+
+def _build_alerts_summary_part(
+    part_number: int,
+    parts_count: int,
+    total_alerts: int,
+    alert_blocks: List[str],
+    truncate: bool = True,
+) -> str:
     lines = [
-        f"Alert quote calcio: {len(alerts)} movimenti validi rilevati",
+        f"OddSignal - Alert quote (parte {part_number}/{parts_count})",
+        f"Alert totali generati: {total_alerts}",
+        f"Alert in questa parte: {len(alert_blocks)}",
         "",
-        f"Critici: {critical_count}",
-        f"Standard: {standard_count}",
-        "",
-        "Dettaglio alert:",
     ]
+    lines.extend(alert_blocks)
+
+    message = "\n\n".join(lines)
+    if not truncate:
+        return message
+
+    return _truncate_text(message)
+
+
+def build_alerts_summary_messages(alerts: List[Alert], max_items: int = 500) -> List[str]:
+    if not alerts:
+        return ["Nessun alert quote calcio rilevato."]
 
     sorted_alerts = sorted(
         alerts,
         key=lambda alert: abs(alert.variation_percent or 0),
         reverse=True,
     )
-
-    for index, alert in enumerate(sorted_alerts[:max_items], start=1):
-        severity_label = " CRITICO" if alert.alert_type == "critical_alert" else ""
-        direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
-        competition = _alert_competition_label(alert)
-        event_label = _alert_event_label(alert)
-
-        lines.extend(
-            [
-                "",
-                f"{index}. {competition}",
-                f"Evento: {event_label}",
-                f"Tipo: {alert.alert_type}{severity_label}",
-                f"Bookmaker: {alert.bookmaker}",
-                f"Mercato: {readable_market_label(alert.market)}",
-                f"Selezione: {alert.selection}",
-                f"Variazione: {alert.variation_percent}% ({direction_label})",
-                f"Quota precedente: {alert.previous_odds}",
-                f"Quota attuale: {alert.current_odds}",
-            ]
-        )
+    alert_blocks = [
+        _compact_alert_summary_block(alert, index)
+        for index, alert in enumerate(sorted_alerts[:max_items], start=1)
+    ]
 
     remaining = len(alerts) - max_items
     if remaining > 0:
-        lines.extend(
-            [
-                "",
-                f"Altri {remaining} alert non inclusi per limite messaggio.",
-            ]
+        alert_blocks.append(f"Altri {remaining} alert non inclusi per limite riepilogo.")
+
+    parts = []
+    current_blocks = []
+
+    for alert_block in alert_blocks:
+        candidate_blocks = current_blocks + [alert_block]
+        candidate_message = _build_alerts_summary_part(
+            part_number=999,
+            parts_count=999,
+            total_alerts=len(alerts),
+            alert_blocks=candidate_blocks,
+            truncate=False,
         )
 
-    return "\n".join(lines)
+        if current_blocks and len(candidate_message) > TELEGRAM_SAFE_MESSAGE_LIMIT:
+            parts.append(current_blocks)
+            current_blocks = [alert_block]
+        else:
+            current_blocks = candidate_blocks
+
+    if current_blocks:
+        parts.append(current_blocks)
+
+    parts_count = len(parts)
+    return [
+        _build_alerts_summary_part(
+            part_number=index,
+            parts_count=parts_count,
+            total_alerts=len(alerts),
+            alert_blocks=part_blocks,
+        )
+        for index, part_blocks in enumerate(parts, start=1)
+    ]
 
 
 def save_notification_log(
@@ -299,6 +352,7 @@ def _send_single_telegram_message(
     recipient: str,
     message: str,
 ):
+    message = _truncate_text(message)
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": recipient,
@@ -356,6 +410,7 @@ def _send_single_telegram_message(
 
 
 def send_telegram_message(bot_token: str, recipient: str, message: str):
+    message = _truncate_text(message)
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": recipient,
@@ -454,7 +509,8 @@ def send_telegram_alert_summary(db, alerts: List[Alert]):
             "reason": "No alerts to notify.",
         }
 
-    message = build_alerts_summary_message(alerts)
+    messages = build_alerts_summary_messages(alerts)
+    message = messages[0]
     log_alert = alerts[0]
 
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -491,23 +547,34 @@ def send_telegram_alert_summary(db, alerts: List[Alert]):
             "reason": "No active Telegram recipients configured.",
         }
 
-    results = [
-        _send_single_telegram_message(
-            db=db,
-            alert=log_alert,
-            bot_token=bot_token,
-            recipient=recipient,
-            message=message,
-        )
-        for recipient in recipients
-    ]
+    results = []
+    for recipient in recipients:
+        for part_index, part_message in enumerate(messages, start=1):
+            result = _send_single_telegram_message(
+                db=db,
+                alert=log_alert,
+                bot_token=bot_token,
+                recipient=recipient,
+                message=part_message,
+            )
+            result["part"] = part_index
+            result["parts_count"] = len(messages)
+            results.append(result)
+
+    messages_sent = len([item for item in results if item["status"] == "sent"])
+    messages_failed = len([item for item in results if item["status"] == "failed"])
 
     return {
         "status": "completed",
         "channel": "telegram",
         "logs_created": len(results),
-        "sent": len([item for item in results if item["status"] == "sent"]),
-        "failed": len([item for item in results if item["status"] == "failed"]),
+        "recipients_count": len(recipients),
+        "messages_attempted": len(results),
+        "messages_sent": messages_sent,
+        "messages_failed": messages_failed,
+        "parts_count": len(messages),
+        "sent": messages_sent,
+        "failed": messages_failed,
         "alerts_included": len(alerts),
         "results": results,
     }

@@ -13,9 +13,12 @@ from app.models import (
     Team,
 )
 from app.services.telegram_notifier import (
+    TELEGRAM_SAFE_MESSAGE_LIMIT,
     build_alert_message,
+    build_alerts_summary_messages,
     get_active_telegram_recipients,
     send_telegram_alert,
+    send_telegram_alert_summary,
 )
 
 
@@ -72,6 +75,34 @@ def create_alert(db):
     db.refresh(alert)
 
     return alert
+
+
+def create_many_alerts(db, count=50):
+    first_alert = create_alert(db)
+    alerts = [first_alert]
+
+    for index in range(2, count + 1):
+        alert = Alert(
+            event_id=first_alert.event_id,
+            provider="odds_api_io",
+            bookmaker="Stake" if index % 2 else "Sbobet",
+            market="ML",
+            selection=f"selection-{index}",
+            previous_odds=2.00,
+            current_odds=1.70,
+            variation_percent=-15.0 - (index / 100),
+            direction="decrease",
+            alert_type="critical_alert",
+            created_at=datetime.utcnow(),
+        )
+        db.add(alert)
+        alerts.append(alert)
+
+    db.commit()
+    for alert in alerts:
+        db.refresh(alert)
+
+    return alerts
 
 
 def create_telegram_recipient(db, recipient_value="123456789", is_active=True):
@@ -214,15 +245,14 @@ def test_build_alerts_summary_message_contains_all_alerts(tmp_path):
             [first_alert, second_alert, third_alert]
         )
 
-        assert "3 movimenti validi rilevati" in message
-        assert "Critici: 1" in message
-        assert "Standard: 2" in message
+        assert "OddSignal - Alert quote (parte 1/1)" in message
+        assert "Alert totali generati: 3" in message
+        assert "Alert in questa parte: 3" in message
         assert "Stake" in message
         assert "Sbobet" in message
         assert "-16.28%" in message
         assert "-14.86%" in message
         assert "11.11%" in message
-        assert "Apri la dashboard" not in message
     finally:
         db.close()
 
@@ -235,3 +265,128 @@ def test_readable_market_label_maps_provider_markets_to_user_labels():
     assert readable_market_label("Both Teams To Score") == "Goal/No Goal"
     assert readable_market_label("Spread -1.75") == "Handicap -1.75"
     assert readable_market_label("Exact Score") == "Exact Score"
+
+
+def test_build_alerts_summary_messages_splits_long_summary_under_safe_limit(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        alerts = create_many_alerts(db, count=50)
+
+        messages = build_alerts_summary_messages(alerts)
+
+        assert len(messages) > 1
+        assert all(len(message) <= TELEGRAM_SAFE_MESSAGE_LIMIT for message in messages)
+        assert "OddSignal - Alert quote (parte 1/" in messages[0]
+        assert "Alert totali generati: 50" in messages[0]
+    finally:
+        db.close()
+
+
+def test_build_alerts_summary_messages_truncates_single_long_alert_block(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        alert = create_alert(db)
+        alert.selection = "very-long-selection-" + ("x" * 5000)
+        db.commit()
+        db.refresh(alert)
+
+        messages = build_alerts_summary_messages([alert])
+
+        assert len(messages) == 1
+        assert len(messages[0]) <= TELEGRAM_SAFE_MESSAGE_LIMIT
+        assert "…contenuto abbreviato" in messages[0]
+    finally:
+        db.close()
+
+
+class FakeTelegramResponse:
+    def __init__(self, status_code=200, text="OK"):
+        self.status_code = status_code
+        self.text = text
+
+
+class FakeTelegramClient:
+    posts = []
+    responses = []
+
+    def __init__(self, timeout=15.0):
+        self.timeout = timeout
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def post(self, url, json):
+        self.posts.append({"url": url, "json": json})
+        if self.responses:
+            return self.responses.pop(0)
+        return FakeTelegramResponse()
+
+
+def test_send_telegram_alert_summary_sends_all_parts_to_two_recipients(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "dummy-token")
+        monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+        monkeypatch.setattr("app.services.telegram_notifier.httpx.Client", FakeTelegramClient)
+        FakeTelegramClient.posts = []
+        FakeTelegramClient.responses = []
+
+        create_telegram_recipient(db, recipient_value="111")
+        create_telegram_recipient(db, recipient_value="222")
+        alerts = create_many_alerts(db, count=50)
+
+        result = send_telegram_alert_summary(db=db, alerts=alerts)
+        db.commit()
+
+        assert result["recipients_count"] == 2
+        assert result["parts_count"] > 1
+        assert result["messages_attempted"] == result["parts_count"] * 2
+        assert result["messages_sent"] == result["messages_attempted"]
+        assert result["messages_failed"] == 0
+        assert len(FakeTelegramClient.posts) == result["messages_attempted"]
+        assert db.query(NotificationLog).count() == result["messages_attempted"]
+        assert all(
+            len(item["json"]["text"]) <= TELEGRAM_SAFE_MESSAGE_LIMIT
+            for item in FakeTelegramClient.posts
+        )
+    finally:
+        db.close()
+
+
+def test_send_telegram_alert_summary_logs_part_failure_without_crashing(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "dummy-token")
+        monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+        monkeypatch.setattr("app.services.telegram_notifier.httpx.Client", FakeTelegramClient)
+        FakeTelegramClient.posts = []
+        FakeTelegramClient.responses = [
+            FakeTelegramResponse(status_code=400, text="Bad Request: message is too long")
+        ]
+
+        create_telegram_recipient(db, recipient_value="111")
+        alerts = create_many_alerts(db, count=50)
+
+        result = send_telegram_alert_summary(db=db, alerts=alerts)
+        db.commit()
+
+        failed_log = (
+            db.query(NotificationLog)
+            .filter(NotificationLog.status == "failed")
+            .first()
+        )
+
+        assert result["messages_attempted"] == result["parts_count"]
+        assert result["messages_failed"] == 1
+        assert result["messages_sent"] == result["messages_attempted"] - 1
+        assert failed_log is not None
+        assert "Bad Request: message is too long" in failed_log.error_message
+    finally:
+        db.close()

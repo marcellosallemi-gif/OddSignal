@@ -131,6 +131,7 @@ def test_ingestion_inserts_first_snapshot_without_alert(monkeypatch, tmp_path):
         assert result["snapshots_inserted"] == 1
         assert result["alerts_created"] == 0
         assert "ignored_odds_breakdown" in result
+        assert "ignored_market_breakdown_by_name" in result
         assert set(result["ignored_odds_breakdown"]) == EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS
         assert set(result["ignored_events_breakdown"]) == EXPECTED_IGNORED_EVENTS_BREAKDOWN_KEYS
         assert result["ignored_odds_breakdown"]["missing_previous_snapshot"] == 1
@@ -269,6 +270,7 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
         assert result["odds_received"] == 2
         assert result["odds_ignored"] == 1
         assert result["ignored_odds_breakdown"]["unsupported_market"] == 1
+        assert result["ignored_market_breakdown_by_name"]["unsupported_market"]
         assert result["snapshots_inserted"] == 1
         assert db.query(OddsSnapshot).count() == 1
 
@@ -295,6 +297,7 @@ def test_ingestion_ignores_inactive_monitored_market(monkeypatch, tmp_path):
         assert result["odds_received"] == 1
         assert result["odds_ignored"] == 1
         assert result["ignored_odds_breakdown"]["inactive_market"] == 1
+        assert result["ignored_market_breakdown_by_name"]["inactive_market"]
         assert result["snapshots_inserted"] == 0
         assert db.query(OddsSnapshot).count() == 0
     finally:

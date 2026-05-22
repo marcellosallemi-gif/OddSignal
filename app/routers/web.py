@@ -907,7 +907,20 @@ def web_home():
       <details>
         <summary>Risposta tecnica ultimo controllo</summary>
         <div id="manual-odds-check-executed-at" class="feedback muted">Ultimo controllo eseguito: n/d</div>
-        <div id="manual-odds-check-summary" class="feedback muted">Quote processate: n/d. Quote escluse per mercati non ancora supportati: n/d.</div>
+        <div id="manual-odds-check-summary" class="info-box">
+          <div class="summary-grid">
+            <div class="summary-card"><div class="summary-label">Quote ricevute</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Quote processate</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Quote escluse per mercati non ancora supportati</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Snapshot inseriti</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Quote invariate</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Alert generati</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Notifiche Telegram create</div><div class="summary-value">n/d</div></div>
+            <div class="summary-card"><div class="summary-label">Duplicati alert evitati</div><div class="summary-value">n/d</div></div>
+          </div>
+          <p class="secondary-text">Le quote escluse non sono errori: indicano mercati ricevuti dal provider ma non ancora supportati o volutamente non monitorati.</p>
+          <p class="secondary-text">Mercati esclusi principali: n/d</p>
+        </div>
         <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
       </details>
       <details>
@@ -1115,6 +1128,53 @@ function formatDateTime(value) {
   return String(value).replace("T", " ").slice(0, 19);
 }
 
+function formatLocalDateTime(value) {
+  if (!value) {
+    return "n/d";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return formatDateTime(value);
+  }
+
+  return parsed.toLocaleString("it-IT");
+}
+
+function renderManualOddsCheckSummary(data) {
+  const summaryBox = document.getElementById("manual-odds-check-summary");
+  if (!summaryBox) {
+    return;
+  }
+
+  const safeData = data || {};
+  const metrics = [
+    ["Quote ricevute", safeData.odds_received ?? "n/d"],
+    ["Quote processate", safeData.odds_processed ?? "n/d"],
+    ["Quote escluse per mercati non ancora supportati", safeData.odds_excluded ?? "n/d"],
+    ["Snapshot inseriti", safeData.snapshots_inserted ?? "n/d"],
+    ["Quote invariate", safeData.snapshots_unchanged ?? "n/d"],
+    ["Alert generati", safeData.alerts_created ?? "n/d"],
+    ["Notifiche Telegram create", safeData.notification_logs_created ?? "n/d"],
+    ["Duplicati alert evitati", safeData.duplicate_alerts_skipped ?? "n/d"]
+  ];
+  const unsupportedMarkets = Object.entries(
+    safeData.excluded_market_breakdown_by_name?.unsupported_market || {}
+  )
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 8)
+    .map(([marketName]) => marketName);
+  const excludedMarketsText = unsupportedMarkets.length ? unsupportedMarkets.join(", ") : "n/d";
+
+  summaryBox.innerHTML = `
+    <div class="summary-grid">
+      ${metrics.map(([label, value]) => summaryCard(label, value)).join("")}
+    </div>
+    <p class="secondary-text">Le quote escluse non sono errori: indicano mercati ricevuti dal provider ma non ancora supportati o volutamente non monitorati.</p>
+    <p class="secondary-text">Mercati esclusi principali: ${escapeHtml(excludedMarketsText)}</p>
+  `;
+}
+
 function renderDashboardSummary(data) {
   if (data) {
     dashboardState.system = data;
@@ -1224,11 +1284,19 @@ async function loadStatus() {
 async function runManualOddsCheck() {
   const resultBox = document.getElementById("manual-odds-check-result");
   const executedAtBox = document.getElementById("manual-odds-check-executed-at");
-  const summaryBox = document.getElementById("manual-odds-check-summary");
   setFeedback("manual-odds-check-feedback", "Controllo quote in corso...", "");
   resultBox.textContent = "Controllo in corso...";
   executedAtBox.textContent = "Ultimo controllo eseguito: controllo in corso...";
-  summaryBox.textContent = "Quote processate: controllo in corso. Quote escluse per mercati non ancora supportati: controllo in corso.";
+  renderManualOddsCheckSummary({
+    odds_received: "...",
+    odds_processed: "...",
+    odds_excluded: "...",
+    snapshots_inserted: "...",
+    snapshots_unchanged: "...",
+    alerts_created: "...",
+    notification_logs_created: "...",
+    duplicate_alerts_skipped: "..."
+  });
 
   try {
     const data = await api("/api/odds-provider/ingest-sample?limit=1", {
@@ -1236,8 +1304,8 @@ async function runManualOddsCheck() {
     });
 
     resultBox.textContent = JSON.stringify(data, null, 2);
-    executedAtBox.textContent = `Ultimo controllo eseguito: ${formatDateTime(data.executed_at)}`;
-    summaryBox.textContent = `Quote processate: ${data.odds_processed ?? "n/d"}. Quote escluse per mercati non ancora supportati: ${data.odds_excluded ?? "n/d"}.`;
+    executedAtBox.textContent = `Ultimo controllo eseguito: ${formatLocalDateTime(data.executed_at)}`;
+    renderManualOddsCheckSummary(data);
     dashboardState.lastManualCheck = "OK";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote completato. Dashboard aggiornata.", "success");
@@ -1248,7 +1316,16 @@ async function runManualOddsCheck() {
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
     executedAtBox.textContent = "Ultimo controllo eseguito: errore";
-    summaryBox.textContent = "Quote processate: errore. Quote escluse per mercati non ancora supportati: errore.";
+    renderManualOddsCheckSummary({
+      odds_received: "errore",
+      odds_processed: "errore",
+      odds_excluded: "errore",
+      snapshots_inserted: "errore",
+      snapshots_unchanged: "errore",
+      alerts_created: "errore",
+      notification_logs_created: "errore",
+      duplicate_alerts_skipped: "errore"
+    });
     dashboardState.lastManualCheck = "Errore";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + error.message, "error");

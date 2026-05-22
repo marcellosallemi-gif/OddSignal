@@ -74,8 +74,16 @@ def test_web_home_returns_html_page():
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
     assert "Ultimo controllo eseguito" in response.text
+    assert "Quote ricevute" in response.text
     assert "Quote processate" in response.text
     assert "Quote escluse per mercati non ancora supportati" in response.text
+    assert "Snapshot inseriti" in response.text
+    assert "Quote invariate" in response.text
+    assert "Alert generati" in response.text
+    assert "Notifiche Telegram create" in response.text
+    assert "Duplicati alert evitati" in response.text
+    assert "Le quote escluse non sono errori" in response.text
+    assert "Mercati esclusi principali" in response.text
     assert "Soglie alert" in response.text
     assert "Salva soglie" in response.text
     assert "Dedup minuti" in response.text

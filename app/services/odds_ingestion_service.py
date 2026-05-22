@@ -138,6 +138,52 @@ DEFAULT_MONITORED_MARKETS = {
 }
 
 
+
+
+MARKET_PROVIDER_ALIASES = {
+    "1X2": {"ML"},
+    "Moneyline": {"ML"},
+    "Vincente": {"ML"},
+
+    "Over/Under": {"Totals"},
+    "Over/Under 0.5": {"Totals"},
+    "Over/Under 1.5": {"Totals"},
+    "Over/Under 2.5": {"Totals"},
+    "Over/Under 3.5": {"Totals"},
+    "Over/Under 4.5": {"Totals"},
+
+    "Goal/No Goal": {"Both Teams To Score"},
+    "Gol/No Gol": {"Both Teams To Score"},
+    "Both Teams To Score": {"Both Teams To Score"},
+
+    "Handicap": {"Spread"},
+    "Handicap principale": {"Spread"},
+    "Handicap asiatico": {"Spread"},
+    "Spread": {"Spread"},
+
+    "Doppia chance": {"Double Chance"},
+    "Double Chance": {"Double Chance"},
+
+    "Draw No Bet": {"Draw No Bet"},
+    "Rimborso pareggio": {"Draw No Bet"},
+
+    "Handicap europeo": {"European Handicap"},
+    "European Handicap": {"European Handicap"},
+
+    "Corner Handicap": {"Corners Spread"},
+    "Corner Over/Under": {"Corners Totals"},
+    "Cartellini Over/Under": {"Bookings Totals"},
+}
+
+
+def _expand_market_aliases(market_names: set) -> set:
+    expanded = set(market_names)
+
+    for market_name in market_names:
+        expanded.update(MARKET_PROVIDER_ALIASES.get(market_name, set()))
+
+    return expanded
+
 def _empty_ignored_odds_breakdown() -> Dict[str, int]:
     return {
         "inactive_competition": 0,
@@ -198,14 +244,16 @@ def _get_active_monitored_market_names(db) -> set:
     if not market_names and db.query(MonitoredMarket).count() == 0:
         return DEFAULT_MONITORED_MARKETS
 
-    return market_names
+    return _expand_market_aliases(market_names)
 
 
 def _get_configured_monitored_market_names(db) -> set:
-    return {
+    market_names = {
         item.market_name
         for item in db.query(MonitoredMarket).all()
     }
+
+    return _expand_market_aliases(market_names)
 
 
 def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:

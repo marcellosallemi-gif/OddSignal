@@ -1,3 +1,4 @@
+from app.services.odds_ingestion_service import _expand_market_aliases
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -352,7 +353,7 @@ def test_ingestion_ignores_unmonitored_competitions(monkeypatch, tmp_path):
 
 
 def test_parse_datetime_handles_provider_fractional_timezone_format():
-    from app.services.odds_ingestion_service import _parse_datetime
+    from app.services.odds_ingestion_service import _expand_market_aliases, _parse_datetime
 
     parsed = _parse_datetime("2026-05-19T09:35:23.33+00:00")
 
@@ -403,3 +404,12 @@ def test_ingestion_notifies_only_odds_decreases(monkeypatch, tmp_path):
         assert alerts[1].alert_type == "critical_alert"
     finally:
         db.close()
+
+
+
+def test_market_aliases_expand_dashboard_names_to_provider_names():
+    assert "ML" in _expand_market_aliases({"1X2"})
+    assert "Totals" in _expand_market_aliases({"Over/Under 2.5"})
+    assert "Both Teams To Score" in _expand_market_aliases({"Goal/No Goal"})
+    assert "Spread" in _expand_market_aliases({"Handicap principale"})
+    assert "Double Chance" in _expand_market_aliases({"Doppia chance"})

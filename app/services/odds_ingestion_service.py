@@ -135,9 +135,10 @@ DEFAULT_MONITORED_MARKETS = {
     "Totals",
     "Both Teams To Score",
     "Spread",
+    "Draw No Bet",
+    "Double Chance",
+    "European Handicap",
 }
-
-
 
 
 MARKET_PROVIDER_ALIASES = {
@@ -183,6 +184,7 @@ def _expand_market_aliases(market_names: set) -> set:
         expanded.update(MARKET_PROVIDER_ALIASES.get(market_name, set()))
 
     return expanded
+
 
 def _empty_ignored_odds_breakdown() -> Dict[str, int]:
     return {
@@ -259,13 +261,29 @@ def _get_configured_monitored_market_names(db) -> set:
 def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:
     market_name = odd_data.get("market_name") or ""
 
-    if "HT" in market_name:
-        return False
-
-    if market_name.startswith("Team Total"):
+    if _is_unsupported_market_family(market_name):
         return False
 
     return market_name in active_market_names
+
+
+def _is_unsupported_market_family(market_name: str) -> bool:
+    if "HT" in market_name:
+        return True
+
+    if market_name.startswith("Team Total"):
+        return True
+
+    if market_name.startswith("Corner"):
+        return True
+
+    if market_name.startswith("Booking"):
+        return True
+
+    if market_name.startswith("Card"):
+        return True
+
+    return False
 
 
 def _ignored_market_reason(
@@ -275,10 +293,7 @@ def _ignored_market_reason(
 ) -> Optional[str]:
     market_name = odd_data.get("market_name") or ""
 
-    if "HT" in market_name:
-        return "unsupported_market"
-
-    if market_name.startswith("Team Total"):
+    if _is_unsupported_market_family(market_name):
         return "unsupported_market"
 
     if market_name in active_market_names:
@@ -387,6 +402,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     ignored_events_breakdown = _empty_ignored_events_breakdown()
     ignored_odds_breakdown = _empty_ignored_odds_breakdown()
     ignored_market_breakdown_by_name = _empty_ignored_market_breakdown_by_name()
+    excluded_market_breakdown_by_name = _empty_ignored_market_breakdown_by_name()
 
     for event_data in sample["events"]:
         if not _is_monitored_competition(event_data, active_competition_names):
@@ -409,6 +425,8 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     ignored_odds = 0
+    processed_odds = 0
+    excluded_odds = 0
 
     for odd_data in sample["odds"]:
         ignored_market_reason = _ignored_market_reason(
@@ -418,9 +436,15 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         )
         if ignored_market_reason:
             ignored_odds += 1
+            excluded_odds += 1
             ignored_odds_breakdown[ignored_market_reason] += 1
             _increment_ignored_market_name(
                 ignored_market_breakdown_by_name,
+                ignored_market_reason,
+                odd_data,
+            )
+            _increment_ignored_market_name(
+                excluded_market_breakdown_by_name,
                 ignored_market_reason,
                 odd_data,
             )
@@ -437,6 +461,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
             ignored_odds_breakdown["invalid_odds"] += 1
             continue
 
+        processed_odds += 1
         previous_snapshot = _find_previous_snapshot(db, event.id, odd_data)
 
         if previous_snapshot and previous_snapshot.odds_decimal == odd_data["odds_decimal"]:
@@ -531,8 +556,11 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "active_provider_league_slugs_count": len(active_provider_league_slugs),
         "odds_received": sample["odds_count"],
         "odds_ignored": ignored_odds,
+        "odds_processed": processed_odds,
+        "odds_excluded": excluded_odds,
         "ignored_odds_breakdown": ignored_odds_breakdown,
         "ignored_market_breakdown_by_name": ignored_market_breakdown_by_name,
+        "excluded_market_breakdown_by_name": excluded_market_breakdown_by_name,
         "active_markets_count": len(active_market_names),
         "snapshots_inserted": inserted_snapshots,
         "snapshots_unchanged": unchanged_snapshots,

@@ -133,8 +133,11 @@ def test_ingestion_inserts_first_snapshot_without_alert(monkeypatch, tmp_path):
         assert result["alerts_created"] == 0
         assert "ignored_odds_breakdown" in result
         assert "ignored_market_breakdown_by_name" in result
+        assert "excluded_market_breakdown_by_name" in result
         assert set(result["ignored_odds_breakdown"]) == EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS
         assert set(result["ignored_events_breakdown"]) == EXPECTED_IGNORED_EVENTS_BREAKDOWN_KEYS
+        assert result["odds_processed"] == 1
+        assert result["odds_excluded"] == 0
         assert result["ignored_odds_breakdown"]["missing_previous_snapshot"] == 1
         assert db.query(OddsSnapshot).count() == 1
         assert db.query(Alert).count() == 0
@@ -255,6 +258,128 @@ class FakeProviderWithIgnoredMarket:
         }
 
 
+class FakeProviderWithAdditionalMarkets:
+    def get_sample(self, limit=3, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 3,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-additional-markets",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-additional-markets",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Double Chance",
+                    "selection": "home_or_draw",
+                    "line": None,
+                    "odds_decimal": 1.35,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-additional-markets",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Draw No Bet",
+                    "selection": "home",
+                    "line": None,
+                    "odds_decimal": 1.70,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-additional-markets",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "European Handicap",
+                    "selection": "home",
+                    "line": -1,
+                    "odds_decimal": 2.10,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+            ],
+        }
+
+
+class FakeProviderWithExcludedMarkets:
+    def get_sample(self, limit=3, league_slugs=None):
+        excluded_markets = [
+            ("Spread HT", "home", 0.5),
+            ("Totals HT", "over", 1.5),
+            ("Corners Spread", "home", 1.5),
+            ("Corners Totals", "over", 8.5),
+            ("Bookings Totals", "over", 4.5),
+            ("Team Total Home", "over", 1.5),
+        ]
+
+        odds = []
+        for index, item in enumerate(excluded_markets):
+            market_name, selection, line = item
+            odds.append(
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-excluded-markets",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": market_name,
+                    "selection": selection,
+                    "line": line,
+                    "odds_decimal": 1.50 + (index * 0.01),
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                }
+            )
+
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": len(odds),
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-excluded-markets",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": odds,
+        }
+
+
 def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
@@ -270,8 +395,11 @@ def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
 
         assert result["odds_received"] == 2
         assert result["odds_ignored"] == 1
+        assert result["odds_processed"] == 1
+        assert result["odds_excluded"] == 1
         assert result["ignored_odds_breakdown"]["unsupported_market"] == 1
-        assert result["ignored_market_breakdown_by_name"]["unsupported_market"]
+        assert result["ignored_market_breakdown_by_name"]["unsupported_market"]["Team Total Home 0.5"] == 1
+        assert result["excluded_market_breakdown_by_name"]["unsupported_market"]["Team Total Home 0.5"] == 1
         assert result["snapshots_inserted"] == 1
         assert db.query(OddsSnapshot).count() == 1
 
@@ -297,8 +425,11 @@ def test_ingestion_ignores_inactive_monitored_market(monkeypatch, tmp_path):
 
         assert result["odds_received"] == 1
         assert result["odds_ignored"] == 1
+        assert result["odds_processed"] == 0
+        assert result["odds_excluded"] == 1
         assert result["ignored_odds_breakdown"]["inactive_market"] == 1
-        assert result["ignored_market_breakdown_by_name"]["inactive_market"]
+        assert result["ignored_market_breakdown_by_name"]["inactive_market"]["ML"] == 1
+        assert result["excluded_market_breakdown_by_name"]["inactive_market"]["ML"] == 1
         assert result["snapshots_inserted"] == 0
         assert db.query(OddsSnapshot).count() == 0
     finally:
@@ -324,6 +455,85 @@ def test_ingestion_accepts_active_monitored_market(monkeypatch, tmp_path):
         assert result["odds_ignored"] == 0
         assert result["snapshots_inserted"] == 1
         assert db.query(OddsSnapshot).count() == 1
+    finally:
+        db.close()
+
+
+def test_ingestion_processes_added_supported_markets_when_active(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Doppia chance", is_active=True)
+        add_monitored_market(db, "Draw No Bet", is_active=True)
+        add_monitored_market(db, "Handicap europeo", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithAdditionalMarkets(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 3
+        assert result["odds_ignored"] == 0
+        assert result["odds_processed"] == 3
+        assert result["odds_excluded"] == 0
+        assert result["ignored_odds_breakdown"]["unsupported_market"] == 0
+        assert result["snapshots_inserted"] == 3
+
+        snapshot_markets = {snapshot.market for snapshot in db.query(OddsSnapshot).all()}
+        assert snapshot_markets == {
+            "Double Chance",
+            "Draw No Bet",
+            "European Handicap -1",
+        }
+    finally:
+        db.close()
+
+
+def test_ingestion_keeps_ht_corners_bookings_and_team_totals_excluded(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        for market_name in [
+            "Spread HT",
+            "Totals HT",
+            "Corner Handicap",
+            "Corner Over/Under",
+            "Cartellini Over/Under",
+            "Team Total Home",
+        ]:
+            add_monitored_market(db, market_name, is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithExcludedMarkets(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 6
+        assert result["odds_ignored"] == 6
+        assert result["odds_processed"] == 0
+        assert result["odds_excluded"] == 6
+        assert result["ignored_odds_breakdown"]["unsupported_market"] == 6
+        assert result["snapshots_inserted"] == 0
+        assert db.query(OddsSnapshot).count() == 0
+
+        ignored_names = result["ignored_market_breakdown_by_name"]["unsupported_market"]
+        excluded_names = result["excluded_market_breakdown_by_name"]["unsupported_market"]
+        for market_name in [
+            "Spread HT 0.5",
+            "Totals HT 1.5",
+            "Corners Spread 1.5",
+            "Corners Totals 8.5",
+            "Bookings Totals 4.5",
+            "Team Total Home 1.5",
+        ]:
+            assert ignored_names[market_name] == 1
+            assert excluded_names[market_name] == 1
     finally:
         db.close()
 
@@ -413,3 +623,7 @@ def test_market_aliases_expand_dashboard_names_to_provider_names():
     assert "Both Teams To Score" in _expand_market_aliases({"Goal/No Goal"})
     assert "Spread" in _expand_market_aliases({"Handicap principale"})
     assert "Double Chance" in _expand_market_aliases({"Doppia chance"})
+    assert "Double Chance" in _expand_market_aliases({"Double Chance"})
+    assert "Draw No Bet" in _expand_market_aliases({"Draw No Bet"})
+    assert "European Handicap" in _expand_market_aliases({"Handicap europeo"})
+    assert "European Handicap" in _expand_market_aliases({"European Handicap"})

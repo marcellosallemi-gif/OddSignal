@@ -907,6 +907,7 @@ def web_home():
       <details>
         <summary>Risposta tecnica ultimo controllo</summary>
         <div id="manual-odds-check-executed-at" class="feedback muted">Ultimo controllo eseguito: n/d</div>
+        <div id="manual-odds-check-summary" class="feedback muted">Quote processate: n/d. Quote escluse per mercati non ancora supportati: n/d.</div>
         <pre id="manual-odds-check-result">Nessun controllo eseguito.</pre>
       </details>
       <details>
@@ -983,6 +984,8 @@ let dashboardAutoRefreshIntervalId = null;
 const suggestedFootballMarkets = [
   "1X2",
   "Doppia chance",
+  "Double Chance",
+  "Draw No Bet",
   "Over/Under 0.5",
   "Over/Under 1.5",
   "Over/Under 2.5",
@@ -990,6 +993,8 @@ const suggestedFootballMarkets = [
   "Goal/No Goal",
   "Handicap principale",
   "Handicap asiatico",
+  "Handicap europeo",
+  "European Handicap",
   "Risultato esatto",
   "Primo tempo/finale",
   "Risultato primo tempo",
@@ -1219,9 +1224,11 @@ async function loadStatus() {
 async function runManualOddsCheck() {
   const resultBox = document.getElementById("manual-odds-check-result");
   const executedAtBox = document.getElementById("manual-odds-check-executed-at");
+  const summaryBox = document.getElementById("manual-odds-check-summary");
   setFeedback("manual-odds-check-feedback", "Controllo quote in corso...", "");
   resultBox.textContent = "Controllo in corso...";
   executedAtBox.textContent = "Ultimo controllo eseguito: controllo in corso...";
+  summaryBox.textContent = "Quote processate: controllo in corso. Quote escluse per mercati non ancora supportati: controllo in corso.";
 
   try {
     const data = await api("/api/odds-provider/ingest-sample?limit=1", {
@@ -1230,6 +1237,7 @@ async function runManualOddsCheck() {
 
     resultBox.textContent = JSON.stringify(data, null, 2);
     executedAtBox.textContent = `Ultimo controllo eseguito: ${formatDateTime(data.executed_at)}`;
+    summaryBox.textContent = `Quote processate: ${data.odds_processed ?? "n/d"}. Quote escluse per mercati non ancora supportati: ${data.odds_excluded ?? "n/d"}.`;
     dashboardState.lastManualCheck = "OK";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote completato. Dashboard aggiornata.", "success");
@@ -1240,6 +1248,7 @@ async function runManualOddsCheck() {
   } catch (error) {
     resultBox.textContent = "Errore controllo quote: " + error.message;
     executedAtBox.textContent = "Ultimo controllo eseguito: errore";
+    summaryBox.textContent = "Quote processate: errore. Quote escluse per mercati non ancora supportati: errore.";
     dashboardState.lastManualCheck = "Errore";
     renderDashboardSummary();
     setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + error.message, "error");

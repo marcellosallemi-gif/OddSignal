@@ -472,6 +472,13 @@ def create_notification_recipient(
 
 @router.post("/telegram-recipients/sync")
 def sync_telegram_recipients(db: Session = Depends(get_db)):
+    existing_telegram_values = {
+        item.recipient_value
+        for item in db.query(NotificationRecipient)
+        .filter(NotificationRecipient.channel == "telegram")
+        .all()
+    }
+
     result = sync_telegram_recipients_from_telegram(db)
 
     if result["status"] == "skipped" and result["error"] == "telegram_not_configured":
@@ -501,8 +508,33 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
             },
         )
 
+    telegram_recipients = (
+        db.query(NotificationRecipient)
+        .filter(NotificationRecipient.channel == "telegram")
+        .all()
+    )
+
+    new_recipients_count = len(
+        [
+            item
+            for item in telegram_recipients
+            if item.recipient_value not in existing_telegram_values
+        ]
+    )
+
+    active_recipients_count = len(
+        [item for item in telegram_recipients if item.status == "active" and item.is_active]
+    )
+    pending_recipients_count = len(
+        [item for item in telegram_recipients if item.status == "pending"]
+    )
+
     return {
         "synced_count": result["synced_count"],
+        "new_recipients_count": new_recipients_count,
+        "total_telegram_recipients_count": len(telegram_recipients),
+        "active_recipients_count": active_recipients_count,
+        "pending_recipients_count": pending_recipients_count,
         "recipients": result["recipients"],
     }
 

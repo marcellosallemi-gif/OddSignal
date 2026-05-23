@@ -179,6 +179,43 @@ def test_create_monitored_market():
     assert data["is_active"] is True
 
 
+def test_monitored_markets_are_returned_with_canonical_italian_labels():
+    with TestClient(app) as client:
+        double_chance_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "market_name": "Double Chance",
+                "is_active": False,
+            },
+        )
+        canonical_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "market_name": "Doppia chance",
+                "is_active": True,
+            },
+        )
+        draw_no_bet_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "market_name": "Draw No Bet",
+                "is_active": True,
+            },
+        )
+        list_response = client.get("/configuration/monitored-markets")
+
+    assert double_chance_response.status_code == 200
+    assert double_chance_response.json()["market_name"] == "Doppia chance"
+    assert canonical_response.status_code == 200
+    assert draw_no_bet_response.status_code == 200
+    assert draw_no_bet_response.json()["market_name"] == "Pareggio escluso"
+
+    market_names = [item["market_name"] for item in list_response.json()]
+    assert market_names.count("Doppia chance") == 1
+    assert "Double Chance" not in market_names
+    assert "Pareggio escluso" in market_names
+
+
 def test_toggle_monitored_market():
     market_name = "Toggle Market " + uuid4().hex
 

@@ -30,6 +30,77 @@ TELEGRAM_TEST_MESSAGE = (
     "il bot online è configurato correttamente."
 )
 
+MARKET_CANONICAL_LABELS = {
+    "ML": "1X2",
+    "Moneyline": "1X2",
+    "1X2": "1X2",
+    "Double Chance": "Doppia chance",
+    "Doppia chance": "Doppia chance",
+    "Draw No Bet": "Pareggio escluso",
+    "Pareggio escluso": "Pareggio escluso",
+    "Both Teams To Score": "Goal/No Goal",
+    "Goal/No Goal": "Goal/No Goal",
+    "Spread": "Handicap asiatico",
+    "Asian Handicap": "Handicap asiatico",
+    "Handicap asiatico": "Handicap asiatico",
+    "Handicap principale": "Handicap asiatico",
+    "European Handicap": "Handicap europeo",
+    "Handicap europeo": "Handicap europeo",
+    "Correct Score": "Risultato esatto",
+    "Risultato esatto": "Risultato esatto",
+    "1st Half Result": "Risultato primo tempo",
+    "Risultato primo tempo": "Risultato primo tempo",
+    "Half Time/Full Time": "Primo tempo/finale",
+    "Primo tempo/finale": "Primo tempo/finale",
+    "Corners Totals": "Totale corner",
+    "Totale corner": "Totale corner",
+    "Corners Spread": "Handicap corner",
+    "Handicap corner": "Handicap corner",
+    "Cards Totals": "Totale cartellini",
+    "Bookings Totals": "Totale cartellini",
+    "Totale cartellini": "Totale cartellini",
+    "Anytime Goalscorer": "Marcatori",
+    "Marcatori": "Marcatori",
+    "First Goalscorer": "Primo marcatore",
+    "Primo marcatore": "Primo marcatore",
+    "Both Teams To Score 1st Half": "Entrambe segnano nel primo tempo",
+    "Entrambe segnano nel primo tempo": "Entrambe segnano nel primo tempo",
+    "Entrambe le squadre segnano primo tempo": "Entrambe segnano nel primo tempo",
+}
+
+
+def _canonical_market_name(market_name: str) -> str:
+    clean_name = (market_name or "").strip()
+    if clean_name.startswith("Totals "):
+        return "Over/Under " + clean_name.replace("Totals ", "", 1).strip()
+    if clean_name.startswith("Over/Under "):
+        return clean_name
+    return MARKET_CANONICAL_LABELS.get(clean_name, clean_name)
+
+
+def _market_aliases_for_canonical(canonical_name: str) -> List[str]:
+    aliases = [
+        alias
+        for alias, label in MARKET_CANONICAL_LABELS.items()
+        if label == canonical_name
+    ]
+
+    if canonical_name.startswith("Over/Under "):
+        line = canonical_name.replace("Over/Under ", "", 1).strip()
+        aliases.extend([canonical_name, "Totals " + line])
+
+    aliases.append(canonical_name)
+    return sorted(set(aliases))
+
+
+def _market_response(item: MonitoredMarket, canonical_name: str, is_active: bool):
+    return {
+        "id": item.id,
+        "market_name": canonical_name,
+        "is_active": is_active,
+        "created_at": item.created_at,
+    }
+
 
 def _utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -345,7 +416,24 @@ def toggle_monitored_competition(
     response_model=List[MonitoredMarketResponse],
 )
 def get_monitored_markets(db: Session = Depends(get_db)):
-    return db.query(MonitoredMarket).order_by(MonitoredMarket.market_name).all()
+    grouped_markets = {}
+    for item in db.query(MonitoredMarket).order_by(MonitoredMarket.market_name).all():
+        canonical_name = _canonical_market_name(item.market_name)
+        group = grouped_markets.setdefault(
+            canonical_name,
+            {
+                "item": item,
+                "is_active": False,
+            },
+        )
+        if item.market_name == canonical_name:
+            group["item"] = item
+        group["is_active"] = group["is_active"] or item.is_active
+
+    return [
+        _market_response(group["item"], canonical_name, group["is_active"])
+        for canonical_name, group in sorted(grouped_markets.items())
+    ]
 
 
 @router.post(
@@ -356,20 +444,31 @@ def upsert_monitored_market(
     payload: MonitoredMarketCreate,
     db: Session = Depends(get_db),
 ):
-    existing = (
+    canonical_name = _canonical_market_name(payload.market_name)
+    aliases = _market_aliases_for_canonical(canonical_name)
+    existing_items = (
         db.query(MonitoredMarket)
-        .filter(MonitoredMarket.market_name == payload.market_name)
-        .first()
+        .filter(MonitoredMarket.market_name.in_(aliases))
+        .all()
     )
 
-    if existing:
-        existing.is_active = payload.is_active
+    if existing_items:
+        canonical_item = next(
+            (item for item in existing_items if item.market_name == canonical_name),
+            existing_items[0],
+        )
+        if canonical_item.market_name != canonical_name:
+            canonical_item.market_name = canonical_name
+
+        for item in existing_items:
+            item.is_active = payload.is_active
+
         db.commit()
-        db.refresh(existing)
-        return existing
+        db.refresh(canonical_item)
+        return _market_response(canonical_item, canonical_name, payload.is_active)
 
     item = MonitoredMarket(
-        market_name=payload.market_name,
+        market_name=canonical_name,
         is_active=payload.is_active,
         created_at=_utc_now_naive(),
     )
@@ -395,12 +494,28 @@ def toggle_monitored_market(
     if not item:
         raise HTTPException(status_code=404, detail="Monitored market not found")
 
-    item.is_active = is_active
-    item.status = "active" if is_active else "disabled"
-    db.commit()
-    db.refresh(item)
+    canonical_name = _canonical_market_name(item.market_name)
+    aliases = _market_aliases_for_canonical(canonical_name)
+    group_items = (
+        db.query(MonitoredMarket)
+        .filter(MonitoredMarket.market_name.in_(aliases))
+        .all()
+    )
 
-    return item
+    canonical_item = next(
+        (market for market in group_items if market.market_name == canonical_name),
+        item,
+    )
+    if canonical_item.market_name != canonical_name:
+        canonical_item.market_name = canonical_name
+
+    for market in group_items:
+        market.is_active = is_active
+
+    db.commit()
+    db.refresh(canonical_item)
+
+    return _market_response(canonical_item, canonical_name, is_active)
 
 
 @router.get(

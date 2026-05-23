@@ -170,12 +170,14 @@ MARKET_PROVIDER_ALIASES = {
     "Handicap": {"Spread"},
     "Handicap principale": {"Spread"},
     "Handicap asiatico": {"Spread"},
+    "Asian Handicap": {"Spread"},
     "Spread": {"Spread"},
 
     "Doppia chance": {"Double Chance"},
     "Double Chance": {"Double Chance"},
 
     "Draw No Bet": {"Draw No Bet"},
+    "Pareggio escluso": {"Draw No Bet"},
     "Rimborso pareggio": {"Draw No Bet"},
 
     "Handicap europeo": {"European Handicap"},

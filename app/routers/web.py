@@ -997,27 +997,36 @@ let dashboardAutoRefreshIntervalId = null;
 const suggestedFootballMarkets = [
   "1X2",
   "Doppia chance",
-  "Double Chance",
-  "Draw No Bet",
+  "Pareggio escluso",
+  "Goal/No Goal",
+  "Handicap asiatico",
   "Over/Under 0.5",
   "Over/Under 1.5",
   "Over/Under 2.5",
   "Over/Under 3.5",
-  "Goal/No Goal",
-  "Handicap principale",
-  "Handicap asiatico",
   "Handicap europeo",
-  "European Handicap",
   "Risultato esatto",
-  "Primo tempo/finale",
   "Risultato primo tempo",
+  "Primo tempo/finale",
   "Totale corner",
   "Handicap corner",
   "Totale cartellini",
   "Marcatori",
   "Primo marcatore",
-  "Entrambe le squadre segnano primo tempo"
+  "Entrambe segnano nel primo tempo"
 ];
+
+const activeSuggestedFootballMarkets = new Set([
+  "1X2",
+  "Doppia chance",
+  "Pareggio escluso",
+  "Goal/No Goal",
+  "Handicap asiatico",
+  "Over/Under 0.5",
+  "Over/Under 1.5",
+  "Over/Under 2.5",
+  "Over/Under 3.5"
+]);
 
 function setFeedback(elementId, message, type) {
   const element = document.getElementById(elementId);
@@ -1069,7 +1078,20 @@ function readableMarketName(marketName) {
 
   if (marketName.startsWith("Spread")) {
     const suffix = marketName.replace("Spread", "").trim();
-    return "Handicap" + (suffix ? ` ${suffix}` : "");
+    return "Handicap asiatico" + (suffix ? ` ${suffix}` : "");
+  }
+
+  if (marketName === "Double Chance") {
+    return "Doppia chance";
+  }
+
+  if (marketName === "Draw No Bet") {
+    return "Pareggio escluso";
+  }
+
+  if (marketName.startsWith("European Handicap")) {
+    const suffix = marketName.replace("European Handicap", "").trim();
+    return "Handicap europeo" + (suffix ? ` ${suffix}` : "");
   }
 
   return marketName;
@@ -2016,13 +2038,12 @@ async function loadMonitoredMarkets() {
   dashboardState.activeMarkets = data.filter((item) => item.is_active).length;
   renderDashboardSummary();
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Nome provider</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
   for (const item of data) {
     const active = item.is_active ? "Attivo" : "In attesa di attivazione";
     const badgeClass = item.is_active ? "badge ok" : "badge";
     html += `<tr>
       <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
-      <td><span class="secondary-text">${escapeHtml(item.market_name)}</span></td>
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
         <button class="compact" onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
@@ -2034,7 +2055,6 @@ async function loadMonitoredMarkets() {
   for (const marketName of missingSuggestedMarkets) {
     html += `<tr>
       <td><span class="market-name">${escapeHtml(readableMarketName(marketName))}</span></td>
-      <td><span class="secondary-text">${escapeHtml(marketName)}</span></td>
       <td><span class="badge">Da caricare</span></td>
       <td><button class="compact" onclick="addSuggestedMarkets()">Carica mercati suggeriti</button></td>
     </tr>`;
@@ -2059,13 +2079,13 @@ async function addSuggestedMarkets() {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           market_name: marketName,
-          is_active: false
+          is_active: activeSuggestedFootballMarkets.has(marketName)
         })
       });
     }
 
     await loadMonitoredMarkets();
-    setFeedback("markets-feedback", `Mercati suggeriti caricati: ${marketsToCreate.length}. Attivali solo se vuoi monitorarli.`, "success");
+    setFeedback("markets-feedback", `Mercati suggeriti caricati: ${marketsToCreate.length}. I mercati consigliati sono attivi, gli altri restano in attesa.`, "success");
   } catch (error) {
     setFeedback("markets-feedback", "Mercati suggeriti non caricati: " + error.message, "error");
   }

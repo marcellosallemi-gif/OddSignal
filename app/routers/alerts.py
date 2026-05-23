@@ -1,10 +1,10 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Alert, Event
+from app.models import Alert, Event, NotificationLog
 from app.schemas import AlertResponse
 
 
@@ -81,15 +81,31 @@ def delete_recent_alerts(
         .all()
     )
 
-    deleted_count = len(alerts_to_delete)
+    alert_ids = [alert.id for alert in alerts_to_delete]
+    deleted_count = len(alert_ids)
 
-    for alert in alerts_to_delete:
-        db.delete(alert)
+    try:
+        deleted_notification_logs = 0
+        if alert_ids:
+            deleted_notification_logs = (
+                db.query(NotificationLog)
+                .filter(NotificationLog.alert_id.in_(alert_ids))
+                .delete(synchronize_session=False)
+            )
 
-    db.commit()
+        for alert in alerts_to_delete:
+            db.delete(alert)
+
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Alert recenti non cancellati: errore durante la cancellazione dei log collegati.",
+        ) from exc
 
     return {
         "deleted_count": deleted_count,
+        "deleted_notification_logs": deleted_notification_logs,
         "message": "Alert recenti cancellati.",
     }
-

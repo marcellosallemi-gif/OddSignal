@@ -100,10 +100,11 @@ def test_web_home_returns_html_page():
     assert "Mercati futuri / da integrare" not in response.text
     assert "Carica mercati suggeriti" in response.text
     assert "Doppia chance" in response.text
-    assert "Double Chance" in response.text
-    assert "Draw No Bet" in response.text
+    assert "Pareggio escluso" in response.text
+    assert "Handicap principale" not in response.text
+    assert "Nome provider" not in response.text
     assert "Handicap europeo" in response.text
-    assert "European Handicap" in response.text
+    assert "activeSuggestedFootballMarkets" in response.text
     assert "loadMonitoredMarkets" in response.text
     assert "toggleMonitoredMarket" in response.text
     assert "Rileva account Telegram" in response.text

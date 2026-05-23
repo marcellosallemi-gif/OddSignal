@@ -17,6 +17,7 @@ from app.services.telegram_notifier import (
     build_alert_message,
     build_alerts_summary_messages,
     get_active_telegram_recipients,
+    readable_selection_label,
     send_telegram_alert,
     send_telegram_alert_summary,
 )
@@ -262,9 +263,83 @@ def test_readable_market_label_maps_provider_markets_to_user_labels():
 
     assert readable_market_label("ML") == "1X2"
     assert readable_market_label("Totals") == "Over/Under"
+    assert readable_market_label("Totals 2.5") == "Over/Under 2.5"
     assert readable_market_label("Both Teams To Score") == "Goal/No Goal"
     assert readable_market_label("Spread -1.75") == "Handicap -1.75"
+    assert readable_market_label("European Handicap -1") == "Handicap europeo -1"
     assert readable_market_label("Exact Score") == "Exact Score"
+
+
+def test_readable_selection_label_formats_line_and_double_chance_description():
+    assert readable_selection_label("ML", "home", "Inter", "Milan") == "1 - Inter"
+    assert readable_selection_label("ML", "draw", "Inter", "Milan") == "X - Pareggio"
+    assert readable_selection_label("ML", "away", "Inter", "Milan") == "2 - Milan"
+    assert readable_selection_label("Totals 2.5", "Under") == "Under 2.5"
+    assert readable_selection_label("Totals 2.5", "over") == "Over 2.5"
+    assert readable_selection_label("Double Chance", "1X") == "1X - Casa o Pareggio"
+    assert readable_selection_label("Double Chance", "X2") == "X2 - Pareggio o Trasferta"
+    assert readable_selection_label("Double Chance", "12") == "12 - Casa o Trasferta"
+    assert readable_selection_label("Double Chance", "1X", "Inter", "Milan") == "1X - Inter o Pareggio"
+    assert readable_selection_label("Double Chance", "X2", "Inter", "Milan") == "X2 - Pareggio o Milan"
+    assert readable_selection_label("Double Chance", "12", "Inter", "Milan") == "12 - Inter o Milan"
+    assert readable_selection_label("Spread -1.5", "home", "Inter", "Milan") == "Inter handicap -1.5"
+
+
+def test_build_alert_message_shows_readable_selection_and_line(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        alert = create_alert(db)
+        alert.market = "Totals 2.5"
+        alert.selection = "Under"
+        db.commit()
+        db.refresh(alert)
+
+        message = build_alert_message(alert)
+
+        assert "Mercato: Over/Under 2.5" in message
+        assert "Selezione: Under 2.5" in message
+        assert "Linea: 2.5" in message
+    finally:
+        db.close()
+
+
+def test_build_alert_message_shows_double_chance_description(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        alert = create_alert(db)
+        alert.market = "Double Chance"
+        alert.selection = "1X"
+        db.commit()
+        db.refresh(alert)
+
+        message = build_alert_message(alert)
+
+        assert "Mercato: Double Chance" in message
+        assert "Selezione: 1X - Inter o Pareggio" in message
+        assert "Selezione: under" not in message
+    finally:
+        db.close()
+
+
+def test_summary_alert_message_contains_type_provider_and_team_selection(tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        alert = create_alert(db)
+        alert.market = "Double Chance"
+        alert.selection = "X2"
+        db.commit()
+        db.refresh(alert)
+
+        messages = build_alerts_summary_messages([alert])
+
+        assert "Selezione: X2 - Pareggio o Milan" in messages[0]
+        assert "Tipo alert: standard_alert" in messages[0]
+        assert "Provider: odds_api_io" in messages[0]
+    finally:
+        db.close()
 
 
 def test_build_alerts_summary_messages_splits_long_summary_under_safe_limit(tmp_path):

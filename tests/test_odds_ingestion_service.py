@@ -18,6 +18,7 @@ EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS = {
     "missing_previous_snapshot",
     "unchanged_odds",
     "invalid_odds",
+    "invalid_market_selection",
     "missing_event_mapping",
     "below_alert_threshold",
     "outside_alert_range",
@@ -380,6 +381,106 @@ class FakeProviderWithExcludedMarkets:
         }
 
 
+class FakeProviderWithInvalidDoubleChanceSelection:
+    odds_decimal = 1.80
+    market_name = "Double Chance"
+    selection = "under"
+    line = None
+
+    def get_sample(self, limit=3, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 1,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-invalid-double-chance",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-invalid-double-chance",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": self.market_name,
+                    "selection": self.selection,
+                    "line": self.line,
+                    "odds_decimal": self.odds_decimal,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                }
+            ],
+        }
+
+
+class FakeProviderWithTotalsAndDoubleChanceSelections:
+    def get_sample(self, limit=3, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 2,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-normalized-selections",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-normalized-selections",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Double Chance",
+                    "selection": "home_or_draw",
+                    "line": None,
+                    "odds_decimal": 1.35,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-normalized-selections",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Totals",
+                    "selection": "under",
+                    "line": 2.5,
+                    "odds_decimal": 1.90,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                },
+            ],
+        }
+
+
 def test_ingestion_ignores_non_mvp_markets(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
@@ -488,6 +589,113 @@ def test_ingestion_processes_added_supported_markets_when_active(monkeypatch, tm
             "Draw No Bet",
             "European Handicap -1",
         }
+    finally:
+        db.close()
+
+
+def test_ingestion_excludes_double_chance_with_under_selection(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Double Chance", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithInvalidDoubleChanceSelection(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 1
+        assert result["odds_excluded"] == 1
+        assert result["ignored_odds_breakdown"]["invalid_market_selection"] == 1
+        assert result["excluded_market_breakdown_by_name"]["invalid_market_selection"]["Double Chance"] == 1
+        assert db.query(OddsSnapshot).count() == 0
+        assert db.query(Alert).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_excludes_active_unrecognized_market(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Exact Score", is_active=True)
+
+        provider = FakeProviderWithInvalidDoubleChanceSelection()
+        provider.market_name = "Exact Score"
+        provider.selection = "1-0"
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: provider,
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 1
+        assert result["ignored_odds_breakdown"]["unsupported_market"] == 1
+        assert result["excluded_market_breakdown_by_name"]["unsupported_market"]["Exact Score"] == 1
+        assert db.query(OddsSnapshot).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_excludes_totals_without_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Over/Under 2.5", is_active=True)
+
+        provider = FakeProviderWithInvalidDoubleChanceSelection()
+        provider.market_name = "Totals"
+        provider.selection = "under"
+        provider.line = None
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: provider,
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 1
+        assert result["ignored_odds_breakdown"]["invalid_market_selection"] == 1
+        assert result["excluded_market_breakdown_by_name"]["invalid_market_selection"]["Totals"] == 1
+        assert db.query(OddsSnapshot).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_normalizes_supported_selections_and_requires_totals_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Double Chance", is_active=True)
+        add_monitored_market(db, "Over/Under 2.5", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithTotalsAndDoubleChanceSelections(),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        snapshots = db.query(OddsSnapshot).order_by(OddsSnapshot.market).all()
+
+        assert result["odds_received"] == 2
+        assert result["odds_ignored"] == 0
+        assert [(item.market, item.selection, item.line) for item in snapshots] == [
+            ("Double Chance", "1X", None),
+            ("Totals 2.5", "Under", 2.5),
+        ]
     finally:
         db.close()
 

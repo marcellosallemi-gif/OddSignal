@@ -140,6 +140,16 @@ DEFAULT_MONITORED_MARKETS = {
     "European Handicap",
 }
 
+SUPPORTED_PROVIDER_MARKETS = {
+    "ML",
+    "Totals",
+    "Both Teams To Score",
+    "Spread",
+    "Draw No Bet",
+    "Double Chance",
+    "European Handicap",
+}
+
 
 MARKET_PROVIDER_ALIASES = {
     "1X2": {"ML"},
@@ -196,6 +206,7 @@ def _empty_ignored_odds_breakdown() -> Dict[str, int]:
         "missing_previous_snapshot": 0,
         "unchanged_odds": 0,
         "invalid_odds": 0,
+        "invalid_market_selection": 0,
         "missing_event_mapping": 0,
         "below_alert_threshold": 0,
         "outside_alert_range": 0,
@@ -207,6 +218,7 @@ def _empty_ignored_market_breakdown_by_name() -> Dict[str, Dict[str, int]]:
     return {
         "inactive_market": {},
         "unsupported_market": {},
+        "invalid_market_selection": {},
     }
 
 
@@ -296,6 +308,9 @@ def _ignored_market_reason(
     if _is_unsupported_market_family(market_name):
         return "unsupported_market"
 
+    if market_name not in SUPPORTED_PROVIDER_MARKETS:
+        return "unsupported_market"
+
     if market_name in active_market_names:
         return None
 
@@ -312,6 +327,103 @@ def _odds_value_is_valid(odd_data: Dict) -> bool:
         return float(odds_decimal) > 0
     except (TypeError, ValueError):
         return False
+
+
+def _normalize_selection_value(value) -> str:
+    return str(value or "").strip().lower().replace("_", " ").replace("-", " ")
+
+
+def _line_is_present(value) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
+def _normalize_supported_odd_data(odd_data: Dict) -> Optional[Dict]:
+    market_name = odd_data.get("market_name") or ""
+    selection_key = _normalize_selection_value(odd_data.get("selection"))
+    line = odd_data.get("line")
+    normalized = dict(odd_data)
+
+    ml_selections = {
+        "home": "home",
+        "1": "home",
+        "draw": "draw",
+        "x": "draw",
+        "away": "away",
+        "2": "away",
+    }
+    totals_selections = {
+        "over": "Over",
+        "under": "Under",
+    }
+    btts_selections = {
+        "yes": "Goal",
+        "goal": "Goal",
+        "goals": "Goal",
+        "no": "No Goal",
+        "no goal": "No Goal",
+        "nogoal": "No Goal",
+    }
+    double_chance_selections = {
+        "1x": "1X",
+        "home draw": "1X",
+        "home or draw": "1X",
+        "home_or_draw": "1X",
+        "x2": "X2",
+        "draw away": "X2",
+        "draw or away": "X2",
+        "draw_or_away": "X2",
+        "12": "12",
+        "home away": "12",
+        "home or away": "12",
+        "home_or_away": "12",
+    }
+    draw_no_bet_selections = {
+        "home": "home",
+        "1": "home",
+        "away": "away",
+        "2": "away",
+    }
+
+    if market_name == "ML":
+        if _line_is_present(line) or selection_key not in ml_selections:
+            return None
+        normalized["selection"] = ml_selections[selection_key]
+        normalized["line"] = None
+        return normalized
+
+    if market_name == "Totals":
+        if not _line_is_present(line) or selection_key not in totals_selections:
+            return None
+        normalized["selection"] = totals_selections[selection_key]
+        return normalized
+
+    if market_name == "Both Teams To Score":
+        if _line_is_present(line) or selection_key not in btts_selections:
+            return None
+        normalized["selection"] = btts_selections[selection_key]
+        normalized["line"] = None
+        return normalized
+
+    if market_name == "Double Chance":
+        if _line_is_present(line) or selection_key not in double_chance_selections:
+            return None
+        normalized["selection"] = double_chance_selections[selection_key]
+        normalized["line"] = None
+        return normalized
+
+    if market_name == "Draw No Bet":
+        if _line_is_present(line) or selection_key not in draw_no_bet_selections:
+            return None
+        normalized["selection"] = draw_no_bet_selections[selection_key]
+        normalized["line"] = None
+        return normalized
+
+    if market_name in {"Spread", "European Handicap"}:
+        if not _line_is_present(line):
+            return None
+        return normalized
+
+    return None
 
 
 def _get_active_monitored_competitions(db):
@@ -449,6 +561,24 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
                 odd_data,
             )
             continue
+
+        normalized_odd_data = _normalize_supported_odd_data(odd_data)
+        if not normalized_odd_data:
+            ignored_odds += 1
+            excluded_odds += 1
+            ignored_odds_breakdown["invalid_market_selection"] += 1
+            _increment_ignored_market_name(
+                ignored_market_breakdown_by_name,
+                "invalid_market_selection",
+                odd_data,
+            )
+            _increment_ignored_market_name(
+                excluded_market_breakdown_by_name,
+                "invalid_market_selection",
+                odd_data,
+            )
+            continue
+        odd_data = normalized_odd_data
 
         event = events_by_provider_id.get(odd_data["provider_event_id"])
         if not event:

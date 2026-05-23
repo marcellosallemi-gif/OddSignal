@@ -178,7 +178,84 @@ def readable_market_label(market_name: str) -> str:
         suffix = market_name.replace("Spread", "", 1).strip()
         return "Handicap" + (f" {suffix}" if suffix else "")
 
+    if market_name.startswith("European Handicap"):
+        suffix = market_name.replace("European Handicap", "", 1).strip()
+        return "Handicap europeo" + (f" {suffix}" if suffix else "")
+
     return market_name
+
+
+def readable_line_label(market_name: str) -> Optional[str]:
+    if not market_name:
+        return None
+
+    market_name = str(market_name)
+    for prefix in ["European Handicap", "Totals", "Spread"]:
+        if market_name.startswith(prefix + " "):
+            return market_name.replace(prefix, "", 1).strip()
+
+    return None
+
+
+def readable_selection_label(
+    market_name: str,
+    selection: str,
+    home_team: Optional[str] = None,
+    away_team: Optional[str] = None,
+) -> str:
+    selection_value = str(selection or "").strip()
+    selection_key = selection_value.lower().replace("_", " ").replace("-", " ")
+    line = readable_line_label(market_name)
+    home_label = home_team or "Casa"
+    away_label = away_team or "Trasferta"
+
+    if not selection_value:
+        return "Selezione non specificata"
+
+    if market_name == "ML":
+        return {
+            "home": f"1 - {home_label}",
+            "draw": "X - Pareggio",
+            "away": f"2 - {away_label}",
+            "1": f"1 - {home_label}",
+            "x": "X - Pareggio",
+            "2": f"2 - {away_label}",
+        }.get(selection_key, selection_value)
+
+    if market_name.startswith("Totals"):
+        label = {
+            "over": "Over",
+            "under": "Under",
+        }.get(selection_key, selection_value)
+        return f"{label} {line}" if line else label
+
+    if market_name.startswith("Both Teams To Score"):
+        return {
+            "goal": "Goal",
+            "yes": "Goal",
+            "no goal": "No Goal",
+            "no": "No Goal",
+        }.get(selection_key, selection_value)
+
+    if market_name.startswith("Double Chance"):
+        return {
+            "1x": f"1X - {home_label} o Pareggio",
+            "x2": f"X2 - Pareggio o {away_label}",
+            "12": f"12 - {home_label} o {away_label}",
+        }.get(selection_key, selection_value)
+
+    if market_name.startswith("Spread") or market_name.startswith("European Handicap"):
+        label = {
+            "home": home_label,
+            "draw": "Pareggio",
+            "away": away_label,
+            "1": home_label,
+            "x": "Pareggio",
+            "2": away_label,
+        }.get(selection_key, selection_value)
+        return f"{label} handicap {line}" if line else label
+
+    return selection_value
 
 
 def build_alert_message(alert: Alert) -> str:
@@ -189,6 +266,8 @@ def build_alert_message(alert: Alert) -> str:
     away_team = event.away_team.name if event and event.away_team else "Unknown away"
 
     direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
+    line_label = readable_line_label(alert.market)
+    line_text = f"Linea: {line_label}\n" if line_label else ""
 
     return (
         "Alert quote calcio\n"
@@ -198,7 +277,8 @@ def build_alert_message(alert: Alert) -> str:
         f"Competizione: {competition}\n"
         f"Bookmaker: {alert.bookmaker}\n"
         f"Mercato: {readable_market_label(alert.market)}\n"
-        f"Selezione: {alert.selection}\n"
+        f"Selezione: {readable_selection_label(alert.market, alert.selection, home_team, away_team)}\n"
+        f"{line_text}"
         f"Variazione: {alert.variation_percent}% ({direction_label})\n"
         f"Quota precedente: {alert.previous_odds}\n"
         f"Quota attuale: {alert.current_odds}\n"
@@ -232,16 +312,24 @@ def _truncate_text(value: str, limit: int = TELEGRAM_SAFE_MESSAGE_LIMIT) -> str:
 
 def _compact_alert_summary_block(alert: Alert, index: int) -> str:
     direction_label = "aumento" if alert.direction == "increase" else "diminuzione"
+    line_label = readable_line_label(alert.market)
+    line_items = [f"Linea: {line_label}"] if line_label else []
+    event = alert.event
+    home_team = event.home_team.name if event and event.home_team else None
+    away_team = event.away_team.name if event and event.away_team else None
 
     block = "\n".join(
         [
             f"{index}. Evento: {_alert_event_label(alert)}",
             f"Mercato: {readable_market_label(alert.market)}",
-            f"Selezione: {alert.selection}",
+            f"Selezione: {readable_selection_label(alert.market, alert.selection, home_team, away_team)}",
+            *line_items,
             f"Bookmaker: {alert.bookmaker}",
             f"Quota precedente: {alert.previous_odds}",
             f"Quota attuale: {alert.current_odds}",
             f"Variazione: {alert.variation_percent}% ({direction_label})",
+            f"Tipo alert: {alert.alert_type}",
+            f"Provider: {alert.provider}",
         ]
     )
 

@@ -2238,7 +2238,7 @@ async function syncTelegramRecipients() {
     if (newRecipientsCount === 0) {
       setFeedback(
         "recipients-feedback",
-        "Nessun nuovo account Telegram rilevato. Gli account già configurati restano invariati.",
+        "Nessun nuovo account Telegram rilevato. I profili già configurati sono stati sincronizzati con i dati Telegram più recenti.",
         "success"
       );
       return;
@@ -2291,6 +2291,7 @@ async function loadRecipients() {
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
         <button class="compact ${item.is_active ? "" : "primary"}" onclick="toggleRecipient(${item.id}, ${nextState})">${actionLabel}</button>
+        <button class="compact" onclick="deleteRecipient(${item.id})">Cancella</button>
       </td>
     </tr>`;
   }
@@ -2312,6 +2313,30 @@ async function toggleRecipient(recipientId, isActive) {
     await loadStatus();
   } catch (error) {
     setFeedback("recipients-feedback", "Operazione destinatario Telegram non completata: " + error.message, "error");
+  }
+}
+
+async function deleteRecipient(recipientId) {
+  const confirmed = window.confirm(
+    "Cancellare questo destinatario Telegram? Non riceverà più alert finché non verrà rilevato/sincronizzato di nuovo."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  setFeedback("recipients-feedback", "Cancellazione destinatario Telegram in corso...", "");
+
+  try {
+    await api(`/configuration/notification-recipients/${recipientId}`, {
+      method: "DELETE"
+    });
+
+    await loadRecipients();
+    setFeedback("recipients-feedback", "Destinatario Telegram cancellato.", "success");
+    await loadStatus();
+  } catch (error) {
+    setFeedback("recipients-feedback", "Cancellazione destinatario Telegram non completata: " + error.message, "error");
   }
 }
 

@@ -721,6 +721,37 @@ def toggle_notification_recipient(
     return item
 
 
+@router.delete("/notification-recipients/{recipient_id}")
+def delete_notification_recipient(
+    recipient_id: int,
+    db: Session = Depends(get_db),
+):
+    item = db.query(NotificationRecipient).filter(NotificationRecipient.id == recipient_id).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Notification recipient not found")
+
+    if item.channel != "telegram":
+        raise HTTPException(
+            status_code=400,
+            detail="Only Telegram recipients can be deleted from this action.",
+        )
+
+    deleted_id = item.id
+    deleted_label = item.label
+    deleted_recipient_value = item.recipient_value
+
+    db.delete(item)
+    db.commit()
+
+    return {
+        "deleted": True,
+        "deleted_id": deleted_id,
+        "deleted_label": deleted_label,
+        "deleted_recipient_value": deleted_recipient_value,
+    }
+
+
 from app.schemas import AlertSettingResponse, AlertSettingUpdate, SchedulerSettingResponse, SchedulerSettingUpdate, ProviderPlanSettingResponse, ProviderPlanSettingUpdate, ProviderBookmakerSettingResponse, ProviderBookmakerSettingUpdate
 from app.services.alert_settings_service import (
     get_or_create_alert_settings,

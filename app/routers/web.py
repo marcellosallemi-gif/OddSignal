@@ -1669,11 +1669,13 @@ async function loadReadiness() {
 
 function renderProviderUsage(data) {
   const limitLabel = data.hourly_request_limit === null ? "Illimitato" : `${data.hourly_request_limit}/h`;
+  const requestsUsed = data.requests_used_current_hour ?? data.requests_used_last_hour;
   const usedLabel = data.hourly_request_limit === null
-    ? `${data.requests_used_last_hour}`
-    : `${data.requests_used_last_hour}/${data.hourly_request_limit}`;
+    ? `${requestsUsed}`
+    : `${requestsUsed}/${data.hourly_request_limit}`;
   const remainingLabel = data.requests_remaining === null ? "n/d" : data.requests_remaining;
   const cooldownLabel = data.cooldown_active ? "Attivo" : "Non attivo";
+  const resetLabel = data.current_window_reset_at ? formatDateTime(data.current_window_reset_at) : "n/d";
 
   let statusClass = "badge ok";
   let statusLabel = "OK";
@@ -1694,9 +1696,10 @@ function renderProviderUsage(data) {
   document.getElementById("provider-usage-summary").innerHTML = `
     <div class="summary-grid">
       ${summaryCard("Provider", data.provider)}
-      ${summaryCard("Usate ultima ora", usedLabel)}
+      ${summaryCard("Usate ora corrente", usedLabel)}
       ${summaryCard("Residue", remainingLabel)}
       ${summaryCard("Limite piano", limitLabel)}
+      ${summaryCard("Reset finestra", resetLabel)}
       ${summaryCard("Cooldown", cooldownLabel)}
     </div>
     <p><span class="${statusClass}">${statusLabel}</span></p>
@@ -2358,23 +2361,23 @@ function renderAlertsTable(options) {
 }
 
 async function clearRecentAlerts() {
-  const confirmed = window.confirm("Cancellare gli alert recenti visualizzati? Quote, configurazioni e log notifiche non verranno cancellati.");
+  const confirmed = window.confirm("Cancellare tutti gli alert? Quote, eventi, configurazioni e log di sistema non verranno cancellati.");
   if (!confirmed) {
     return;
   }
 
-  setFeedback("alerts-filter-feedback", "Cancellazione alert recenti...", "");
+  setFeedback("alerts-filter-feedback", "Cancellazione alert...", "");
 
   try {
-    const data = await api("/alerts/recent?limit=20", {
+    const data = await api("/alerts/recent", {
       method: "DELETE"
     });
 
     await loadAlerts();
     await loadStatus();
-    setFeedback("alerts-filter-feedback", `Alert recenti cancellati: ${data.deleted_count}.`, "success");
+    setFeedback("alerts-filter-feedback", `Alert cancellati: ${data.deleted_count}.`, "success");
   } catch (error) {
-    setFeedback("alerts-filter-feedback", "Alert recenti non cancellati: " + error.message, "error");
+    setFeedback("alerts-filter-feedback", "Alert non cancellati: " + error.message, "error");
   }
 }
 

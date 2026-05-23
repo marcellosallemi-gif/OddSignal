@@ -76,11 +76,12 @@ def test_get_alerts_returns_readable_alert_fields():
     clear_alerts()
 
 
-def test_delete_recent_alerts_removes_only_alert_rows():
+def test_delete_recent_alerts_removes_all_alert_rows():
     with TestClient(app) as client:
         clear_alerts()
         db = SessionLocal()
         try:
+            events_count = db.query(Event).count()
             event = db.query(Event).order_by(Event.id).first()
             for selection, created_at in [
                 ("Over 2.5", datetime(2026, 5, 17, 10, 0)),
@@ -108,11 +109,14 @@ def test_delete_recent_alerts_removes_only_alert_rows():
         response = client.delete("/alerts/recent?limit=1")
 
     assert response.status_code == 200
-    assert response.json()["deleted_count"] == 1
+    payload = response.json()
+    assert payload["deleted_count"] == 2
+    assert payload["message"] == "Alert cancellati."
 
     db = SessionLocal()
     try:
-        assert db.query(Alert).count() == 1
+        assert db.query(Alert).count() == 0
+        assert db.query(Event).count() == events_count
     finally:
         db.close()
         clear_alerts()
@@ -174,7 +178,7 @@ def test_delete_recent_alerts_removes_linked_notification_logs_first():
 
 def test_delete_recent_alerts_endpoint_returns_deleted_count():
     with TestClient(app) as client:
-        response = client.delete("/alerts/recent?limit=20")
+        response = client.delete("/alerts/recent")
 
     assert response.status_code == 200
     payload = response.json()

@@ -11,26 +11,39 @@ def _utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _window_start(now=None):
+def _current_hour_window(now=None):
     current = now or _utc_now_naive()
-    return current - timedelta(hours=1)
+    window_start = current.replace(minute=0, second=0, microsecond=0)
+    return window_start, window_start + timedelta(hours=1)
 
 
-def count_provider_requests_last_hour(db, now=None):
+def _window_start(now=None):
+    return _current_hour_window(now)[0]
+
+
+def count_provider_requests_current_hour(db, now=None):
+    window_start, window_end = _current_hour_window(now)
     return (
         db.query(ProviderApiRequestLog)
         .filter(
             ProviderApiRequestLog.provider == PROVIDER_NAME,
-            ProviderApiRequestLog.created_at >= _window_start(now),
+            ProviderApiRequestLog.created_at >= window_start,
+            ProviderApiRequestLog.created_at < window_end,
         )
         .count()
     )
 
 
-def get_provider_usage_status(db):
+def count_provider_requests_last_hour(db, now=None):
+    return count_provider_requests_current_hour(db, now=now)
+
+
+def get_provider_usage_status(db, now=None):
+    current = now or _utc_now_naive()
+    window_start, window_reset_at = _current_hour_window(current)
     plan = get_or_create_provider_plan_settings(db)
-    used = count_provider_requests_last_hour(db)
-    cooldown = get_active_provider_rate_limit_cooldown(db)
+    used = count_provider_requests_current_hour(db, now=current)
+    cooldown = get_active_provider_rate_limit_cooldown(db, now=current)
 
     cooldown_active = cooldown is not None
     cooldown_until = cooldown.blocked_until if cooldown else None
@@ -41,7 +54,10 @@ def get_provider_usage_status(db):
             "provider": PROVIDER_NAME,
             "hourly_request_limit": None,
             "requests_used_last_hour": used,
+            "requests_used_current_hour": used,
             "requests_remaining": None,
+            "current_window_start": window_start,
+            "current_window_reset_at": window_reset_at,
             "limit_reached": False,
             "cooldown_active": cooldown_active,
             "cooldown_until": cooldown_until,
@@ -60,7 +76,10 @@ def get_provider_usage_status(db):
         "provider": PROVIDER_NAME,
         "hourly_request_limit": plan.hourly_request_limit,
         "requests_used_last_hour": used,
+        "requests_used_current_hour": used,
         "requests_remaining": remaining,
+        "current_window_start": window_start,
+        "current_window_reset_at": window_reset_at,
         "limit_reached": limit_reached,
         "cooldown_active": cooldown_active,
         "cooldown_until": cooldown_until,

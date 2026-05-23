@@ -9,11 +9,11 @@ def _utc_now_naive():
 
 
 def _default_plan_name() -> str:
-    return os.getenv("PROVIDER_PLAN_NAME", "Free Plan")
+    return os.getenv("PROVIDER_PLAN_NAME", "Starter")
 
 
 def _default_hourly_request_limit():
-    raw_value = os.getenv("PROVIDER_HOURLY_REQUEST_LIMIT", "100")
+    raw_value = os.getenv("PROVIDER_HOURLY_REQUEST_LIMIT", "5000")
 
     if str(raw_value).lower() in {"", "0", "none", "unlimited", "illimitato"}:
         return None
@@ -21,7 +21,7 @@ def _default_hourly_request_limit():
     try:
         value = int(raw_value)
     except ValueError:
-        return 100
+        return 5000
 
     if value < 1:
         return None

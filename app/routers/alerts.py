@@ -69,43 +69,32 @@ def get_alerts(
 
 @router.delete("/alerts/recent")
 def delete_recent_alerts(
-    limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    safe_limit = max(1, min(limit, 100))
-
-    alerts_to_delete = (
-        db.query(Alert)
-        .order_by(Alert.created_at.desc(), Alert.id.desc())
-        .limit(safe_limit)
-        .all()
-    )
-
-    alert_ids = [alert.id for alert in alerts_to_delete]
-    deleted_count = len(alert_ids)
+    alert_ids_query = db.query(Alert.id)
+    deleted_count = db.query(Alert).count()
 
     try:
         deleted_notification_logs = 0
-        if alert_ids:
+        if deleted_count:
             deleted_notification_logs = (
                 db.query(NotificationLog)
-                .filter(NotificationLog.alert_id.in_(alert_ids))
+                .filter(NotificationLog.alert_id.in_(alert_ids_query))
                 .delete(synchronize_session=False)
             )
 
-        for alert in alerts_to_delete:
-            db.delete(alert)
+        db.query(Alert).delete(synchronize_session=False)
 
         db.commit()
     except Exception as exc:
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail="Alert recenti non cancellati: errore durante la cancellazione dei log collegati.",
+            detail="Alert non cancellati: errore durante la cancellazione dei log collegati.",
         ) from exc
 
     return {
         "deleted_count": deleted_count,
         "deleted_notification_logs": deleted_notification_logs,
-        "message": "Alert recenti cancellati.",
+        "message": "Alert cancellati.",
     }

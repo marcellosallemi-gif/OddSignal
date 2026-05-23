@@ -1,6 +1,32 @@
-from fastapi.testclient import TestClient
+from datetime import datetime
 
+from fastapi.testclient import TestClient
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.database import Base
 from app.main import app
+from app.models import ProviderApiRequestLog, ProviderPlanSetting
+from app.services.provider_plan_settings_service import (
+    get_or_create_provider_plan_settings,
+    validate_scheduler_against_provider_plan,
+)
+from app.services.provider_usage_service import get_provider_usage_status
+
+
+def make_usage_test_db(tmp_path):
+    engine = create_engine(
+        "sqlite:///" + str(tmp_path / "provider_usage.db"),
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    TestingSessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
+    return TestingSessionLocal()
 
 
 def test_get_system_status_returns_operational_summary():
@@ -77,4 +103,107 @@ def test_provider_usage_returns_usage_status():
     assert "cooldown_active" in payload
     assert "cooldown_until" in payload
     assert "cooldown_reason" in payload
+    assert "requests_used_current_hour" in payload
+    assert "current_window_start" in payload
+    assert "current_window_reset_at" in payload
     assert "message" in payload
+
+
+def test_provider_usage_counts_requests_in_current_hour_window(tmp_path):
+    db = make_usage_test_db(tmp_path)
+    now = datetime(2026, 5, 23, 10, 30)
+
+    try:
+        db.add(
+            ProviderPlanSetting(
+                plan_name="Starter",
+                hourly_request_limit=5000,
+                max_bookmakers=2,
+                created_at=now,
+            )
+        )
+        for created_at in [
+            datetime(2026, 5, 23, 9, 59),
+            datetime(2026, 5, 23, 10, 0),
+            datetime(2026, 5, 23, 10, 59),
+            datetime(2026, 5, 23, 11, 0),
+        ]:
+            db.add(
+                ProviderApiRequestLog(
+                    provider="odds_api_io",
+                    endpoint="/v1/events",
+                    status_code=200,
+                    created_at=created_at,
+                )
+            )
+        db.commit()
+
+        status = get_provider_usage_status(db, now=now)
+
+        assert status["hourly_request_limit"] == 5000
+        assert status["requests_used_current_hour"] == 2
+        assert status["requests_used_last_hour"] == 2
+        assert status["requests_remaining"] == 4998
+        assert status["current_window_start"] == datetime(2026, 5, 23, 10, 0)
+        assert status["current_window_reset_at"] == datetime(2026, 5, 23, 11, 0)
+    finally:
+        db.close()
+
+
+def test_provider_usage_resets_when_hour_window_changes(tmp_path):
+    db = make_usage_test_db(tmp_path)
+
+    try:
+        plan = get_or_create_provider_plan_settings(db)
+        assert plan.hourly_request_limit == 5000
+
+        db.add(
+            ProviderApiRequestLog(
+                provider="odds_api_io",
+                endpoint="/v1/events",
+                status_code=200,
+                created_at=datetime(2026, 5, 23, 10, 59),
+            )
+        )
+        db.commit()
+
+        before_reset = get_provider_usage_status(
+            db,
+            now=datetime(2026, 5, 23, 10, 59, 30),
+        )
+        after_reset = get_provider_usage_status(
+            db,
+            now=datetime(2026, 5, 23, 11, 0),
+        )
+
+        assert before_reset["requests_used_current_hour"] == 1
+        assert before_reset["requests_remaining"] == 4999
+        assert after_reset["requests_used_current_hour"] == 0
+        assert after_reset["requests_remaining"] == 5000
+    finally:
+        db.close()
+
+
+def test_scheduler_validation_uses_default_5000_hourly_limit(tmp_path):
+    db = make_usage_test_db(tmp_path)
+
+    try:
+        plan = get_or_create_provider_plan_settings(db)
+        assert plan.hourly_request_limit == 5000
+
+        assert validate_scheduler_against_provider_plan(
+            db=db,
+            enabled=True,
+            poll_interval_seconds=3600,
+            event_limit=5000,
+        ) is None
+
+        with pytest.raises(ValueError):
+            validate_scheduler_against_provider_plan(
+                db=db,
+                enabled=True,
+                poll_interval_seconds=3600,
+                event_limit=5001,
+            )
+    finally:
+        db.close()

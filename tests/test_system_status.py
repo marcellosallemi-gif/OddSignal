@@ -106,6 +106,10 @@ def test_provider_usage_returns_usage_status():
     assert "requests_used_current_hour" in payload
     assert "current_window_start" in payload
     assert "current_window_reset_at" in payload
+    assert (
+        payload["current_window_reset_at"].endswith("+01:00")
+        or payload["current_window_reset_at"].endswith("+02:00")
+    )
     assert "message" in payload
 
 
@@ -144,8 +148,8 @@ def test_provider_usage_counts_requests_in_current_hour_window(tmp_path):
         assert status["requests_used_current_hour"] == 2
         assert status["requests_used_last_hour"] == 2
         assert status["requests_remaining"] == 4998
-        assert status["current_window_start"] == datetime(2026, 5, 23, 10, 0)
-        assert status["current_window_reset_at"] == datetime(2026, 5, 23, 11, 0)
+        assert status["current_window_start"] == "2026-05-23T12:00:00+02:00"
+        assert status["current_window_reset_at"] == "2026-05-23T13:00:00+02:00"
     finally:
         db.close()
 
@@ -180,6 +184,8 @@ def test_provider_usage_resets_when_hour_window_changes(tmp_path):
         assert before_reset["requests_remaining"] == 4999
         assert after_reset["requests_used_current_hour"] == 0
         assert after_reset["requests_remaining"] == 5000
+        assert before_reset["current_window_reset_at"] == "2026-05-23T13:00:00+02:00"
+        assert after_reset["current_window_start"] == "2026-05-23T13:00:00+02:00"
     finally:
         db.close()
 

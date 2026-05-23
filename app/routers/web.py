@@ -1156,20 +1156,30 @@ function formatDateTime(value) {
     return "n/d";
   }
 
-  return String(value).replace("T", " ").slice(0, 19);
+  const rawValue = String(value).trim();
+  const hasTimezone = /(?:Z|[+-]\\d{2}:?\\d{2})$/.test(rawValue);
+  const normalizedValue = value instanceof Date
+    ? value
+    : rawValue.replace(" ", "T") + (hasTimezone ? "" : "Z");
+  const parsed = normalizedValue instanceof Date ? normalizedValue : new Date(normalizedValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return rawValue.replace("T", " ").slice(0, 19);
+  }
+
+  return parsed.toLocaleString("it-IT", {
+    timeZone: "Europe/Rome",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 function formatLocalDateTime(value) {
-  if (!value) {
-    return "n/d";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return formatDateTime(value);
-  }
-
-  return parsed.toLocaleString("it-IT");
+  return formatDateTime(value);
 }
 
 function formatLocalTime(value) {
@@ -1177,12 +1187,23 @@ function formatLocalTime(value) {
     return "n/d";
   }
 
-  const parsed = value instanceof Date ? value : new Date(value);
+  const rawValue = String(value).trim();
+  const hasTimezone = /(?:Z|[+-]\\d{2}:?\\d{2})$/.test(rawValue);
+  const normalizedValue = value instanceof Date
+    ? value
+    : rawValue.replace(" ", "T") + (hasTimezone ? "" : "Z");
+  const parsed = normalizedValue instanceof Date ? normalizedValue : new Date(normalizedValue);
   if (Number.isNaN(parsed.getTime())) {
     return "n/d";
   }
 
-  return parsed.toLocaleTimeString("it-IT");
+  return parsed.toLocaleTimeString("it-IT", {
+    timeZone: "Europe/Rome",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 }
 
 function renderManualOddsCheckSummary(data) {
@@ -1720,7 +1741,7 @@ async function loadProviderUsage(options) {
     renderProviderUsage(data);
     renderDashboardSummary();
     document.getElementById("provider-usage-last-updated").textContent =
-      `Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}`;
+      `Ultimo aggiornamento: ${formatDateTime(new Date())}`;
     setFeedback(
       "provider-usage-feedback",
       isAutoRefresh
@@ -1775,7 +1796,7 @@ async function refreshDashboardDataAutomatically() {
 
   setFeedback(
     "dashboard-auto-refresh-feedback",
-    `Auto refresh dashboard completato: ${new Date().toLocaleString("it-IT")}.`,
+    `Auto refresh dashboard completato: ${formatDateTime(new Date())}.`,
     "success"
   );
 }
@@ -2215,7 +2236,7 @@ async function loadRecipients() {
   dashboardState.activeRecipients = activeRecipients.length;
   renderDashboardSummary();
   document.getElementById("recipients-last-updated").textContent =
-    `Ultimo aggiornamento: ${new Date().toLocaleString("it-IT")}`;
+    `Ultimo aggiornamento: ${formatDateTime(new Date())}`;
 
   if (telegramRecipients.length === 0) {
     document.getElementById("recipients-table").innerHTML = "<p class='muted'>Nessun destinatario Telegram configurato.</p>";

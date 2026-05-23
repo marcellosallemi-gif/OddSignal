@@ -19,6 +19,10 @@ def test_web_home_returns_html_page():
     assert "Ricarica consumo API locale" in response.text
     assert "DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 300000" in response.text
     assert "PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 300000" in response.text
+    assert 'timeZone: "Europe/Rome"' in response.text
+    assert "hour12: false" in response.text
+    assert "Usate ora corrente" in response.text
+    assert "Reset finestra" in response.text
     assert "startDashboardAutoRefresh" in response.text
     assert "Automazioni automatiche" in response.text
     assert "Provider competitions auto refresh" in response.text

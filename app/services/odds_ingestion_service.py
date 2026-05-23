@@ -132,12 +132,21 @@ def _market_key(odd_data: Dict) -> str:
 
 DEFAULT_MONITORED_MARKETS = {
     "ML",
-    "Totals",
+    "Over/Under 0.5",
+    "Over/Under 1.5",
+    "Over/Under 2.5",
+    "Over/Under 3.5",
     "Both Teams To Score",
     "Spread",
     "Draw No Bet",
     "Double Chance",
     "European Handicap",
+}
+
+SUPPORTED_TOTAL_LINES = {"0.5", "1.5", "2.5", "3.5"}
+SUPPORTED_TOTAL_MARKETS = {
+    "Over/Under {}".format(line)
+    for line in SUPPORTED_TOTAL_LINES
 }
 
 SUPPORTED_PROVIDER_MARKETS = {
@@ -157,11 +166,10 @@ MARKET_PROVIDER_ALIASES = {
     "Vincente": {"ML"},
 
     "Over/Under": {"Totals"},
-    "Over/Under 0.5": {"Totals"},
-    "Over/Under 1.5": {"Totals"},
-    "Over/Under 2.5": {"Totals"},
-    "Over/Under 3.5": {"Totals"},
-    "Over/Under 4.5": {"Totals"},
+    "Over/Under 0.5": {"Totals 0.5"},
+    "Over/Under 1.5": {"Totals 1.5"},
+    "Over/Under 2.5": {"Totals 2.5"},
+    "Over/Under 3.5": {"Totals 3.5"},
 
     "Goal/No Goal": {"Both Teams To Score"},
     "Gol/No Gol": {"Both Teams To Score"},
@@ -189,10 +197,70 @@ MARKET_PROVIDER_ALIASES = {
 }
 
 
+def _line_to_market_label(line) -> Optional[str]:
+    if not _line_is_present(line):
+        return None
+
+    try:
+        number = float(line)
+    except (TypeError, ValueError):
+        return str(line).strip()
+
+    if number.is_integer():
+        return str(int(number))
+
+    return "{:g}".format(number)
+
+
+def _line_label_is_number(line_label: Optional[str]) -> bool:
+    if not line_label:
+        return False
+
+    try:
+        float(line_label)
+    except (TypeError, ValueError):
+        return False
+
+    return True
+
+
+def normalize_provider_market(provider_market, line) -> Optional[str]:
+    market_name = str(provider_market or "").strip()
+
+    if market_name == "Totals":
+        line_label = _line_to_market_label(line)
+        if not line_label:
+            return None
+        return "Over/Under {}".format(line_label)
+
+    if market_name.startswith("Totals "):
+        line_label = _line_to_market_label(market_name.replace("Totals ", "", 1))
+        if not _line_label_is_number(line_label):
+            return market_name
+        return "Over/Under {}".format(line_label)
+
+    if market_name.startswith("Over/Under "):
+        line_label = _line_to_market_label(
+            market_name.replace("Over/Under ", "", 1)
+        )
+        if not line_label:
+            return market_name
+        return "Over/Under {}".format(line_label)
+
+    return market_name
+
+
 def _expand_market_aliases(market_names: set) -> set:
     expanded = set(market_names)
 
     for market_name in market_names:
+        canonical_market = normalize_provider_market(market_name, None)
+        if canonical_market:
+            expanded.add(canonical_market)
+            if canonical_market.startswith("Over/Under "):
+                line = canonical_market.replace("Over/Under ", "", 1).strip()
+                expanded.add("Totals {}".format(line))
+
         expanded.update(MARKET_PROVIDER_ALIASES.get(market_name, set()))
 
     return expanded
@@ -203,7 +271,9 @@ def _empty_ignored_odds_breakdown() -> Dict[str, int]:
         "inactive_competition": 0,
         "missing_provider_league_slug": 0,
         "inactive_market": 0,
+        "disabled_market": 0,
         "unsupported_market": 0,
+        "unsupported_line": 0,
         "inactive_bookmaker": 0,
         "missing_previous_snapshot": 0,
         "unchanged_odds": 0,
@@ -219,7 +289,9 @@ def _empty_ignored_odds_breakdown() -> Dict[str, int]:
 def _empty_ignored_market_breakdown_by_name() -> Dict[str, Dict[str, int]]:
     return {
         "inactive_market": {},
+        "disabled_market": {},
         "unsupported_market": {},
+        "unsupported_line": {},
         "invalid_market_selection": {},
     }
 
@@ -232,11 +304,13 @@ def _increment_ignored_market_name(
     if reason not in breakdown:
         return
 
-    market_name = odd_data.get("market_name") or "Unknown market"
-    line = odd_data.get("line")
-
-    if line is not None:
-        market_name = "{} {}".format(market_name, line)
+    market_name = _market_key(odd_data)
+    canonical_market = normalize_provider_market(
+        odd_data.get("market_name"),
+        odd_data.get("line"),
+    )
+    if canonical_market and canonical_market != (odd_data.get("market_name") or ""):
+        market_name = canonical_market
 
     breakdown[reason][market_name] = breakdown[reason].get(market_name, 0) + 1
 
@@ -278,7 +352,8 @@ def _is_monitored_market(odd_data: Dict, active_market_names: set) -> bool:
     if _is_unsupported_market_family(market_name):
         return False
 
-    return market_name in active_market_names
+    canonical_market = normalize_provider_market(market_name, odd_data.get("line"))
+    return canonical_market in active_market_names
 
 
 def _is_unsupported_market_family(market_name: str) -> bool:
@@ -300,12 +375,52 @@ def _is_unsupported_market_family(market_name: str) -> bool:
     return False
 
 
+def _has_specific_total_market(market_names: set) -> bool:
+    for market_name in market_names:
+        if market_name.startswith("Over/Under ") or market_name.startswith("Totals "):
+            return True
+
+    return False
+
+
+def _is_total_line_supported(canonical_market: Optional[str], configured_market_names: set) -> bool:
+    if not canonical_market or not canonical_market.startswith("Over/Under "):
+        return True
+
+    return (
+        canonical_market in SUPPORTED_TOTAL_MARKETS
+        or canonical_market in configured_market_names
+    )
+
+
+def _canonical_market_is_active(
+    canonical_market: Optional[str],
+    active_market_names: set,
+    configured_market_names: set,
+) -> bool:
+    if not canonical_market:
+        return False
+
+    if canonical_market in active_market_names:
+        return True
+
+    if (
+        canonical_market.startswith("Over/Under ")
+        and "Totals" in active_market_names
+        and not _has_specific_total_market(configured_market_names)
+    ):
+        return canonical_market in SUPPORTED_TOTAL_MARKETS
+
+    return False
+
+
 def _ignored_market_reason(
     odd_data: Dict,
     active_market_names: set,
     configured_market_names: set,
 ) -> Optional[str]:
     market_name = odd_data.get("market_name") or ""
+    line = odd_data.get("line")
 
     if _is_unsupported_market_family(market_name):
         return "unsupported_market"
@@ -313,10 +428,30 @@ def _ignored_market_reason(
     if market_name not in SUPPORTED_PROVIDER_MARKETS:
         return "unsupported_market"
 
-    if market_name in active_market_names:
+    canonical_market = normalize_provider_market(market_name, line)
+
+    if market_name == "Totals" and not _line_is_present(line):
         return None
 
-    if market_name in configured_market_names or market_name in DEFAULT_MONITORED_MARKETS:
+    if not _is_total_line_supported(canonical_market, configured_market_names):
+        return "unsupported_line"
+
+    if _canonical_market_is_active(
+        canonical_market,
+        active_market_names,
+        configured_market_names,
+    ):
+        return None
+
+    if (
+        canonical_market in configured_market_names
+        or canonical_market in DEFAULT_MONITORED_MARKETS
+        or canonical_market in SUPPORTED_TOTAL_MARKETS
+        or market_name in configured_market_names
+        or market_name in DEFAULT_MONITORED_MARKETS
+    ):
+        if canonical_market and canonical_market.startswith("Over/Under "):
+            return "disabled_market"
         return "inactive_market"
 
     return "unsupported_market"
@@ -693,6 +828,8 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "ignored_odds_breakdown": ignored_odds_breakdown,
         "ignored_market_breakdown_by_name": ignored_market_breakdown_by_name,
         "excluded_market_breakdown_by_name": excluded_market_breakdown_by_name,
+        "excluded_disabled_market": ignored_odds_breakdown["disabled_market"],
+        "excluded_unsupported_line": ignored_odds_breakdown["unsupported_line"],
         "active_markets_count": len(active_market_names),
         "snapshots_inserted": inserted_snapshots,
         "snapshots_unchanged": unchanged_snapshots,

@@ -13,7 +13,9 @@ EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS = {
     "inactive_competition",
     "missing_provider_league_slug",
     "inactive_market",
+    "disabled_market",
     "unsupported_market",
+    "unsupported_line",
     "inactive_bookmaker",
     "missing_previous_snapshot",
     "unchanged_odds",
@@ -108,6 +110,51 @@ class FakeProvider:
                     "market_name": "ML",
                     "selection": "home",
                     "line": None,
+                    "odds_decimal": self.odds_decimal,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                }
+            ],
+        }
+
+
+class FakeProviderWithTotalsLine:
+    def __init__(self, line, odds_decimal=1.80):
+        self.line = line
+        self.odds_decimal = odds_decimal
+
+    def get_sample(self, limit=3, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 1,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-totals-line",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-totals-line",
+                    "event": "Home FC vs Away FC",
+                    "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "Totals",
+                    "selection": "over",
+                    "line": self.line,
                     "odds_decimal": self.odds_decimal,
                     "updated_at": "2026-08-01T10:00:00Z",
                     "raw": {},
@@ -560,6 +607,104 @@ def test_ingestion_accepts_active_monitored_market(monkeypatch, tmp_path):
         db.close()
 
 
+def test_ingestion_excludes_disabled_totals_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Over/Under 0.5", is_active=False)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithTotalsLine(line=0.5),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_processed"] == 0
+        assert result["snapshots_inserted"] == 0
+        assert result["excluded_disabled_market"] == 1
+        assert result["ignored_odds_breakdown"]["disabled_market"] == 1
+        assert result["excluded_market_breakdown_by_name"]["disabled_market"]["Over/Under 0.5"] == 1
+        assert db.query(OddsSnapshot).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_processes_active_totals_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Over/Under 2.5", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithTotalsLine(line=2.5),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_ignored"] == 0
+        assert result["odds_processed"] == 1
+        assert result["snapshots_inserted"] == 1
+        assert db.query(OddsSnapshot).count() == 1
+    finally:
+        db.close()
+
+
+def test_ingestion_excludes_unsupported_totals_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Over/Under 2.5", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithTotalsLine(line=7.5),
+        )
+
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["odds_received"] == 1
+        assert result["odds_processed"] == 0
+        assert result["snapshots_inserted"] == 0
+        assert result["excluded_unsupported_line"] == 1
+        assert result["ignored_odds_breakdown"]["unsupported_line"] == 1
+        assert result["excluded_market_breakdown_by_name"]["unsupported_line"]["Over/Under 7.5"] == 1
+        assert db.query(OddsSnapshot).count() == 0
+    finally:
+        db.close()
+
+
+def test_ingestion_does_not_alert_for_disabled_totals_line(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+    provider = FakeProviderWithTotalsLine(line=0.5, odds_decimal=1.80)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_market(db, "Over/Under 0.5", is_active=False)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: provider,
+        )
+
+        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+        provider.odds_decimal = 1.98
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["snapshots_inserted"] == 0
+        assert result["alerts_created"] == 0
+        assert db.query(OddsSnapshot).count() == 0
+        assert db.query(Alert).count() == 0
+    finally:
+        db.close()
+
+
 def test_ingestion_processes_added_supported_markets_when_active(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
@@ -827,7 +972,7 @@ def test_ingestion_notifies_only_odds_decreases(monkeypatch, tmp_path):
 
 def test_market_aliases_expand_dashboard_names_to_provider_names():
     assert "ML" in _expand_market_aliases({"1X2"})
-    assert "Totals" in _expand_market_aliases({"Over/Under 2.5"})
+    assert "Totals 2.5" in _expand_market_aliases({"Over/Under 2.5"})
     assert "Both Teams To Score" in _expand_market_aliases({"Goal/No Goal"})
     assert "Spread" in _expand_market_aliases({"Handicap principale"})
     assert "Double Chance" in _expand_market_aliases({"Doppia chance"})

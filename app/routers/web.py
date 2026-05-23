@@ -648,9 +648,10 @@ def web_home():
           <div class="section-actions">
             <select id="alerts-filter" onchange="renderAlertsTable()">
               <option value="all">Tutti</option>
+              <option value="standard">Standard</option>
+              <option value="critical">Critici</option>
               <option value="notifiable">Solo cali notificabili</option>
               <option value="increases">Aumenti non notificati</option>
-              <option value="critical">Critici</option>
             </select>
             <button onclick="loadAlerts()">Aggiorna alert</button>
             <button onclick="clearRecentAlerts()">Cancella alert recenti</button>
@@ -949,6 +950,10 @@ function showPage(pageId, event) {
   document.querySelectorAll(".sidebar-link").forEach((link) => {
     link.classList.toggle("active", link.dataset.page === pageId);
   });
+
+  if (pageId === "recent-alerts") {
+    loadAlerts({ifStale: true});
+  }
 }
 
 async function api(path, options) {
@@ -987,11 +992,15 @@ const dashboardState = {
   activeCompetitions: "...",
   activeMarkets: "...",
   activeRecipients: "...",
+  recentAlerts: [],
+  alertsLastUpdatedAt: null,
+  alertsLoading: false,
   lastManualCheck: "Nessuno"
 };
 
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 300000;
 const PROVIDER_USAGE_AUTO_REFRESH_INTERVAL_MS = 300000;
+const ALERTS_AUTO_LOAD_COOLDOWN_MS = 5000;
 let dashboardAutoRefreshIntervalId = null;
 
 const suggestedFootballMarkets = [
@@ -1163,6 +1172,19 @@ function formatLocalDateTime(value) {
   return parsed.toLocaleString("it-IT");
 }
 
+function formatLocalTime(value) {
+  if (!value) {
+    return "n/d";
+  }
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "n/d";
+  }
+
+  return parsed.toLocaleTimeString("it-IT");
+}
+
 function renderManualOddsCheckSummary(data) {
   const summaryBox = document.getElementById("manual-odds-check-summary");
   if (!summaryBox) {
@@ -1239,11 +1261,14 @@ function renderDashboardSummary(data) {
 
   const overviewMetrics = document.getElementById("overview-metrics");
   if (overviewMetrics) {
+    const recentAlertsCount = dashboardState.alertsLastUpdatedAt
+      ? dashboardState.recentAlerts.length
+      : (counts.alerts ?? 0);
     overviewMetrics.innerHTML = [
       summaryCard("Campionati attivi", dashboardState.activeCompetitions),
       summaryCard("Mercati attivi", dashboardState.activeMarkets),
       summaryCard("Ultimo controllo", dashboardState.lastManualCheck),
-      summaryCard("Alert recenti", counts.alerts ?? 0),
+      summaryCard("Alert recenti", recentAlertsCount),
       summaryCard("Log notifiche", counts.notification_logs ?? 0)
     ].join("");
   }
@@ -2236,56 +2261,100 @@ async function toggleRecipient(recipientId, isActive) {
   }
 }
 
-async function loadAlerts() {
-  const data = await api("/alerts?limit=20");
-  dashboardState.recentAlerts = data;
-  renderDashboardSummary();
-  renderAlertsTable();
-}
-
-
-function renderAlertsTable() {
-  const filterElement = document.getElementById("alerts-filter");
-  const filter = filterElement ? filterElement.value : "all";
-  const data = dashboardState.recentAlerts || [];
-
-  let filtered = data;
-  if (filter === "notifiable") {
-    filtered = data.filter((item) => item.direction === "decrease");
-  } else if (filter === "increases") {
-    filtered = data.filter((item) => item.direction === "increase");
-  } else if (filter === "critical") {
-    filtered = data.filter((item) => item.alert_type === "critical_alert");
-  }
-
-  if (filtered.length === 0) {
-    document.getElementById("alerts").innerHTML = "<p class='muted'>Nessun alert per il filtro selezionato.</p>";
-    setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "");
+async function loadAlerts(options) {
+  const opts = options || {};
+  const now = new Date();
+  if (
+    opts.ifStale &&
+    dashboardState.alertsLastUpdatedAt &&
+    now - dashboardState.alertsLastUpdatedAt < ALERTS_AUTO_LOAD_COOLDOWN_MS
+  ) {
+    renderAlertsTable();
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Variazione</th><th>Notifica</th><th>Tipo</th><th>Data</th></tr></thead><tbody>";
+  if (dashboardState.alertsLoading) {
+    return;
+  }
+
+  dashboardState.alertsLoading = true;
+  setFeedback("alerts-filter-feedback", "Aggiornamento alert in corso...", "");
+
+  try {
+    const data = await api("/alerts?limit=20");
+    dashboardState.recentAlerts = data;
+    dashboardState.alertsLastUpdatedAt = new Date();
+    renderDashboardSummary();
+    renderAlertsTable({updateFeedback: false});
+    setFeedback(
+      "alerts-filter-feedback",
+      `Alert aggiornati alle ${formatLocalTime(dashboardState.alertsLastUpdatedAt)}`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback("alerts-filter-feedback", "Alert non aggiornati: " + error.message, "error");
+  } finally {
+    dashboardState.alertsLoading = false;
+  }
+}
+
+
+function renderAlertsTable(options) {
+  const opts = options || {};
+  const filterElement = document.getElementById("alerts-filter");
+  const filter = filterElement ? filterElement.value : "all";
+  const data = dashboardState.recentAlerts || [];
+  const lastUpdatedLabel = formatLocalTime(dashboardState.alertsLastUpdatedAt);
+
+  let filtered = data;
+  if (filter === "standard") {
+    filtered = data.filter((item) => item.alert_type === "standard_alert");
+  } else if (filter === "critical") {
+    filtered = data.filter((item) => item.alert_type === "critical_alert");
+  } else if (filter === "notifiable") {
+    filtered = data.filter((item) => item.direction === "decrease");
+  } else if (filter === "increases") {
+    filtered = data.filter((item) => item.direction === "increase");
+  }
+
+  if (filtered.length === 0) {
+    const emptyMessage = data.length === 0
+      ? `Nessun alert presente. Ultimo controllo: ${lastUpdatedLabel}`
+      : `Nessun alert per il filtro selezionato. Ultimo controllo: ${lastUpdatedLabel}`;
+    document.getElementById("alerts").innerHTML = `<p class='muted'>${escapeHtml(emptyMessage)}</p>`;
+    if (opts.updateFeedback !== false) {
+      setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "");
+    }
+    return;
+  }
+
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Competizione</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Quota prec.</th><th>Quota att.</th><th>Variazione</th><th>Direzione</th><th>Tipo</th><th>Data creazione</th></tr></thead><tbody>";
   for (const item of filtered) {
     const variation = `${item.variation_percent}%`;
     const alertLabel = readableAlertType(item.alert_type);
     const alertBadgeClass = alertTypeBadgeClass(item.alert_type);
-    const notificationLabel = item.direction === "decrease" ? "Telegram" : "Solo storico";
-    const notificationBadgeClass = item.direction === "decrease" ? "badge ok" : "badge";
+    const directionLabel = item.direction === "decrease" ? "Calo" : "Aumento";
+    const directionBadgeClass = item.direction === "decrease" ? "badge ok" : "badge";
 
     html += `<tr>
       <td><strong>${escapeHtml(item.event)}</strong></td>
+      <td>${escapeHtml(item.competition)}</td>
       <td>${escapeHtml(item.bookmaker)}</td>
       <td>${escapeHtml(readableMarketName(item.market))}</td>
       <td>${escapeHtml(item.selection)}</td>
+      <td>${escapeHtml(item.previous_odds)}</td>
+      <td>${escapeHtml(item.current_odds)}</td>
       <td><strong>${escapeHtml(variation)}</strong></td>
-      <td><span class="${notificationBadgeClass}">${escapeHtml(notificationLabel)}</span></td>
+      <td><span class="${directionBadgeClass}">${escapeHtml(directionLabel)}</span></td>
       <td><span class="${alertBadgeClass}">${escapeHtml(alertLabel)}</span></td>
       <td><span class="secondary-text">${escapeHtml(formatDateTime(item.created_at))}</span></td>
     </tr>`;
   }
   html += "</tbody></table></div>";
   document.getElementById("alerts").innerHTML = html;
-  setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "success");
+  if (opts.updateFeedback !== false) {
+    setFeedback("alerts-filter-feedback", `Filtro applicato: ${filtered.length} alert visualizzati su ${data.length}.`, "success");
+  }
 }
 
 async function clearRecentAlerts() {

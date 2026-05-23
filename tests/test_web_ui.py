@@ -119,6 +119,15 @@ def test_web_home_returns_html_page():
     assert "sendTelegramTestMessage" in response.text
     assert "recipients-last-updated" in response.text
     assert "Alert recenti" in response.text
+    assert "Aggiornamento alert in corso" in response.text
+    assert "Alert aggiornati alle" in response.text
+    assert "Alert non aggiornati" in response.text
+    assert "Nessun alert presente. Ultimo controllo" in response.text
+    assert "ALERTS_AUTO_LOAD_COOLDOWN_MS" in response.text
+    assert "loadAlerts({ifStale: true})" in response.text
+    assert "Quota prec." in response.text
+    assert "Quota att." in response.text
+    assert "Data creazione" in response.text
     assert "notification-logs-section" in response.text
     assert "toggleRecipient" in response.text
 

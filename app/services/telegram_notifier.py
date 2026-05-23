@@ -87,7 +87,10 @@ def sync_telegram_recipients_from_payload(db, payload):
             .first()
         )
 
+        updated_profile = False
+
         if existing:
+            updated_profile = existing.label != label
             existing.label = label
             recipient = existing
         else:
@@ -107,14 +110,22 @@ def sync_telegram_recipients_from_payload(db, payload):
                 "id": recipient.id,
                 "label": label,
                 "is_active": recipient.is_active,
+                "status": recipient.status,
+                "recipient_value": recipient.recipient_value,
+                "updated_profile": updated_profile,
             }
         )
 
     db.commit()
 
+    updated_recipients_count = len(
+        [item for item in synced if item.get("updated_profile")]
+    )
+
     return {
         "status": "completed",
         "synced_count": len(synced),
+        "updated_recipients_count": updated_recipients_count,
         "recipients": synced,
     }
 

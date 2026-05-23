@@ -647,6 +647,7 @@ def sync_telegram_recipients(db: Session = Depends(get_db)):
     return {
         "synced_count": result["synced_count"],
         "new_recipients_count": new_recipients_count,
+        "updated_recipients_count": result.get("updated_recipients_count", 0),
         "total_telegram_recipients_count": len(telegram_recipients),
         "active_recipients_count": active_recipients_count,
         "pending_recipients_count": pending_recipients_count,

@@ -70,3 +70,9 @@ def ingest_provider_sample(
     except RuntimeError as exc:
         status_code, detail = classify_provider_error(exc)
         raise HTTPException(status_code=status_code, detail=detail) from exc
+    except Exception as exc:
+        print("[manual-odds-ingest] error:", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Controllo quote non completato. Controlla i log Render.",
+        ) from exc

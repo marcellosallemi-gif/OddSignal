@@ -958,22 +958,42 @@ function showPage(pageId, event) {
 
 async function api(path, options) {
   const response = await fetch(path, options || {});
+  const contentType = response.headers.get("content-type") || "";
+
   if (!response.ok) {
-    const text = await response.text();
-    let message = text;
-    try {
-      const payload = JSON.parse(text);
+    let message = "";
+
+    if (contentType.includes("application/json")) {
+      const payload = await response.json();
       if (typeof payload.detail === "string") {
         message = payload.detail;
       } else if (payload.detail && payload.detail.message) {
         message = payload.detail.message;
+      } else if (typeof payload.message === "string") {
+        message = payload.message;
       }
-    } catch (error) {
-      message = text;
+    } else {
+      await response.text();
     }
-    throw new Error(response.status + " " + message);
+
+    if (!message) {
+      if ([502, 503, 504].includes(response.status)) {
+        message = `Servizio temporaneamente non disponibile o timeout durante il controllo quote. Codice: ${response.status}.`;
+      } else {
+        message = `Richiesta non completata. Codice: ${response.status}.`;
+      }
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
-  return response.json();
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return response.text();
 }
 
 function escapeHtml(value) {
@@ -1382,8 +1402,18 @@ async function runManualOddsCheck() {
     await loadAlerts();
     await loadNotificationLogs();
   } catch (error) {
-    resultBox.textContent = "Errore controllo quote: " + error.message;
-    executedAtBox.textContent = "Ultimo controllo eseguito: errore";
+    const statusCode = error.status || "n/d";
+    const errorTime = formatDateTime(new Date());
+    const cleanMessage = error.message || `Richiesta non completata. Codice: ${statusCode}.`;
+
+    resultBox.textContent = JSON.stringify({
+      status: "errore",
+      http_status: statusCode,
+      error_at: errorTime,
+      message: cleanMessage,
+      suggestion: "Controlla i log Render"
+    }, null, 2);
+    executedAtBox.textContent = `Ultimo controllo eseguito: errore alle ${errorTime}`;
     renderManualOddsCheckSummary({
       odds_received: "errore",
       odds_processed: "errore",
@@ -1396,7 +1426,7 @@ async function runManualOddsCheck() {
     });
     dashboardState.lastManualCheck = "Errore";
     renderDashboardSummary();
-    setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + error.message, "error");
+    setFeedback("manual-odds-check-feedback", "Controllo quote non completato. " + cleanMessage, "error");
   }
 }
 

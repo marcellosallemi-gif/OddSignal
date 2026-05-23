@@ -228,3 +228,24 @@ def test_manual_odds_check_response_contains_executed_at(monkeypatch):
     assert datetime.fromisoformat(data["executed_at"]).tzinfo is not None
     assert "ignored_odds_breakdown" in data
     assert "ignored_events_breakdown" in data
+
+
+def test_manual_odds_check_unexpected_error_returns_json_detail(monkeypatch):
+    from app.routers import odds_provider
+
+    def raise_unexpected_error(db, limit):
+        raise ValueError("internal details should stay in server logs")
+
+    monkeypatch.setattr(
+        odds_provider,
+        "ingest_odds_sample",
+        raise_unexpected_error,
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/odds-provider/ingest-sample?limit=1")
+
+    assert response.status_code == 500
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["detail"] == "Controllo quote non completato. Controlla i log Render."
+    assert "internal details" not in response.text

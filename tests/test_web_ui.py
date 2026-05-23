@@ -78,6 +78,12 @@ def test_web_home_returns_html_page():
     assert "Controllo quote manuale" in response.text
     assert "Esegui controllo quote ora" in response.text
     assert "Ultimo controllo eseguito" in response.text
+    assert "Servizio temporaneamente non disponibile o timeout durante il controllo quote. Codice:" in response.text
+    assert "Richiesta non completata. Codice:" in response.text
+    assert "Controlla i log Render" in response.text
+    assert "http_status" in response.text
+    assert "message = text" not in response.text
+    assert '"Errore controllo quote: " + error.message' not in response.text
     assert "Quote ricevute" in response.text
     assert "Quote processate" in response.text
     assert "Quote escluse per mercati non ancora supportati" in response.text

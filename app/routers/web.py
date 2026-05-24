@@ -1171,6 +1171,14 @@ function notificationStatusBadgeClass(status) {
   return "badge";
 }
 
+function formatEventDateTime(value) {
+  if (!value) {
+    return "n/d";
+  }
+
+  return formatDateTime(value);
+}
+
 function formatDateTime(value) {
   if (!value) {
     return "n/d";
@@ -2407,7 +2415,7 @@ function renderAlertsTable(options) {
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Competizione</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Quota prec.</th><th>Quota att.</th><th>Variazione</th><th>Direzione</th><th>Tipo</th><th>Data creazione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Competizione</th><th>Data/Ora evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Quota prec.</th><th>Quota att.</th><th>Variazione</th><th>Direzione</th><th>Tipo</th><th>Data creazione</th></tr></thead><tbody>";
   for (const item of filtered) {
     const variation = `${item.variation_percent}%`;
     const alertLabel = readableAlertType(item.alert_type);

@@ -52,6 +52,11 @@ def get_alerts(
                 alert.event.away_team.name,
             ),
             "competition": alert.event.competition.name,
+            "event_start_time": (
+                alert.event.start_time.isoformat()
+                if getattr(alert.event, "start_time", None)
+                else None
+            ),
             "provider": alert.provider,
             "bookmaker": alert.bookmaker,
             "market": alert.market,

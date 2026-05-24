@@ -309,6 +309,22 @@ def _alert_competition_label(alert: Alert) -> str:
     return event.competition.name if event and event.competition else "Unknown competition"
 
 
+def _alert_start_time_label(alert: Alert) -> str:
+    event = alert.event
+
+    if not event:
+        return "n/d"
+
+    start_time = getattr(event, "start_time", None) or getattr(event, "commence_time", None) or getattr(event, "event_time", None)
+
+    if not start_time:
+        return "n/d"
+
+    try:
+        return start_time.strftime("%d/%m/%Y %H:%M")
+    except AttributeError:
+        return str(start_time)
+
 def build_alerts_summary_message(alerts: List[Alert], max_items: int = 500) -> str:
     return "\n\n".join(build_alerts_summary_messages(alerts, max_items=max_items))
 

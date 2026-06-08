@@ -46,6 +46,7 @@ def test_get_system_status_returns_operational_summary():
     assert "database_counts" in payload
 
     assert "enabled" in payload["scheduler"]
+    assert "loop_running" in payload["scheduler"]
     assert "configured" in payload["telegram"]
     assert "events" in payload["database_counts"]
     assert "odds_snapshots" in payload["database_counts"]
@@ -86,6 +87,7 @@ def test_system_readiness_returns_operational_checks():
     assert "ok" in checks["markets"]
     assert "ok" in checks["telegram"]
     assert "enabled" in checks["scheduler"]
+    assert "loop_running" in checks["scheduler"]
 
 
 def test_provider_usage_returns_usage_status():

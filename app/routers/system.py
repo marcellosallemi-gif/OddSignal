@@ -11,6 +11,7 @@ from app.services.telegram_notifier import (
 )
 from app.services.alert_settings_service import get_or_create_alert_settings
 from app.services.scheduler_settings_service import get_or_create_scheduler_settings
+from app.services.odds_scheduler import odds_scheduler
 from app.services.provider_bookmaker_settings_service import get_configured_bookmakers
 from app.services.provider_usage_service import get_provider_usage_status
 from app.services.provider_plan_settings_service import (
@@ -38,6 +39,7 @@ def get_system_status(db: Session = Depends(get_db)):
             "enabled": scheduler_settings.enabled,
             "poll_interval_seconds": scheduler_settings.poll_interval_seconds,
             "event_limit": scheduler_settings.event_limit,
+            "loop_running": odds_scheduler.is_running(),
         },
         "alerts": {
             "min_percent": alert_settings.min_percent,
@@ -169,6 +171,7 @@ def get_system_readiness(db: Session = Depends(get_db)):
             "enabled": scheduler_settings.enabled,
             "poll_interval_seconds": scheduler_settings.poll_interval_seconds,
             "event_limit": scheduler_settings.event_limit,
+            "loop_running": odds_scheduler.is_running(),
             "message": (
                 "Scheduler acceso."
                 if scheduler_settings.enabled

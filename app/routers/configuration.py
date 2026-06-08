@@ -762,6 +762,7 @@ from app.services.scheduler_settings_service import (
     get_or_create_scheduler_settings,
     update_scheduler_settings,
 )
+from app.services.odds_scheduler import odds_scheduler
 from app.services.provider_plan_settings_service import (
     estimate_provider_hourly_requests,
     get_active_mapped_competitions_count,
@@ -820,12 +821,14 @@ def put_scheduler_settings(
             db=db,
             enabled=payload.enabled,
         )
-        return update_scheduler_settings(
+        settings = update_scheduler_settings(
             db=db,
             enabled=payload.enabled,
             poll_interval_seconds=payload.poll_interval_seconds,
             event_limit=payload.event_limit,
         )
+        odds_scheduler.notify_settings_changed()
+        return settings
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

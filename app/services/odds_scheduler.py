@@ -10,37 +10,53 @@ class OddsScheduler:
     def __init__(self):
         self._task: Optional[asyncio.Task] = None
         self._stop_event: Optional[asyncio.Event] = None
+        self._wake_event: Optional[asyncio.Event] = None
 
     async def start(self):
         if self._task and not self._task.done():
             return
 
         self._stop_event = asyncio.Event()
-        self._task = asyncio.create_task(self._run_loop(self._stop_event))
+        self._wake_event = asyncio.Event()
+        self._task = asyncio.create_task(
+            self._run_loop(self._stop_event, self._wake_event)
+        )
 
     async def stop(self):
         if not self._stop_event:
             return
 
         self._stop_event.set()
+        if self._wake_event:
+            self._wake_event.set()
 
         if self._task:
             await self._task
 
         self._task = None
         self._stop_event = None
+        self._wake_event = None
 
-    async def _run_loop(self, stop_event: asyncio.Event):
+    def is_running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    def notify_settings_changed(self):
+        if self._wake_event:
+            self._wake_event.set()
+
+    async def _run_loop(self, stop_event: asyncio.Event, wake_event: asyncio.Event):
         while not stop_event.is_set():
             interval_seconds = await asyncio.to_thread(self._run_configured_cycle)
 
             try:
                 await asyncio.wait_for(
-                    stop_event.wait(),
+                    wake_event.wait(),
                     timeout=interval_seconds,
                 )
             except asyncio.TimeoutError:
-                continue
+                pass
+
+            wake_event.clear()
 
     def _run_configured_cycle(self) -> int:
         db = SessionLocal()

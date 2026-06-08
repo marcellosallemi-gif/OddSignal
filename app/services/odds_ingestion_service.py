@@ -333,19 +333,61 @@ def _empty_ignored_events_breakdown() -> Dict[str, int]:
     }
 
 
-def _get_active_monitored_market_names(db) -> set:
-    market_names = {
+def _get_active_monitored_market_names(db, sport: str = "football"):
+    configured_query = db.query(MonitoredMarket)
+
+    if sport and hasattr(MonitoredMarket, "sport"):
+        configured_query = configured_query.filter(MonitoredMarket.sport == sport)
+
+    configured_markets = configured_query.all()
+
+    active_market_names = {
         item.market_name
-        for item in db.query(MonitoredMarket)
-        .filter(MonitoredMarket.is_active.is_(True))
-        .all()
+        for item in configured_markets
+        if item.is_active
     }
 
-    if not market_names and db.query(MonitoredMarket).count() == 0:
-        return DEFAULT_MONITORED_MARKETS
+    if active_market_names:
+        expanded_market_names = set(active_market_names)
 
-    return _expand_market_aliases(market_names)
+        if sport == "football":
+            for canonical_name, aliases in MARKET_PROVIDER_ALIASES.items():
+                if canonical_name in active_market_names or active_market_names.intersection(aliases):
+                    expanded_market_names.add(canonical_name)
+                    expanded_market_names.update(aliases)
 
+        if sport == "tennis":
+            if (
+                "Vincitore match" in active_market_names
+                or "ML" in active_market_names
+                or "Moneyline" in active_market_names
+            ):
+                expanded_market_names.update({"Vincitore match", "ML", "Moneyline"})
+
+        return expanded_market_names
+
+    # Compatibilità: se il database non ha ancora mercati configurati per il calcio,
+    # usa i default storici così il calcio continua a funzionare.
+    if not configured_markets and sport == "football":
+        return set(DEFAULT_MONITORED_MARKETS)
+
+    # Compatibilità limitata per test/database legacy:
+    # se non esistono ancora mercati tennis configurati, accetta solo ML/Moneyline
+    # eventualmente presente come vecchio mercato attivo globale.
+    # In produzione, dopo la migration runtime, i mercati tennis esistono e questa
+    # fallback non viene usata.
+    if not configured_markets and sport == "tennis":
+        legacy_active_markets = {
+            item.market_name
+            for item in db.query(MonitoredMarket)
+            .filter(MonitoredMarket.is_active.is_(True))
+            .all()
+        }
+
+        if legacy_active_markets.intersection({"ML", "Moneyline", "Vincitore match"}):
+            return {"ML", "Moneyline", "Vincitore match"}
+
+    return set()
 
 def _get_configured_monitored_market_names(db) -> set:
     market_names = {
@@ -604,8 +646,14 @@ def _sport_supports_market(sport: str, odd_data: Dict) -> bool:
         return True
 
     market_name = odd_data.get("market_name") or ""
-    return market_name in {"ML", "Moneyline"} and not _line_is_present(odd_data.get("line"))
+    line = odd_data.get("line")
 
+    # Prima versione tennis: accetta solo vincitore match.
+    # ML/Moneyline sono alias provider di Vincitore match.
+    if market_name in {"ML", "Moneyline", "Vincitore match"} and not _line_is_present(line):
+        return True
+
+    return False
 
 def _find_previous_snapshot(db, event_id: int, odd_data: Dict) -> Optional[OddsSnapshot]:
     return (
@@ -653,7 +701,7 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
     active_competitions = _get_active_monitored_competitions(db, sport=sport)
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
-    active_market_names = _get_active_monitored_market_names(db)
+    active_market_names = _get_active_monitored_market_names(db, sport=sport)
     configured_market_names = _get_configured_monitored_market_names(db)
 
     provider = OddsApiIoProvider(

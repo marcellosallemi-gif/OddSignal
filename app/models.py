@@ -133,6 +133,7 @@ class MonitoredMarket(Base):
     __tablename__ = "monitored_markets"
 
     id = Column(Integer, primary_key=True, index=True)
+    sport = Column(String, nullable=False, default="football", server_default="football")
     market_name = Column(String, nullable=False, unique=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False)

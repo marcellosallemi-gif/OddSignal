@@ -79,12 +79,14 @@ class MonitoredCompetitionResponse(BaseModel):
 
 
 class MonitoredMarketCreate(BaseModel):
+    sport: str = "football"
     market_name: str
     is_active: bool = True
 
 
 class MonitoredMarketResponse(BaseModel):
     id: int
+    sport: str = "football"
     market_name: str
     is_active: bool
     created_at: datetime

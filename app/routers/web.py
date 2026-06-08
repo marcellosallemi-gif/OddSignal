@@ -2244,44 +2244,97 @@ async function refreshProviderTennisLeagues() {
 }
 
 async function loadMonitoredMarkets() {
-  const data = await api("/configuration/monitored-markets");
-  const existingNames = new Set(data.map((item) => item.market_name));
-  const missingSuggestedMarkets = suggestedFootballMarkets.filter((marketName) => !existingNames.has(marketName));
-  dashboardState.activeMarkets = data.filter((item) => item.is_active).length;
-  renderDashboardSummary();
+  setFeedback("markets-feedback", "Caricamento mercati...", "");
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Mercato</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
-  for (const item of data) {
-    const active = item.is_active ? "Attivo" : "In attesa di attivazione";
-    const badgeClass = item.is_active ? "badge ok" : "badge";
-    html += `<tr>
-      <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
-      <td><span class="${badgeClass}">${active}</span></td>
-      <td>
-        <button class="compact" onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
-        <button class="compact" onclick="toggleMonitoredMarket(${item.id}, false)">Disattiva</button>
-      </td>
-    </tr>`;
+  try {
+    const [footballMarkets, tennisMarkets] = await Promise.all([
+      api("/configuration/monitored-markets?sport=football"),
+      api("/configuration/monitored-markets?sport=tennis")
+    ]);
+
+    const existingFootballNames = new Set(footballMarkets.map((item) => item.market_name));
+    const missingSuggestedMarkets = suggestedFootballMarkets.filter((marketName) => !existingFootballNames.has(marketName));
+
+    const footballActive = footballMarkets.filter((item) => item.is_active).length;
+    const tennisActive = tennisMarkets.filter((item) => item.is_active).length;
+    dashboardState.activeMarkets = footballActive + tennisActive;
+    renderDashboardSummary();
+
+    const renderRows = (items, emptyText) => {
+      if (!items || items.length === 0) {
+        return `<tr><td colspan="4" class="muted">${escapeHtml(emptyText)}</td></tr>`;
+      }
+
+      return items.map((item) => {
+        const active = item.is_active ? "Attivo" : "In attesa di attivazione";
+        const badgeClass = item.is_active ? "badge ok" : "badge";
+        return `<tr>
+          <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
+          <td>${escapeHtml(item.sport === "tennis" ? "Tennis" : "Calcio")}</td>
+          <td><span class="${badgeClass}">${active}</span></td>
+          <td>
+            <button class="compact" onclick="toggleMonitoredMarket(${item.id}, true)">Attiva</button>
+            <button class="compact" onclick="toggleMonitoredMarket(${item.id}, false)">Disattiva</button>
+          </td>
+        </tr>`;
+      }).join("");
+    };
+
+    let missingRows = "";
+    for (const marketName of missingSuggestedMarkets) {
+      missingRows += `<tr>
+        <td><span class="market-name">${escapeHtml(readableMarketName(marketName))}</span></td>
+        <td>Calcio</td>
+        <td><span class="badge">Da caricare</span></td>
+        <td><button class="compact" onclick="addSuggestedMarkets()">Carica mercati suggeriti</button></td>
+      </tr>`;
+    }
+
+    const footballRows = renderRows(footballMarkets, "Nessun mercato calcio configurato.") + missingRows;
+    const tennisRows = renderRows(tennisMarkets, "Nessun mercato tennis configurato.");
+
+    const html = `
+      <div class="section-stack">
+        <div>
+          <h3>Mercati calcio</h3>
+          <p class="muted">Questi mercati vengono usati solo per gli eventi calcio.</p>
+          <div class='table-wrap'>
+            <table>
+              <thead><tr><th>Mercato</th><th>Sport</th><th>Stato</th><th>Azione</th></tr></thead>
+              <tbody>${footballRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3>Mercati tennis</h3>
+          <p class="muted">Questi mercati vengono usati solo per gli eventi tennis. Attivali progressivamente per evitare alert rumorosi.</p>
+          <div class='table-wrap'>
+            <table>
+              <thead><tr><th>Mercato</th><th>Sport</th><th>Stato</th><th>Azione</th></tr></thead>
+              <tbody>${tennisRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("monitored-markets").innerHTML = html;
+    setFeedback(
+      "markets-feedback",
+      `Mercati calcio: ${footballMarkets.length} (${footballActive} attivi). Mercati tennis: ${tennisMarkets.length} (${tennisActive} attivi). Suggeriti calcio da caricare: ${missingSuggestedMarkets.length}.`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback("markets-feedback", "Mercati non caricati: " + error.message, "error");
   }
-
-  for (const marketName of missingSuggestedMarkets) {
-    html += `<tr>
-      <td><span class="market-name">${escapeHtml(readableMarketName(marketName))}</span></td>
-      <td><span class="badge">Da caricare</span></td>
-      <td><button class="compact" onclick="addSuggestedMarkets()">Carica mercati suggeriti</button></td>
-    </tr>`;
-  }
-
-  html += "</tbody></table></div>";
-  document.getElementById("monitored-markets").innerHTML = html;
-  setFeedback("markets-feedback", `Mercati configurati: ${data.length}. Suggeriti da caricare: ${missingSuggestedMarkets.length}.`, "success");
 }
 
 async function addSuggestedMarkets() {
   setFeedback("markets-feedback", "Caricamento mercati suggeriti...", "");
 
   try {
-    const currentMarkets = await api("/configuration/monitored-markets");
+    const currentMarkets = await api("/configuration/monitored-markets?sport=football");
     const existingNames = new Set(currentMarkets.map((item) => item.market_name));
     const marketsToCreate = suggestedFootballMarkets.filter((marketName) => !existingNames.has(marketName));
 
@@ -2290,6 +2343,7 @@ async function addSuggestedMarkets() {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
+          sport: "football",
           market_name: marketName,
           is_active: activeSuggestedFootballMarkets.has(marketName)
         })

@@ -97,6 +97,7 @@ def _market_aliases_for_canonical(canonical_name: str) -> List[str]:
 def _market_response(item: MonitoredMarket, canonical_name: str, is_active: bool):
     return {
         "id": item.id,
+        "sport": getattr(item, "sport", None) or "football",
         "market_name": canonical_name,
         "is_active": is_active,
         "created_at": item.created_at,
@@ -501,9 +502,21 @@ def toggle_monitored_competition(
     "/monitored-markets",
     response_model=List[MonitoredMarketResponse],
 )
-def get_monitored_markets(db: Session = Depends(get_db)):
+def get_monitored_markets(
+    sport: str = Query(default="football"),
+    db: Session = Depends(get_db),
+):
+    sport = _normalize_sport(sport)
+
     grouped_markets = {}
-    for item in db.query(MonitoredMarket).order_by(MonitoredMarket.market_name).all():
+    markets = (
+        db.query(MonitoredMarket)
+        .filter(MonitoredMarket.sport == sport)
+        .order_by(MonitoredMarket.market_name)
+        .all()
+    )
+
+    for item in markets:
         canonical_name = _canonical_market_name(item.market_name)
         group = grouped_markets.setdefault(
             canonical_name,
@@ -530,11 +543,15 @@ def upsert_monitored_market(
     payload: MonitoredMarketCreate,
     db: Session = Depends(get_db),
 ):
+    sport = _normalize_sport(getattr(payload, "sport", "football"))
     canonical_name = _canonical_market_name(payload.market_name)
     aliases = _market_aliases_for_canonical(canonical_name)
     existing_items = (
         db.query(MonitoredMarket)
-        .filter(MonitoredMarket.market_name.in_(aliases))
+        .filter(
+            MonitoredMarket.sport == sport,
+            MonitoredMarket.market_name.in_(aliases),
+        )
         .all()
     )
 
@@ -543,10 +560,12 @@ def upsert_monitored_market(
             (item for item in existing_items if item.market_name == canonical_name),
             existing_items[0],
         )
+        canonical_item.sport = sport
         if canonical_item.market_name != canonical_name:
             canonical_item.market_name = canonical_name
 
         for item in existing_items:
+            item.sport = sport
             item.is_active = payload.is_active
 
         db.commit()
@@ -554,6 +573,7 @@ def upsert_monitored_market(
         return _market_response(canonical_item, canonical_name, payload.is_active)
 
     item = MonitoredMarket(
+        sport=sport,
         market_name=canonical_name,
         is_active=payload.is_active,
         created_at=_utc_now_naive(),
@@ -563,7 +583,7 @@ def upsert_monitored_market(
     db.commit()
     db.refresh(item)
 
-    return item
+    return _market_response(item, canonical_name, item.is_active)
 
 
 @router.patch(
@@ -580,11 +600,15 @@ def toggle_monitored_market(
     if not item:
         raise HTTPException(status_code=404, detail="Monitored market not found")
 
+    sport = getattr(item, "sport", None) or "football"
     canonical_name = _canonical_market_name(item.market_name)
     aliases = _market_aliases_for_canonical(canonical_name)
     group_items = (
         db.query(MonitoredMarket)
-        .filter(MonitoredMarket.market_name.in_(aliases))
+        .filter(
+            MonitoredMarket.sport == sport,
+            MonitoredMarket.market_name.in_(aliases),
+        )
         .all()
     )
 
@@ -592,10 +616,12 @@ def toggle_monitored_market(
         (market for market in group_items if market.market_name == canonical_name),
         item,
     )
+    canonical_item.sport = sport
     if canonical_item.market_name != canonical_name:
         canonical_item.market_name = canonical_name
 
     for market in group_items:
+        market.sport = sport
         market.is_active = is_active
 
     db.commit()

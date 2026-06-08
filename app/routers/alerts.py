@@ -11,6 +11,37 @@ from app.schemas import AlertResponse
 router = APIRouter()
 
 
+def _alert_response(alert):
+    event = alert.event
+    competition = event.competition if event and event.competition else None
+    home_team = event.home_team.name if event and event.home_team else "n/d"
+    away_team = event.away_team.name if event and event.away_team else "n/d"
+
+    return {
+        "id": alert.id,
+        "sport": getattr(competition, "sport", None) or "n/d",
+        "country": getattr(competition, "country", None) or "n/d",
+        "category": getattr(competition, "name", None) or "n/d",
+        "event": "{} vs {}".format(home_team, away_team),
+        "competition": getattr(competition, "name", None) or "n/d",
+        "event_start_time": (
+            event.start_time.isoformat()
+            if event and getattr(event, "start_time", None)
+            else None
+        ),
+        "provider": alert.provider,
+        "bookmaker": alert.bookmaker,
+        "market": alert.market,
+        "selection": alert.selection,
+        "previous_odds": alert.previous_odds,
+        "current_odds": alert.current_odds,
+        "variation_percent": alert.variation_percent,
+        "direction": alert.direction,
+        "alert_type": alert.alert_type,
+        "created_at": alert.created_at,
+    }
+
+
 @router.get("/alerts", response_model=List[AlertResponse])
 def get_alerts(
     provider: Optional[str] = Query(default=None),
@@ -44,33 +75,7 @@ def get_alerts(
         .all()
     )
 
-    return [
-        {
-            "id": alert.id,
-            "sport": alert.event.competition.sport,
-            "event": "{} vs {}".format(
-                alert.event.home_team.name,
-                alert.event.away_team.name,
-            ),
-            "competition": alert.event.competition.name,
-            "event_start_time": (
-                alert.event.start_time.isoformat()
-                if getattr(alert.event, "start_time", None)
-                else None
-            ),
-            "provider": alert.provider,
-            "bookmaker": alert.bookmaker,
-            "market": alert.market,
-            "selection": alert.selection,
-            "previous_odds": alert.previous_odds,
-            "current_odds": alert.current_odds,
-            "variation_percent": alert.variation_percent,
-            "direction": alert.direction,
-            "alert_type": alert.alert_type,
-            "created_at": alert.created_at,
-        }
-        for alert in alerts
-    ]
+    return [_alert_response(alert) for alert in alerts]
 
 
 @router.delete("/alerts/recent")

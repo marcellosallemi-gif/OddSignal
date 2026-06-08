@@ -127,7 +127,11 @@ def test_build_alert_message_contains_core_details(tmp_path):
         alert = create_alert(db)
         message = build_alert_message(alert)
 
-        assert "Alert quote calcio" in message
+        assert "OddSignal - Alert quote" in message
+        assert "Sport: Calcio" in message
+        assert "Nazione: Italy" in message
+        assert "Categoria: Serie A" in message
+        assert "Data/Ora evento: 15/08/2026 18:30" in message
         assert "Inter vs Milan" in message
         assert "Serie A" in message
         assert "Stake" in message
@@ -249,6 +253,10 @@ def test_build_alerts_summary_message_contains_all_alerts(tmp_path):
         assert "OddSignal - Alert quote (parte 1/1)" in message
         assert "Alert totali generati: 3" in message
         assert "Alert in questa parte: 3" in message
+        assert "Sport: Calcio" in message
+        assert "Nazione: Italy" in message
+        assert "Categoria: Serie A" in message
+        assert "Data/Ora evento: 15/08/2026 18:30" in message
         assert "Stake" in message
         assert "Sbobet" in message
         assert "-16.28%" in message
@@ -338,6 +346,9 @@ def test_summary_alert_message_contains_type_provider_and_team_selection(tmp_pat
         assert "Selezione: X2 - Pareggio o Milan" in messages[0]
         assert "Tipo alert: standard_alert" in messages[0]
         assert "Provider: odds_api_io" in messages[0]
+        assert "Sport: Calcio" in messages[0]
+        assert "Nazione: Italy" in messages[0]
+        assert "Categoria: Serie A" in messages[0]
     finally:
         db.close()
 

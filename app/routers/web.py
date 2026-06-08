@@ -1188,6 +1188,18 @@ function readableMarketName(marketName) {
 }
 
 
+function readableSportName(sport) {
+  const value = String(sport || "").toLowerCase();
+  if (value === "football" || value === "calcio") {
+    return "Calcio";
+  }
+  if (value === "tennis") {
+    return "Tennis";
+  }
+  return sport || "n/d";
+}
+
+
 function readableAlertType(alertType) {
   if (alertType === "critical_alert") {
     return "Critico";
@@ -2528,17 +2540,23 @@ function renderAlertsTable(options) {
     return;
   }
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Competizione</th><th>Data/Ora evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Quota prec.</th><th>Quota att.</th><th>Variazione</th><th>Direzione</th><th>Tipo</th><th>Data creazione</th></tr></thead><tbody>";
+  let html = "<div class='table-wrap'><table><thead><tr><th>Evento</th><th>Contesto<br><span class='secondary-text'>Sport · Nazione · Categoria</span></th><th>Data/Ora evento</th><th>Bookmaker</th><th>Mercato</th><th>Selezione</th><th>Quota prec.</th><th>Quota att.</th><th>Variazione</th><th>Direzione</th><th>Tipo</th><th>Data creazione</th></tr></thead><tbody>";
   for (const item of filtered) {
     const variation = `${item.variation_percent}%`;
     const alertLabel = readableAlertType(item.alert_type);
     const alertBadgeClass = alertTypeBadgeClass(item.alert_type);
     const directionLabel = item.direction === "decrease" ? "Calo" : "Aumento";
     const directionBadgeClass = item.direction === "decrease" ? "badge ok" : "badge";
+    const contextLabel = [
+      readableSportName(item.sport),
+      item.country || "n/d",
+      item.category || item.competition || "n/d"
+    ].join(" · ");
 
     html += `<tr>
       <td><strong>${escapeHtml(item.event)}</strong></td>
-      <td>${escapeHtml(item.competition)}</td>
+      <td>${escapeHtml(contextLabel)}</td>
+      <td>${escapeHtml(item.event_start_time ? formatDateTime(item.event_start_time) : "n/d")}</td>
       <td>${escapeHtml(item.bookmaker)}</td>
       <td>${escapeHtml(readableMarketName(item.market))}</td>
       <td>${escapeHtml(item.selection)}</td>

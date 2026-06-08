@@ -269,9 +269,37 @@ def readable_selection_label(
     return selection_value
 
 
+def readable_sport_label(sport: Optional[str]) -> str:
+    sport_value = str(sport or "").strip().lower()
+    return {
+        "football": "Calcio",
+        "calcio": "Calcio",
+        "tennis": "Tennis",
+    }.get(sport_value, sport or "n/d")
+
+
+def _alert_sport_label(alert: Alert) -> str:
+    event = alert.event
+    competition = event.competition if event and event.competition else None
+    return readable_sport_label(getattr(competition, "sport", None))
+
+
+def _alert_country_label(alert: Alert) -> str:
+    event = alert.event
+    competition = event.competition if event and event.competition else None
+    country = getattr(competition, "country", None)
+    return country or "n/d"
+
+
+def _alert_category_label(alert: Alert) -> str:
+    event = alert.event
+    competition = event.competition if event and event.competition else None
+    category = getattr(competition, "name", None)
+    return category or "n/d"
+
+
 def build_alert_message(alert: Alert) -> str:
     event = alert.event
-    competition = event.competition.name if event and event.competition else "Unknown competition"
 
     home_team = event.home_team.name if event and event.home_team else "Unknown home"
     away_team = event.away_team.name if event and event.away_team else "Unknown away"
@@ -281,11 +309,13 @@ def build_alert_message(alert: Alert) -> str:
     line_text = f"Linea: {line_label}\n" if line_label else ""
 
     return (
-        "Alert quote calcio\n"
+        "OddSignal - Alert quote\n"
         "\n"
-        f"Tipo: {alert.alert_type}\n"
+        f"Sport: {_alert_sport_label(alert)}\n"
+        f"Nazione: {_alert_country_label(alert)}\n"
+        f"Categoria: {_alert_category_label(alert)}\n"
         f"Evento: {home_team} vs {away_team}\n"
-        f"Competizione: {competition}\n"
+        f"Data/Ora evento: {_alert_start_time_label(alert)}\n"
         f"Bookmaker: {alert.bookmaker}\n"
         f"Mercato: {readable_market_label(alert.market)}\n"
         f"Selezione: {readable_selection_label(alert.market, alert.selection, home_team, away_team)}\n"
@@ -293,7 +323,8 @@ def build_alert_message(alert: Alert) -> str:
         f"Variazione: {alert.variation_percent}% ({direction_label})\n"
         f"Quota precedente: {alert.previous_odds}\n"
         f"Quota attuale: {alert.current_odds}\n"
-        f"Provider: {alert.provider}"
+        f"Provider: {alert.provider}\n"
+        f"Tipo alert: {alert.alert_type}"
     )
 
 
@@ -305,8 +336,7 @@ def _alert_event_label(alert: Alert) -> str:
 
 
 def _alert_competition_label(alert: Alert) -> str:
-    event = alert.event
-    return event.competition.name if event and event.competition else "Unknown competition"
+    return _alert_category_label(alert)
 
 
 def _alert_start_time_label(alert: Alert) -> str:
@@ -347,7 +377,11 @@ def _compact_alert_summary_block(alert: Alert, index: int) -> str:
 
     block = "\n".join(
         [
-            f"{index}. Evento: {_alert_event_label(alert)}",
+            f"{index}. Sport: {_alert_sport_label(alert)}",
+            f"Nazione: {_alert_country_label(alert)}",
+            f"Categoria: {_alert_category_label(alert)}",
+            f"Evento: {_alert_event_label(alert)}",
+            f"Data/Ora evento: {_alert_start_time_label(alert)}",
             f"Mercato: {readable_market_label(alert.market)}",
             f"Selezione: {readable_selection_label(alert.market, alert.selection, home_team, away_team)}",
             *line_items,

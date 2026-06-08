@@ -62,6 +62,8 @@ def test_get_alerts_returns_readable_alert_fields():
     alert = alerts[0]
     assert "event" in alert
     assert "sport" in alert
+    assert "country" in alert
+    assert "category" in alert
     assert "competition" in alert
     assert "event_start_time" in alert
     assert "provider" in alert
@@ -74,6 +76,9 @@ def test_get_alerts_returns_readable_alert_fields():
     assert "direction" in alert
     assert "alert_type" in alert
     assert "created_at" in alert
+    assert alert["sport"] in {"football", "n/d"}
+    assert alert["country"]
+    assert alert["category"]
 
     clear_alerts()
 

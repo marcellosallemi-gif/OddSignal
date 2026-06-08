@@ -34,6 +34,8 @@ class OddsResponse(BaseModel):
 class AlertResponse(BaseModel):
     id: int
     sport: str
+    country: str
+    category: str
     event: str
     competition: str
     event_start_time: Optional[str] = None

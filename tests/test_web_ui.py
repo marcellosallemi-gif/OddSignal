@@ -143,6 +143,9 @@ def test_web_home_returns_html_page():
     assert "loadAlerts({ifStale: true})" in response.text
     assert "Quota prec." in response.text
     assert "Quota att." in response.text
+    assert "Contesto" in response.text
+    assert "Nazione" in response.text
+    assert "Categoria" in response.text
     assert "Data creazione" in response.text
     assert "notification-logs-section" in response.text
     assert "toggleRecipient" in response.text

@@ -61,7 +61,9 @@ def test_get_alerts_returns_readable_alert_fields():
 
     alert = alerts[0]
     assert "event" in alert
+    assert "sport" in alert
     assert "competition" in alert
+    assert "event_start_time" in alert
     assert "provider" in alert
     assert "bookmaker" in alert
     assert "market" in alert

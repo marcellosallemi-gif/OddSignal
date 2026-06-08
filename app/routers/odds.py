@@ -43,6 +43,7 @@ def get_odds(
     return [
         {
             "id": snapshot.id,
+            "sport": snapshot.event.competition.sport,
             "event": "{} vs {}".format(
                 snapshot.event.home_team.name,
                 snapshot.event.away_team.name,

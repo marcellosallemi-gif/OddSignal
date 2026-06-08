@@ -47,6 +47,7 @@ def get_alerts(
     return [
         {
             "id": alert.id,
+            "sport": alert.event.competition.sport,
             "event": "{} vs {}".format(
                 alert.event.home_team.name,
                 alert.event.away_team.name,

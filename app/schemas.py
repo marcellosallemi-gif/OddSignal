@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class EventResponse(BaseModel):
     id: int
+    sport: str
     competition: str
     home_team: str
     away_team: str
@@ -16,6 +17,7 @@ class EventResponse(BaseModel):
 
 class OddsResponse(BaseModel):
     id: int
+    sport: str
     event: str
     competition: str
     provider: str
@@ -31,8 +33,10 @@ class OddsResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     id: int
+    sport: str
     event: str
     competition: str
+    event_start_time: Optional[str] = None
     provider: str
     bookmaker: str
     market: str
@@ -49,11 +53,13 @@ class CompetitionProviderMappingUpdate(BaseModel):
     competition_name: str
     provider_league_slug: str
     country: Optional[str] = None
+    sport: str = "football"
 
 
 class MonitoredCompetitionCreate(BaseModel):
     competition_name: str
     country: Optional[str] = None
+    sport: str = "football"
     provider: str = "odds_api_io"
     provider_league_slug: Optional[str] = None
     is_active: bool = True
@@ -63,6 +69,7 @@ class MonitoredCompetitionResponse(BaseModel):
     id: int
     competition_name: str
     country: Optional[str] = None
+    sport: str
     provider: str
     provider_league_slug: Optional[str] = None
     is_active: bool
@@ -137,6 +144,8 @@ class ProviderPlanSettingUpdate(BaseModel):
 
 class ProviderPlanUsageEstimate(BaseModel):
     active_mapped_competitions_count: int
+    active_mapped_football_count: int = 0
+    active_mapped_tennis_count: int = 0
     poll_interval_seconds: int
     event_limit: int
     cycles_per_hour: float

@@ -27,6 +27,7 @@ def get_events(db: Session = Depends(get_db)):
     return [
         {
             "id": event.id,
+            "sport": event.competition.sport,
             "competition": event.competition.name,
             "home_team": event.home_team.name,
             "away_team": event.away_team.name,

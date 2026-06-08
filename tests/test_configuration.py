@@ -35,6 +35,27 @@ class FakeProviderCompetitionRefresh:
         }
 
 
+class FakeTennisProviderCompetitionRefresh:
+    bookmakers = "Stake,Sbobet"
+
+    def get_events(self, limit=10, bookmaker=None):
+        return [
+            {
+                "league": {
+                    "name": "ATP Test Tournament",
+                    "slug": "atp-test-tournament",
+                },
+            }
+        ]
+
+    def normalize_event(self, event):
+        league = event["league"]
+        return {
+            "league_name": league["name"],
+            "league_slug": league["slug"],
+        }
+
+
 class FailingProviderCompetitionRefresh:
     bookmakers = "Stake,Sbobet"
 
@@ -55,6 +76,7 @@ def test_configuration_available_competitions_returns_list():
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+    assert all(item["sport"] == "football" for item in response.json())
 
 
 def test_create_monitored_competition():
@@ -78,8 +100,36 @@ def test_create_monitored_competition():
 
     data = response.json()
     assert data["competition_name"] == competition_name
+    assert data["sport"] == "football"
     assert data["provider_league_slug"] == payload["provider_league_slug"]
     assert data["is_active"] is True
+
+
+def test_create_monitored_tennis_competition():
+    competition_name = "Tennis Tournament " + uuid4().hex
+
+    payload = {
+        "competition_name": competition_name,
+        "country": "Italy",
+        "sport": "tennis",
+        "provider": "odds_api_io",
+        "provider_league_slug": "tennis-tournament-" + uuid4().hex,
+        "is_active": True,
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/configuration/monitored-competitions",
+            json=payload,
+        )
+        available_response = client.get("/configuration/available-competitions?sport=tennis")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["competition_name"] == competition_name
+    assert data["sport"] == "tennis"
+    assert data["is_active"] is True
+    assert available_response.status_code == 200
 
 
 def test_refresh_provider_competitions_upserts_available_competition(monkeypatch):
@@ -115,6 +165,40 @@ def test_refresh_provider_competitions_upserts_available_competition(monkeypatch
         if item["name"] == "Provider Test League"
     ][0]
     assert refreshed_competition["provider_league_slug"] == "provider-test-league"
+    assert refreshed_competition["sport"] == "football"
+
+
+def test_refresh_provider_tennis_competitions_uses_tennis_sport(monkeypatch):
+    from app.routers import configuration
+
+    captured_kwargs = {}
+
+    def fake_provider_factory(**kwargs):
+        captured_kwargs.update(kwargs)
+        return FakeTennisProviderCompetitionRefresh()
+
+    monkeypatch.setattr(configuration, "OddsApiIoProvider", fake_provider_factory)
+
+    with TestClient(app) as client:
+        refresh_response = client.post(
+            "/configuration/provider-competitions/refresh?limit=10&sport=tennis"
+        )
+        available_response = client.get("/configuration/available-competitions?sport=tennis")
+
+    assert refresh_response.status_code == 200
+    data = refresh_response.json()
+    assert captured_kwargs["sport"] == "tennis"
+    assert data["sport"] == "tennis"
+    assert data["competitions"][0]["name"] == "ATP Test Tournament"
+
+    available_competitions = available_response.json()
+    tennis_competition = [
+        item
+        for item in available_competitions
+        if item["name"] == "ATP Test Tournament"
+    ][0]
+    assert tennis_competition["sport"] == "tennis"
+    assert tennis_competition["provider_league_slug"] == "atp-test-tournament"
 
 
 

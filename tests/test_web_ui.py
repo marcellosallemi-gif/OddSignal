@@ -62,7 +62,8 @@ def test_web_home_returns_html_page():
     assert "Sistema" in response.text
     assert "Monitoraggio" in response.text
     assert "Consumo API" in response.text
-    assert "Campionati attivi" in response.text
+    assert "Calcio attivo" in response.text
+    assert "Tennis attivo" in response.text
     assert "Mercati attivi" in response.text
     assert "Telegram" in response.text
     assert "Automazione" in response.text
@@ -99,10 +100,15 @@ def test_web_home_returns_html_page():
     assert "Dedup minuti" in response.text
     assert "evita di generare alert duplicati" in response.text
     assert "Cancella alert recenti" in response.text
-    assert "Campionati" in response.text
+    assert "data-page=\"competitions\" onclick=\"showPage('competitions', event)\">Calcio</button>" in response.text
+    assert "data-page=\"tennis\" onclick=\"showPage('tennis', event)\">Tennis</button>" in response.text
+    assert "Tornei tennis" in response.text
+    assert "Aggiorna tornei tennis" in response.text
+    assert "Torneo attivo" in response.text
+    assert "In attesa di attivazione" in response.text
     assert "competition-search" in response.text
     assert "Cerca campionati" in response.text
-    assert "Campionati rilevati dagli eventi disponibili ora" in response.text
+    assert "rilevati dagli eventi disponibili ora" in response.text
     assert "Aggiorna leghe/slug dal provider" in response.text
     assert "Aggiorna campionati da eventi" in response.text
     assert "refreshProviderCompetitions" in response.text
@@ -123,7 +129,7 @@ def test_web_home_returns_html_page():
     assert "/configuration/telegram-test-message" in response.text
     assert "loadRecipients()" in response.text
     assert "loadRecipients(syncedRecipients)" not in response.text
-    assert "Nessun nuovo account Telegram rilevato. Gli account già configurati restano invariati." in response.text
+    assert "Nessun nuovo account Telegram rilevato. I profili già configurati sono stati sincronizzati con i dati Telegram più recenti." in response.text
     assert "Nuovi account Telegram rilevati" in response.text
     assert "Invia test Telegram" in response.text
     assert "sendTelegramTestMessage" in response.text

@@ -14,6 +14,7 @@ ODDS_SNAPSHOT_METADATA_COLUMNS = {
 
 
 COMPETITION_METADATA_COLUMNS = {
+    "sport": "VARCHAR NOT NULL DEFAULT 'football'",
     "provider_league_slug": "VARCHAR",
 }
 
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS monitored_competitions (
     id INTEGER PRIMARY KEY,
     competition_name VARCHAR NOT NULL UNIQUE,
     country VARCHAR,
+    sport VARCHAR NOT NULL DEFAULT 'football',
     provider VARCHAR NOT NULL DEFAULT 'odds_api_io',
     provider_league_slug VARCHAR,
     is_active BOOLEAN NOT NULL DEFAULT 1,
@@ -195,6 +197,9 @@ def run_runtime_migrations() -> dict:
                     conn.exec_driver_sql(
                         f"ALTER TABLE competitions ADD COLUMN {column_name} {column_type}"
                     )
+            conn.exec_driver_sql(
+                "UPDATE competitions SET sport = 'football' WHERE sport IS NULL OR sport = ''"
+            )
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_LOGS_SQL)
         conn.exec_driver_sql(CREATE_MONITORED_COMPETITIONS_SQL)
@@ -224,6 +229,13 @@ def run_runtime_migrations() -> dict:
             conn.exec_driver_sql(
                 "ALTER TABLE monitored_competitions ADD COLUMN provider_league_slug VARCHAR"
             )
+        if "sport" not in monitored_competition_columns:
+            conn.exec_driver_sql(
+                "ALTER TABLE monitored_competitions ADD COLUMN sport VARCHAR NOT NULL DEFAULT 'football'"
+            )
+        conn.exec_driver_sql(
+            "UPDATE monitored_competitions SET sport = 'football' WHERE sport IS NULL OR sport = ''"
+        )
 
         conn.exec_driver_sql(CREATE_NOTIFICATION_RECIPIENTS_SQL)
 

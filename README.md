@@ -1,8 +1,8 @@
 # Calcolo Quote
 
-Software MVP locale per monitorare quote calcistiche a scopo informativo.
+Software MVP locale per monitorare quote sportive a scopo informativo.
 
-Il sistema acquisisce quote calcio da Odds-API.io, salva storico quote, calcola variazioni percentuali, genera alert e invia notifiche Telegram. La configurazione principale avviene da dashboard web.
+Il sistema acquisisce quote calcio da Odds-API.io, salva storico quote, calcola variazioni percentuali, genera alert e invia notifiche Telegram. La configurazione principale avviene da dashboard web. Il tennis è supportato come configurazione tornei separata; nella prima versione gli alert tennis restano disattivati finché i mercati non sono normalizzati in modo sicuro.
 
 Non piazza scommesse, non automatizza betting, non usa scraping aggressivo e non interagisce con account bookmaker.
 
@@ -21,7 +21,8 @@ http://127.0.0.1:8001/
 
 - stato sistema
 - configurazione controllo automatico
-- selezione campionati
+- selezione campionati calcio
+- selezione tornei tennis
 - configurazione soglie alert
 - rilevamento account Telegram tramite bot
 - attivazione/disattivazione destinatari
@@ -247,8 +248,10 @@ Per uso commerciale non usare 3 secondi come default: può consumare molte chiam
 GET /
 GET /health
 GET /system/status
-GET /configuration/available-competitions
-GET /configuration/monitored-competitions
+GET /configuration/available-competitions?sport=football
+GET /configuration/available-competitions?sport=tennis
+GET /configuration/monitored-competitions?sport=football
+GET /configuration/monitored-competitions?sport=tennis
 POST /configuration/monitored-competitions
 GET /configuration/notification-recipients
 POST /configuration/telegram-recipients/sync

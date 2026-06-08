@@ -38,6 +38,7 @@ def test_get_system_status_returns_operational_summary():
     payload = response.json()
 
     assert "provider" in payload
+    assert "sports" in payload
     assert "sport" in payload
     assert "bookmakers" in payload
     assert "scheduler" in payload
@@ -47,6 +48,8 @@ def test_get_system_status_returns_operational_summary():
 
     assert "enabled" in payload["scheduler"]
     assert "loop_running" in payload["scheduler"]
+    assert "football" in payload["sports"]
+    assert "tennis" in payload["sports"]
     assert "configured" in payload["telegram"]
     assert "events" in payload["database_counts"]
     assert "odds_snapshots" in payload["database_counts"]
@@ -88,6 +91,8 @@ def test_system_readiness_returns_operational_checks():
     assert "ok" in checks["telegram"]
     assert "enabled" in checks["scheduler"]
     assert "loop_running" in checks["scheduler"]
+    assert "active_mapped_football_count" in checks["competitions"]
+    assert "active_mapped_tennis_count" in checks["competitions"]
 
 
 def test_provider_usage_returns_usage_status():

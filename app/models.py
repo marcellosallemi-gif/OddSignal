@@ -10,6 +10,7 @@ class Competition(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
     country = Column(String, nullable=False)
+    sport = Column(String, nullable=False, default="football")
     provider_league_slug = Column(String, nullable=True)
 
     events = relationship("Event", back_populates="competition")
@@ -121,6 +122,7 @@ class MonitoredCompetition(Base):
     id = Column(Integer, primary_key=True, index=True)
     competition_name = Column(String, nullable=False, unique=True)
     country = Column(String, nullable=True)
+    sport = Column(String, nullable=False, default="football")
     provider = Column(String, nullable=False, default="odds_api_io")
     provider_league_slug = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)

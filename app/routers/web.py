@@ -538,7 +538,8 @@ def web_home():
       <button type="button" class="sidebar-link active" data-page="overview" onclick="showPage('overview', event)">Home</button>
       <button type="button" class="sidebar-link" data-page="automation" onclick="showPage('automation', event)">Automazione</button>
       <button type="button" class="sidebar-link" data-page="readiness" onclick="showPage('readiness', event)">Sistema</button>
-      <button type="button" class="sidebar-link" data-page="competitions" onclick="showPage('competitions', event)">Campionati</button>
+      <button type="button" class="sidebar-link" data-page="competitions" onclick="showPage('competitions', event)">Calcio</button>
+      <button type="button" class="sidebar-link" data-page="tennis" onclick="showPage('tennis', event)">Tennis</button>
       <button type="button" class="sidebar-link" data-page="markets" onclick="showPage('markets', event)">Mercati</button>
       <button type="button" class="sidebar-link" data-page="recent-alerts" onclick="showPage('recent-alerts', event)">Alert</button>
       <button type="button" class="sidebar-link" data-page="provider-bookmakers" onclick="showPage('provider-bookmakers', event)">Bookmaker</button>
@@ -578,7 +579,8 @@ def web_home():
         <div class="summary-card"><div class="summary-label">Telegram</div><div class="summary-value">...</div></div>
       </div>
       <div id="overview-metrics" class="summary-grid">
-        <div class="summary-card"><div class="summary-label">Campionati attivi</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Calcio attivo</div><div class="summary-value">...</div></div>
+        <div class="summary-card"><div class="summary-label">Tennis attivo</div><div class="summary-value">...</div></div>
         <div class="summary-card"><div class="summary-label">Mercati attivi</div><div class="summary-value">...</div></div>
         <div class="summary-card"><div class="summary-label">Alert recenti</div><div class="summary-value">...</div></div>
         <div class="summary-card"><div class="summary-label">Log notifiche</div><div class="summary-value">...</div></div>
@@ -666,18 +668,18 @@ def web_home():
   <section id="competitions" class="page-section glass-card">
     <div class="section-header">
       <div>
-        <h2>Campionati da monitorare</h2>
-        <p class="muted">Scegli i campionati su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
+        <h2>Calcio</h2>
+        <p class="muted">Scegli i campionati calcio su cui vuoi ricevere alert. Puoi aggiornare l’elenco in base agli eventi disponibili dal provider.</p>
       </div>
       <div class="section-actions">
         <button class="primary" onclick="refreshProviderLeagues()">Aggiorna leghe/slug dal provider</button>
         <button onclick="refreshProviderCompetitions()">Aggiorna campionati da eventi</button>
-        <button onclick="loadCompetitions()">Aggiorna campionati</button>
+        <button onclick="loadCompetitions()">Aggiorna calcio</button>
       </div>
     </div>
     <div class="info-box">
       <strong>Come usare questa sezione</strong>
-      <p class="muted">Attiva solo i campionati che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
+      <p class="muted">Attiva solo i campionati calcio che vuoi monitorare. I campionati non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
     </div>
     <div class="filter-row">
       <label>Cerca campionati
@@ -687,6 +689,32 @@ def web_home():
     <div id="competitions-summary" class="summary-grid"></div>
     <div id="competitions-feedback" class="feedback muted">Caricamento campionati...</div>
     <div id="competitions-table"></div>
+  </section>
+
+  <section id="tennis" class="page-section glass-card">
+    <div class="section-header">
+      <div>
+        <h2>Tornei tennis</h2>
+        <p class="muted">Scegli i tornei tennis da monitorare. Per questa prima versione gli alert tennis restano disattivati finché i mercati non sono normalizzati in modo sicuro.</p>
+      </div>
+      <div class="section-actions">
+        <button class="primary" onclick="refreshProviderTennisLeagues()">Aggiorna tornei tennis</button>
+        <button onclick="refreshProviderTennisCompetitions()">Aggiorna tornei da eventi</button>
+        <button onclick="loadTennisCompetitions()">Ricarica tennis</button>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>Come usare questa sezione</strong>
+      <p class="muted">Attiva solo i tornei tennis che vuoi monitorare. I tornei non attivi restano disponibili, ma non vengono usati nel controllo quote.</p>
+    </div>
+    <div class="filter-row">
+      <label>Cerca tornei tennis
+        <input id="tennis-search" type="search" placeholder="Cerca per torneo, paese, slug o stato" oninput="renderTennisCompetitionsTable()">
+      </label>
+    </div>
+    <div id="tennis-summary" class="summary-grid"></div>
+    <div id="tennis-feedback" class="feedback muted">Caricamento tornei tennis...</div>
+    <div id="tennis-table"></div>
   </section>
 
   <section id="markets" class="page-section glass-card">
@@ -1009,13 +1037,46 @@ const dashboardState = {
   readiness: null,
   providerUsage: null,
   competitions: [],
+  tennisCompetitions: [],
   activeCompetitions: "...",
+  activeTennisCompetitions: "...",
   activeMarkets: "...",
   activeRecipients: "...",
   recentAlerts: [],
   alertsLastUpdatedAt: null,
   alertsLoading: false,
   lastManualCheck: "Nessuno"
+};
+
+const sportCompetitionConfigs = {
+  football: {
+    stateKey: "competitions",
+    activeStateKey: "activeCompetitions",
+    summaryId: "competitions-summary",
+    feedbackId: "competitions-feedback",
+    tableId: "competitions-table",
+    searchId: "competition-search",
+    entitySingular: "campionato",
+    entityPlural: "campionati",
+    activeLabel: "Campionati attivi",
+    availableLabel: "Campionati disponibili",
+    mappedSummaryLabel: "Provider mappato",
+    missingMappingText: "Inserisci lo slug provider corretto per rendere il campionato monitorabile."
+  },
+  tennis: {
+    stateKey: "tennisCompetitions",
+    activeStateKey: "activeTennisCompetitions",
+    summaryId: "tennis-summary",
+    feedbackId: "tennis-feedback",
+    tableId: "tennis-table",
+    searchId: "tennis-search",
+    entitySingular: "torneo tennis",
+    entityPlural: "tornei tennis",
+    activeLabel: "Tornei tennis attivi",
+    availableLabel: "Tornei tennis disponibili",
+    mappedSummaryLabel: "Provider mappato",
+    missingMappingText: "Inserisci lo slug provider corretto per rendere il torneo tennis monitorabile."
+  }
 };
 
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 300000;
@@ -1314,7 +1375,8 @@ function renderDashboardSummary(data) {
       ? dashboardState.recentAlerts.length
       : (counts.alerts ?? 0);
     overviewMetrics.innerHTML = [
-      summaryCard("Campionati attivi", dashboardState.activeCompetitions),
+      summaryCard("Calcio attivo", dashboardState.activeCompetitions),
+      summaryCard("Tennis attivo", dashboardState.activeTennisCompetitions),
       summaryCard("Mercati attivi", dashboardState.activeMarkets),
       summaryCard("Ultimo controllo", dashboardState.lastManualCheck),
       summaryCard("Alert recenti", recentAlertsCount),
@@ -1553,7 +1615,8 @@ function renderProviderPlanEstimate(data) {
     </div>
     <p><span class="${statusClass}">${statusLabel}</span></p>
     <p class="muted">
-      Campionati attivi mappati: ${escapeHtml(estimate.active_mapped_competitions_count)}.
+      Calcio attivo mappato: ${escapeHtml(estimate.active_mapped_football_count ?? 0)}.
+      Tennis attivo mappato: ${escapeHtml(estimate.active_mapped_tennis_count ?? 0)}.
       Eventi per ciclo: ${escapeHtml(estimate.event_limit)}.
       Cicli/ora stimati: ${escapeHtml(estimate.cycles_per_hour)}.
       Richieste/ciclo stimate: ${escapeHtml(estimate.estimated_requests_per_cycle)}.
@@ -1681,7 +1744,7 @@ function renderReadiness(data) {
           <td>${escapeHtml(checks.bookmakers ? checks.bookmakers.message : "n/d")}</td>
         </tr>
         <tr>
-          <td>Campionati</td>
+          <td>Calcio / Tennis</td>
           <td>${readinessBadge(checks.competitions && checks.competitions.ok)}</td>
           <td>${escapeHtml(checks.competitions ? checks.competitions.message : "n/d")}</td>
         </tr>
@@ -1814,6 +1877,7 @@ async function refreshDashboardDataAutomatically() {
     loadProviderPlanSettings(),
     loadProviderBookmakerSettings(),
     loadCompetitions(),
+    loadTennisCompetitions(),
     loadMonitoredMarkets(),
     loadRecipients(),
     loadAlerts(),
@@ -1934,28 +1998,28 @@ async function saveAlertSettings() {
   }
 }
 
-async function loadCompetitions() {
-  const data = await api("/configuration/available-competitions");
-  dashboardState.competitions = data;
+async function loadSportCompetitions(sport, config) {
+  const data = await api(`/configuration/available-competitions?sport=${sport}`);
+  dashboardState[config.stateKey] = data;
   const activeCompetitions = data.filter((item) => item.is_active);
   const inactiveCompetitions = data.filter((item) => !item.is_active);
 
-  dashboardState.activeCompetitions = activeCompetitions.length;
+  dashboardState[config.activeStateKey] = activeCompetitions.length;
   renderDashboardSummary();
 
-  document.getElementById("competitions-summary").innerHTML = [
-    summaryCard("Campionati attivi", activeCompetitions.length),
-    summaryCard("Campionati disponibili", data.length),
+  document.getElementById(config.summaryId).innerHTML = [
+    summaryCard(config.activeLabel, activeCompetitions.length),
+    summaryCard(config.availableLabel, data.length),
     summaryCard("Non attivi", inactiveCompetitions.length)
   ].join("");
 
-  renderCompetitionsTable();
-  setFeedback("competitions-feedback", `Campionati disponibili: ${data.length}. Attivi: ${activeCompetitions.length}.`, "success");
+  renderSportCompetitionsTable(sport, config);
+  setFeedback(config.feedbackId, `${config.availableLabel}: ${data.length}. Attivi: ${activeCompetitions.length}.`, "success");
 }
 
-function renderCompetitionsTable() {
-  const data = dashboardState.competitions || [];
-  const query = (document.getElementById("competition-search")?.value || "").trim().toLowerCase();
+function renderSportCompetitionsTable(sport, config) {
+  const data = dashboardState[config.stateKey] || [];
+  const query = (document.getElementById(config.searchId)?.value || "").trim().toLowerCase();
   const activeCompetitions = data.filter((item) => item.is_active);
   const inactiveCompetitions = data.filter((item) => !item.is_active);
   const orderedCompetitions = activeCompetitions.concat(inactiveCompetitions);
@@ -1975,11 +2039,13 @@ function renderCompetitionsTable() {
     return !query || searchable.includes(query);
   });
 
-  let html = "<div class='table-wrap'><table><thead><tr><th>Campionato</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>";
+  let html = `<div class='table-wrap'><table><thead><tr><th>${sport === "tennis" ? "Torneo" : "Campionato"}</th><th>Paese</th><th>Stato</th><th>Azione</th></tr></thead><tbody>`;
 
   for (const item of filteredCompetitions) {
     const isMapped = Boolean(item.provider_league_slug);
-    const active = isMapped ? (item.is_active ? "Attivo" : "Non attivo") : "Non monitorabile";
+    const active = isMapped
+      ? (item.is_active ? (sport === "tennis" ? "Torneo attivo" : "Attivo") : "In attesa di attivazione")
+      : "Non monitorabile";
     const badgeClass = item.is_active && isMapped ? "badge ok" : "badge";
     const actionLabel = item.is_active ? "Disattiva" : "Attiva";
     const nextState = item.is_active ? "false" : "true";
@@ -1989,15 +2055,15 @@ function renderCompetitionsTable() {
       : ((item.name || "").includes(" - ") ? (item.name || "").split(" - ")[0] : "");
     const countryArg = JSON.stringify(normalizedCountry || "");
     const slugArg = JSON.stringify(item.provider_league_slug || "");
-    const mappingInputId = `competition-mapping-${item.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
+    const mappingInputId = `${sport}-mapping-${item.name.replace(/[^a-zA-Z0-9]/g, "-")}`;
     const mappingInputIdArg = JSON.stringify(mappingInputId);
     const providerDetail = isMapped
-      ? `<details><summary>Provider mappato</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
+      ? `<details><summary>${escapeHtml(config.mappedSummaryLabel)}</summary><span class="secondary-text">${escapeHtml(item.provider_league_slug)}</span></details>`
       : `<div class="inline-actions">
           <input id="${escapeHtml(mappingInputId)}" type="text" placeholder="provider-league-slug">
-          <button class="compact" onclick='saveCompetitionProviderMapping(${nameArg}, ${countryArg}, ${mappingInputIdArg})'>Salva mapping</button>
+          <button class="compact" onclick='saveSportProviderMapping(${JSON.stringify(sport)}, ${nameArg}, ${countryArg}, ${mappingInputIdArg})'>Salva mapping</button>
         </div>
-        <span class="secondary-text">Inserisci lo slug provider corretto per rendere il campionato monitorabile.</span>`;
+        <span class="secondary-text">${escapeHtml(config.missingMappingText)}</span>`;
 
     html += `<tr>
       <td>
@@ -2008,22 +2074,39 @@ function renderCompetitionsTable() {
       <td><span class="${badgeClass}">${active}</span></td>
       <td>
         ${isMapped
-          ? `<button class="compact ${item.is_active ? "" : "primary"}" onclick='monitorCompetition(${nameArg}, ${countryArg}, ${slugArg}, ${nextState})'>${actionLabel}</button>`
+          ? `<button class="compact ${item.is_active ? "" : "primary"}" onclick='monitorSportCompetition(${JSON.stringify(sport)}, ${nameArg}, ${countryArg}, ${slugArg}, ${nextState})'>${actionLabel}</button>`
           : `<button class="compact" disabled>Non mappato</button>`}
       </td>
     </tr>`;
   }
 
   html += "</tbody></table></div>";
-  document.getElementById("competitions-table").innerHTML = html;
+  document.getElementById(config.tableId).innerHTML = html;
 
   if (query) {
-    setFeedback("competitions-feedback", `Filtro campionati: ${filteredCompetitions.length} risultati su ${data.length}.`, "");
+    setFeedback(config.feedbackId, `Filtro ${config.entityPlural}: ${filteredCompetitions.length} risultati su ${data.length}.`, "");
   }
 }
 
-async function monitorCompetition(name, country, slug, isActive) {
-  setFeedback("competitions-feedback", `${isActive ? "Attivazione" : "Disattivazione"} campionato in corso...`, "");
+async function loadCompetitions() {
+  return loadSportCompetitions("football", sportCompetitionConfigs.football);
+}
+
+async function loadTennisCompetitions() {
+  return loadSportCompetitions("tennis", sportCompetitionConfigs.tennis);
+}
+
+function renderCompetitionsTable() {
+  return renderSportCompetitionsTable("football", sportCompetitionConfigs.football);
+}
+
+function renderTennisCompetitionsTable() {
+  return renderSportCompetitionsTable("tennis", sportCompetitionConfigs.tennis);
+}
+
+async function monitorSportCompetition(sport, name, country, slug, isActive) {
+  const config = sportCompetitionConfigs[sport];
+  setFeedback(config.feedbackId, `${isActive ? "Attivazione" : "Disattivazione"} ${config.entitySingular} in corso...`, "");
 
   try {
     await api("/configuration/monitored-competitions", {
@@ -2032,30 +2115,37 @@ async function monitorCompetition(name, country, slug, isActive) {
       body: JSON.stringify({
         competition_name: name,
         country: country || null,
+        sport,
         provider: "odds_api_io",
         provider_league_slug: slug || null,
         is_active: isActive
       })
     });
-    await loadCompetitions();
-    setFeedback("competitions-feedback", `Campionato ${isActive ? "attivato" : "disattivato"}: ${name}.`, "success");
+    await loadSportCompetitions(sport, config);
+    await loadProviderPlanSettings();
+    setFeedback(config.feedbackId, `${config.entitySingular} ${isActive ? "attivato" : "disattivato"}: ${name}.`, "success");
     await loadStatus();
   } catch (error) {
-    setFeedback("competitions-feedback", "Operazione campionato non completata: " + error.message, "error");
+    setFeedback(config.feedbackId, `Operazione ${config.entitySingular} non completata: ` + error.message, "error");
   }
 }
 
 
-async function saveCompetitionProviderMapping(name, country, inputId) {
+async function monitorCompetition(name, country, slug, isActive) {
+  return monitorSportCompetition("football", name, country, slug, isActive);
+}
+
+async function saveSportProviderMapping(sport, name, country, inputId) {
+  const config = sportCompetitionConfigs[sport];
   const input = document.getElementById(inputId);
   const providerLeagueSlug = input ? input.value.trim() : "";
 
   if (!providerLeagueSlug) {
-    setFeedback("competitions-feedback", "Inserisci uno slug provider prima di salvare il mapping.", "error");
+    setFeedback(config.feedbackId, "Inserisci uno slug provider prima di salvare il mapping.", "error");
     return;
   }
 
-  setFeedback("competitions-feedback", `Salvataggio mapping provider per ${name}...`, "");
+  setFeedback(config.feedbackId, `Salvataggio mapping provider per ${name}...`, "");
 
   try {
     await api("/configuration/competitions/provider-mapping", {
@@ -2064,58 +2154,81 @@ async function saveCompetitionProviderMapping(name, country, inputId) {
       body: JSON.stringify({
         competition_name: name,
         country: country || null,
+        sport,
         provider_league_slug: providerLeagueSlug
       })
     });
 
-    await loadCompetitions();
+    await loadSportCompetitions(sport, config);
     await loadProviderPlanSettings();
-    setFeedback("competitions-feedback", `Mapping provider salvato per ${name}. Ora il campionato è monitorabile.`, "success");
+    setFeedback(config.feedbackId, `Mapping provider salvato per ${name}. Ora ${config.entitySingular} è monitorabile.`, "success");
   } catch (error) {
-    setFeedback("competitions-feedback", "Mapping provider non salvato: " + error.message, "error");
+    setFeedback(config.feedbackId, "Mapping provider non salvato: " + error.message, "error");
   }
 }
+
+async function saveCompetitionProviderMapping(name, country, inputId) {
+  return saveSportProviderMapping("football", name, country, inputId);
+}
+
+async function refreshSportProviderCompetitions(sport) {
+  const config = sportCompetitionConfigs[sport];
+  setFeedback(config.feedbackId, `Aggiornamento ${config.entityPlural} dal provider in corso...`, "");
+
+  try {
+    const data = await api(`/configuration/provider-competitions/refresh?limit=10&sport=${sport}`, {
+      method: "POST"
+    });
+
+    await loadSportCompetitions(sport, config);
+    await loadStatus();
+    setFeedback(
+      config.feedbackId,
+      `${config.availableLabel} rilevati dagli eventi disponibili ora: ${data.competitions_found} da ${data.events_received} eventi.`,
+      "success"
+    );
+  } catch (error) {
+    setFeedback(config.feedbackId, `Aggiornamento ${config.entityPlural} non completato. ` + error.message, "error");
+  }
+}
+
 
 async function refreshProviderCompetitions() {
-  setFeedback("competitions-feedback", "Aggiornamento campionati dal provider in corso...", "");
-
-  try {
-    const data = await api("/configuration/provider-competitions/refresh?limit=10", {
-      method: "POST"
-    });
-
-    await loadCompetitions();
-    await loadStatus();
-    setFeedback(
-      "competitions-feedback",
-      `Campionati rilevati dagli eventi disponibili ora: ${data.competitions_found} da ${data.events_received} eventi.`,
-      "success"
-    );
-  } catch (error) {
-    setFeedback("competitions-feedback", "Aggiornamento campionati non completato. " + error.message, "error");
-  }
+  return refreshSportProviderCompetitions("football");
 }
 
+async function refreshProviderTennisCompetitions() {
+  return refreshSportProviderCompetitions("tennis");
+}
 
-async function refreshProviderLeagues() {
-  setFeedback("competitions-feedback", "Aggiornamento leghe e slug dal provider in corso...", "");
+async function refreshSportProviderLeagues(sport) {
+  const config = sportCompetitionConfigs[sport];
+  setFeedback(config.feedbackId, `Aggiornamento ${config.entityPlural} e slug dal provider in corso...`, "");
 
   try {
-    const data = await api("/configuration/provider-leagues/refresh", {
+    const data = await api(`/configuration/provider-leagues/refresh?sport=${sport}`, {
       method: "POST"
     });
 
-    await loadCompetitions();
+    await loadSportCompetitions(sport, config);
     await loadProviderPlanSettings();
     await loadStatus();
     setFeedback(
-      "competitions-feedback",
-      `Leghe provider aggiornate: ${data.leagues_upserted}. Campionati monitorati aggiornati: ${data.monitored_updated}.`,
+      config.feedbackId,
+      `Leghe provider aggiornate: ${data.leagues_upserted}. ${config.availableLabel} monitorati aggiornati: ${data.monitored_updated}.`,
       "success"
     );
   } catch (error) {
-    setFeedback("competitions-feedback", "Aggiornamento leghe provider non completato. " + error.message, "error");
+    setFeedback(config.feedbackId, "Aggiornamento leghe provider non completato. " + error.message, "error");
   }
+}
+
+async function refreshProviderLeagues() {
+  return refreshSportProviderLeagues("football");
+}
+
+async function refreshProviderTennisLeagues() {
+  return refreshSportProviderLeagues("tennis");
 }
 
 async function loadMonitoredMarkets() {
@@ -2498,6 +2611,7 @@ loadProviderUsage();
 startDashboardAutoRefresh();
 loadProviderBookmakerSettings();
 loadCompetitions();
+loadTennisCompetitions();
 loadMonitoredMarkets();
 loadRecipients();
 loadAlerts();

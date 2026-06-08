@@ -55,8 +55,16 @@ def _get_or_create_competition(
     db,
     name: str,
     provider_league_slug: str = None,
+    sport: str = "football",
 ) -> Competition:
-    competition = db.query(Competition).filter(Competition.name == name).first()
+    competition = (
+        db.query(Competition)
+        .filter(
+            Competition.name == name,
+            Competition.sport == sport,
+        )
+        .first()
+    )
     if competition:
         if provider_league_slug and not competition.provider_league_slug:
             competition.provider_league_slug = provider_league_slug
@@ -66,6 +74,7 @@ def _get_or_create_competition(
     competition = Competition(
         name=name,
         country="Unknown",
+        sport=sport,
         provider_league_slug=provider_league_slug,
     )
     db.add(competition)
@@ -89,6 +98,7 @@ def _get_or_create_event(db, event_data: Dict) -> Event:
         db,
         event_data.get("league_name") or "Unknown competition",
         event_data.get("league_slug"),
+        event_data.get("sport") or "football",
     )
     home_team = _get_or_create_team(db, event_data.get("home_team") or "Unknown home")
     away_team = _get_or_create_team(db, event_data.get("away_team") or "Unknown away")
@@ -563,12 +573,13 @@ def _normalize_supported_odd_data(odd_data: Dict) -> Optional[Dict]:
     return None
 
 
-def _get_active_monitored_competitions(db):
-    return (
-        db.query(MonitoredCompetition)
-        .filter(MonitoredCompetition.is_active.is_(True))
-        .all()
-    )
+def _get_active_monitored_competitions(db, sport: str = None):
+    query = db.query(MonitoredCompetition).filter(MonitoredCompetition.is_active.is_(True))
+
+    if sport:
+        query = query.filter(MonitoredCompetition.sport == sport)
+
+    return query.all()
 
 
 def _get_active_monitored_competition_names(active_competitions) -> set:
@@ -586,6 +597,14 @@ def _get_active_provider_league_slugs(active_competitions) -> list:
 def _is_monitored_competition(event_data: Dict, active_competitions: set) -> bool:
     league_name = event_data.get("league_name")
     return league_name in active_competitions
+
+
+def _sport_supports_market(sport: str, odd_data: Dict) -> bool:
+    if sport != "tennis":
+        return True
+
+    market_name = odd_data.get("market_name") or ""
+    return market_name in {"ML", "Moneyline"} and not _line_is_present(odd_data.get("line"))
 
 
 def _find_previous_snapshot(db, event_id: int, odd_data: Dict) -> Optional[OddsSnapshot]:
@@ -630,8 +649,8 @@ def _recent_alert_exists(
     return existing_alert is not None
 
 
-def ingest_odds_sample(db, limit: int = 3) -> Dict:
-    active_competitions = _get_active_monitored_competitions(db)
+def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -> Dict:
+    active_competitions = _get_active_monitored_competitions(db, sport=sport)
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
     active_market_names = _get_active_monitored_market_names(db)
@@ -640,6 +659,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     provider = OddsApiIoProvider(
         bookmakers_csv=get_configured_bookmakers_csv(db),
         usage_db=db,
+        sport=sport,
     )
     sample = provider.get_sample(
         limit=limit,
@@ -647,6 +667,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     )
 
     events_by_provider_id = {}
+    event_sports_by_provider_id = {}
     ignored_events = 0
     ignored_events_breakdown = _empty_ignored_events_breakdown()
     ignored_odds_breakdown = _empty_ignored_odds_breakdown()
@@ -654,6 +675,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     excluded_market_breakdown_by_name = _empty_ignored_market_breakdown_by_name()
 
     for event_data in sample["events"]:
+        event_data["sport"] = event_data.get("sport") or sport
         if not _is_monitored_competition(event_data, active_competition_names):
             ignored_events += 1
             ignored_events_breakdown["inactive_competition"] += 1
@@ -661,6 +683,9 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
 
         event = _get_or_create_event(db, event_data)
         events_by_provider_id[event_data["provider_event_id"]] = event
+        event_sports_by_provider_id[event_data["provider_event_id"]] = (
+            event_data.get("sport") or sport
+        )
 
     alert_settings = get_or_create_alert_settings(db)
 
@@ -676,8 +701,29 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
     ignored_odds = 0
     processed_odds = 0
     excluded_odds = 0
+    tennis_alerts_skipped = 0
 
     for odd_data in sample["odds"]:
+        odd_sport = event_sports_by_provider_id.get(
+            odd_data.get("provider_event_id"),
+            sport,
+        )
+        if not _sport_supports_market(odd_sport, odd_data):
+            ignored_odds += 1
+            excluded_odds += 1
+            ignored_odds_breakdown["unsupported_market"] += 1
+            _increment_ignored_market_name(
+                ignored_market_breakdown_by_name,
+                "unsupported_market",
+                odd_data,
+            )
+            _increment_ignored_market_name(
+                excluded_market_breakdown_by_name,
+                "unsupported_market",
+                odd_data,
+            )
+            continue
+
         ignored_market_reason = _ignored_market_reason(
             odd_data,
             active_market_names,
@@ -753,6 +799,11 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         inserted_snapshots += 1
 
         if previous_snapshot:
+            if event.competition.sport != "football":
+                tennis_alerts_skipped += 1
+                ignored_odds_breakdown["outside_alert_range"] += 1
+                continue
+
             variation = calculate_variation(
                 previous_snapshot.odds_decimal,
                 odd_data["odds_decimal"],
@@ -816,6 +867,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
 
     return {
         "provider": sample["provider"],
+        "sport": sport,
         "events_received": sample["events_count"],
         "events_ignored": ignored_events,
         "ignored_events_breakdown": ignored_events_breakdown,
@@ -836,6 +888,7 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
         "alerts_created": created_alerts,
         "duplicate_alerts_skipped": skipped_duplicate_alerts,
         "notification_logs_created": notification_logs_created,
+        "tennis_alerts_skipped": tennis_alerts_skipped,
         "alert_settings": {
             "min_percent": alert_settings.min_percent,
             "max_percent": alert_settings.max_percent,
@@ -843,3 +896,87 @@ def ingest_odds_sample(db, limit: int = 3) -> Dict:
             "deduplication_minutes": alert_settings.deduplication_minutes,
         },
     }
+
+
+def _merge_counter_dicts(results, key):
+    merged = {}
+    for result in results:
+        for item_key, value in result.get(key, {}).items():
+            merged[item_key] = merged.get(item_key, 0) + value
+    return merged
+
+
+def _merge_ingestion_results(results):
+    if len(results) == 1:
+        result = dict(results[0])
+        result["sports_processed"] = [results[0]["sport"]]
+        result["sport_results"] = results
+        return result
+
+    base = dict(results[0])
+    numeric_keys = [
+        "events_received",
+        "events_ignored",
+        "active_competitions_count",
+        "active_provider_league_slugs_count",
+        "odds_received",
+        "odds_ignored",
+        "odds_processed",
+        "odds_excluded",
+        "excluded_disabled_market",
+        "excluded_unsupported_line",
+        "snapshots_inserted",
+        "snapshots_unchanged",
+        "alerts_created",
+        "duplicate_alerts_skipped",
+        "notification_logs_created",
+        "tennis_alerts_skipped",
+    ]
+
+    for key in numeric_keys:
+        base[key] = sum(result.get(key, 0) for result in results)
+
+    base["sport"] = "multi"
+    base["sports_processed"] = [result["sport"] for result in results]
+    base["sport_results"] = results
+    base["ignored_events_breakdown"] = _merge_counter_dicts(
+        results,
+        "ignored_events_breakdown",
+    )
+    base["ignored_odds_breakdown"] = _merge_counter_dicts(
+        results,
+        "ignored_odds_breakdown",
+    )
+    base["ignored_market_breakdown_by_name"] = _merge_counter_dicts(
+        results,
+        "ignored_market_breakdown_by_name",
+    )
+    base["excluded_market_breakdown_by_name"] = _merge_counter_dicts(
+        results,
+        "excluded_market_breakdown_by_name",
+    )
+    base["active_markets_count"] = max(
+        result.get("active_markets_count", 0)
+        for result in results
+    )
+    return base
+
+
+def ingest_odds_sample(db, limit: int = 3) -> Dict:
+    active_competitions = _get_active_monitored_competitions(db)
+    active_sports = sorted(
+        {
+            item.sport or "football"
+            for item in active_competitions
+            if item.sport in {"football", "tennis"}
+        }
+    )
+
+    if not active_sports:
+        active_sports = ["football"]
+
+    results = [
+        _ingest_odds_sample_for_sport(db=db, limit=limit, sport=sport)
+        for sport in active_sports
+    ]
+    return _merge_ingestion_results(results)

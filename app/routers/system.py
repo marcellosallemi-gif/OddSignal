@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Alert, Event, MonitoredMarket, NotificationLog, OddsSnapshot
+from app.models import Alert, Event, MonitoredCompetition, MonitoredMarket, NotificationLog, OddsSnapshot
 from app.services.telegram_notifier import (
     get_active_telegram_recipients,
     is_telegram_configured,
@@ -16,7 +16,7 @@ from app.services.provider_bookmaker_settings_service import get_configured_book
 from app.services.provider_usage_service import get_provider_usage_status
 from app.services.provider_plan_settings_service import (
     estimate_provider_hourly_requests,
-    get_active_mapped_competitions_count,
+    get_active_mapped_competitions_breakdown,
     get_or_create_provider_plan_settings,
 )
 
@@ -30,10 +30,19 @@ def get_system_status(db: Session = Depends(get_db)):
 
     alert_settings = get_or_create_alert_settings(db)
     scheduler_settings = get_or_create_scheduler_settings(db)
+    active_mapped_breakdown = get_active_mapped_competitions_breakdown(db)
 
     return {
         "provider": os.getenv("ODDS_PROVIDER", "unknown"),
         "sport": os.getenv("ODDS_API_SPORT", "unknown"),
+        "sports": {
+            "football": {
+                "active_mapped_competitions_count": active_mapped_breakdown["football"],
+            },
+            "tennis": {
+                "active_mapped_competitions_count": active_mapped_breakdown["tennis"],
+            },
+        },
         "bookmakers": bookmakers,
         "scheduler": {
             "enabled": scheduler_settings.enabled,
@@ -55,6 +64,7 @@ def get_system_status(db: Session = Depends(get_db)):
             "odds_snapshots": db.query(OddsSnapshot).count(),
             "alerts": db.query(Alert).count(),
             "notification_logs": db.query(NotificationLog).count(),
+            "monitored_competitions": db.query(MonitoredCompetition).count(),
         },
     }
 
@@ -67,11 +77,13 @@ def get_system_readiness(db: Session = Depends(get_db)):
     bookmakers = get_configured_bookmakers(db)
     provider_usage = get_provider_usage_status(db)
 
-    active_mapped_competitions_count = get_active_mapped_competitions_count(db)
+    active_mapped_breakdown = get_active_mapped_competitions_breakdown(db)
     usage_estimate = estimate_provider_hourly_requests(
         poll_interval_seconds=scheduler_settings.poll_interval_seconds,
         event_limit=scheduler_settings.event_limit,
-        active_mapped_competitions_count=active_mapped_competitions_count,
+        active_mapped_competitions_count=active_mapped_breakdown["total"],
+        active_mapped_football_count=active_mapped_breakdown["football"],
+        active_mapped_tennis_count=active_mapped_breakdown["tennis"],
     )
 
     estimated_requests_per_hour = usage_estimate["estimated_requests_per_hour"]
@@ -94,7 +106,7 @@ def get_system_readiness(db: Session = Depends(get_db)):
     )
     markets_ok = active_markets_count > 0 or monitored_markets_count == 0
 
-    competitions_ok = active_mapped_competitions_count > 0
+    competitions_ok = active_mapped_breakdown["total"] > 0
 
     telegram_configured = is_telegram_configured()
     active_telegram_recipients = get_active_telegram_recipients(db)
@@ -139,11 +151,13 @@ def get_system_readiness(db: Session = Depends(get_db)):
         },
         "competitions": {
             "ok": competitions_ok,
-            "active_mapped_competitions_count": active_mapped_competitions_count,
+            "active_mapped_competitions_count": active_mapped_breakdown["total"],
+            "active_mapped_football_count": active_mapped_breakdown["football"],
+            "active_mapped_tennis_count": active_mapped_breakdown["tennis"],
             "message": (
-                "Almeno un campionato attivo e mappato è disponibile."
+                "Almeno un campionato o torneo attivo e mappato è disponibile."
                 if competitions_ok
-                else "Nessun campionato attivo e mappato disponibile."
+                else "Nessun campionato o torneo attivo e mappato disponibile."
             ),
         },
         "markets": {

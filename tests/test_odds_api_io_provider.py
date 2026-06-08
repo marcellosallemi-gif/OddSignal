@@ -50,6 +50,16 @@ def test_build_events_url_contains_football_sport(monkeypatch):
     assert query["sport"] == ["football"]
 
 
+def test_build_events_url_uses_explicit_tennis_sport(monkeypatch):
+    monkeypatch.setenv("ODDS_API_SKIP_DOTENV", "1")
+    monkeypatch.setenv("ODDS_API_KEY", TEST_API_KEY)
+    monkeypatch.setenv("ODDS_API_SPORT", "football")
+
+    query = parse_query(OddsApiIoProvider(sport="tennis").build_events_url())
+
+    assert query["sport"] == ["tennis"]
+
+
 def test_build_events_url_contains_pending_status(monkeypatch):
     monkeypatch.setenv("ODDS_API_SKIP_DOTENV", "1")
     monkeypatch.setenv("ODDS_API_KEY", TEST_API_KEY)

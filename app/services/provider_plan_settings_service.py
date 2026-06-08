@@ -103,6 +103,8 @@ def estimate_provider_hourly_requests(
     poll_interval_seconds: int,
     event_limit: int,
     active_mapped_competitions_count: int,
+    active_mapped_football_count: int = 0,
+    active_mapped_tennis_count: int = 0,
 ):
     if poll_interval_seconds <= 0:
         return None
@@ -115,18 +117,32 @@ def estimate_provider_hourly_requests(
         "cycles_per_hour": round(cycles_per_hour, 2),
         "estimated_requests_per_cycle": estimated_requests_per_cycle,
         "estimated_requests_per_hour": round(estimated_requests_per_hour, 2),
+        "active_mapped_football_count": active_mapped_football_count,
+        "active_mapped_tennis_count": active_mapped_tennis_count,
     }
 
 
-def get_active_mapped_competitions_count(db):
-    return (
-        db.query(MonitoredCompetition)
-        .filter(
-            MonitoredCompetition.is_active == True,  # noqa: E712
-            MonitoredCompetition.provider_league_slug.isnot(None),
-        )
-        .count()
+def get_active_mapped_competitions_count(db, sport=None):
+    query = db.query(MonitoredCompetition).filter(
+        MonitoredCompetition.is_active == True,  # noqa: E712
+        MonitoredCompetition.provider_league_slug.isnot(None),
     )
+
+    if sport:
+        query = query.filter(MonitoredCompetition.sport == sport)
+
+    return query.count()
+
+
+def get_active_mapped_competitions_breakdown(db):
+    football_count = get_active_mapped_competitions_count(db, sport="football")
+    tennis_count = get_active_mapped_competitions_count(db, sport="tennis")
+
+    return {
+        "football": football_count,
+        "tennis": tennis_count,
+        "total": football_count + tennis_count,
+    }
 
 
 
@@ -144,11 +160,13 @@ def validate_scheduler_against_provider_plan(
     if plan.hourly_request_limit is None:
         return None
 
-    active_mapped_competitions_count = get_active_mapped_competitions_count(db)
+    active_mapped_breakdown = get_active_mapped_competitions_breakdown(db)
     estimate = estimate_provider_hourly_requests(
         poll_interval_seconds=poll_interval_seconds,
         event_limit=event_limit,
-        active_mapped_competitions_count=active_mapped_competitions_count,
+        active_mapped_competitions_count=active_mapped_breakdown["total"],
+        active_mapped_football_count=active_mapped_breakdown["football"],
+        active_mapped_tennis_count=active_mapped_breakdown["tennis"],
     )
 
     estimated_requests_per_hour = estimate["estimated_requests_per_hour"]

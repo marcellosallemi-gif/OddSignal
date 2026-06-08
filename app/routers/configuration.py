@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -25,6 +25,7 @@ from app.services.telegram_notifier import (
 
 
 router = APIRouter(prefix="/configuration", tags=["configuration"])
+SUPPORTED_SPORTS = {"football", "tennis"}
 TELEGRAM_TEST_MESSAGE = (
     "OddSignal - test notifiche Telegram. Se ricevi questo messaggio, "
     "il bot online è configurato correttamente."
@@ -106,19 +107,43 @@ def _utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _normalize_sport(sport: str) -> str:
+    normalized = (sport or "football").strip().lower()
+    if normalized == "calcio":
+        normalized = "football"
+    if normalized not in SUPPORTED_SPORTS:
+        raise HTTPException(
+            status_code=400,
+            detail="Sport non supportato. Usa football o tennis.",
+        )
+    return normalized
+
+
 @router.get("/available-competitions")
-def get_available_competitions(db: Session = Depends(get_db)):
-    competitions = db.query(Competition).order_by(Competition.name).all()
+def get_available_competitions(
+    sport: str = Query(default="football"),
+    db: Session = Depends(get_db),
+):
+    sport = _normalize_sport(sport)
+    competitions = (
+        db.query(Competition)
+        .filter(Competition.sport == sport)
+        .order_by(Competition.name)
+        .all()
+    )
 
     monitored = {
         item.competition_name: item
-        for item in db.query(MonitoredCompetition).all()
+        for item in db.query(MonitoredCompetition)
+        .filter(MonitoredCompetition.sport == sport)
+        .all()
     }
 
     return [
         {
             "name": competition.name,
             "country": competition.country,
+            "sport": competition.sport,
             "provider_league_slug": competition.provider_league_slug,
             "is_monitored": competition.name in monitored,
             "is_active": monitored[competition.name].is_active
@@ -140,6 +165,7 @@ def update_competition_provider_mapping(
     competition_name = payload.competition_name.strip()
     provider_league_slug = payload.provider_league_slug.strip()
     country = payload.country.strip() if payload.country else None
+    sport = _normalize_sport(payload.sport)
 
     if not competition_name:
         raise HTTPException(status_code=400, detail="Il nome campionato è obbligatorio.")
@@ -147,7 +173,14 @@ def update_competition_provider_mapping(
     if not provider_league_slug:
         raise HTTPException(status_code=400, detail="Lo slug provider è obbligatorio.")
 
-    competition = db.query(Competition).filter(Competition.name == competition_name).first()
+    competition = (
+        db.query(Competition)
+        .filter(
+            Competition.name == competition_name,
+            Competition.sport == sport,
+        )
+        .first()
+    )
 
     if competition:
         competition.provider_league_slug = provider_league_slug
@@ -157,13 +190,17 @@ def update_competition_provider_mapping(
         competition = Competition(
             name=competition_name,
             country=country or "Unknown",
+            sport=sport,
             provider_league_slug=provider_league_slug,
         )
         db.add(competition)
 
     monitored = (
         db.query(MonitoredCompetition)
-        .filter(MonitoredCompetition.competition_name == competition_name)
+        .filter(
+            MonitoredCompetition.competition_name == competition_name,
+            MonitoredCompetition.sport == sport,
+        )
         .first()
     )
 
@@ -178,6 +215,7 @@ def update_competition_provider_mapping(
     return {
         "name": competition.name,
         "country": competition.country,
+        "sport": competition.sport,
         "provider_league_slug": competition.provider_league_slug,
         "is_monitored": monitored is not None,
         "is_active": monitored.is_active if monitored else False,
@@ -195,11 +233,16 @@ def _country_from_league_name(name: str):
 
 
 @router.post("/provider-leagues/refresh")
-def refresh_provider_leagues(db: Session = Depends(get_db)):
+def refresh_provider_leagues(
+    sport: str = Query(default="football"),
+    db: Session = Depends(get_db),
+):
+    sport = _normalize_sport(sport)
     try:
         provider = OddsApiIoProvider(
             bookmakers_csv=get_configured_bookmakers_csv(db),
             usage_db=db,
+            sport=sport,
         )
         provider_leagues = provider.get_leagues()
     except RuntimeError as exc:
@@ -219,28 +262,41 @@ def refresh_provider_leagues(db: Session = Depends(get_db)):
 
         country = _country_from_league_name(league_name)
 
-        competition = db.query(Competition).filter(Competition.name == league_name).first()
+        competition = (
+            db.query(Competition)
+            .filter(
+                Competition.name == league_name,
+                Competition.sport == sport,
+            )
+            .first()
+        )
 
         if competition:
             competition.provider_league_slug = league_slug
+            competition.sport = sport
             if competition.country in {None, "", "Unknown"}:
                 competition.country = country
         else:
             competition = Competition(
                 name=league_name,
                 country=country,
+                sport=sport,
                 provider_league_slug=league_slug,
             )
             db.add(competition)
 
         monitored = (
             db.query(MonitoredCompetition)
-            .filter(MonitoredCompetition.competition_name == league_name)
+            .filter(
+                MonitoredCompetition.competition_name == league_name,
+                MonitoredCompetition.sport == sport,
+            )
             .first()
         )
 
         if monitored:
             monitored.provider_league_slug = league_slug
+            monitored.sport = sport
             if not monitored.country or monitored.country == "Unknown":
                 monitored.country = country
             monitored_updated += 1
@@ -250,6 +306,7 @@ def refresh_provider_leagues(db: Session = Depends(get_db)):
             {
                 "name": league_name,
                 "country": country,
+                "sport": sport,
                 "provider_league_slug": league_slug,
                 "events_count": league.get("eventsCount"),
             }
@@ -259,7 +316,7 @@ def refresh_provider_leagues(db: Session = Depends(get_db)):
 
     return {
         "provider": "odds_api_io",
-        "sport": "football",
+        "sport": sport,
         "leagues_received": len(provider_leagues),
         "leagues_upserted": leagues_upserted,
         "monitored_updated": monitored_updated,
@@ -270,21 +327,28 @@ def refresh_provider_leagues(db: Session = Depends(get_db)):
 @router.post("/provider-competitions/refresh")
 def refresh_provider_competitions(
     limit: int = 10,
+    sport: str = Query(default="football"),
     db: Session = Depends(get_db),
 ):
     try:
-        return refresh_provider_competitions_from_provider(db=db, limit=limit)
+        return refresh_provider_competitions_from_provider(
+            db=db,
+            limit=limit,
+            sport=sport,
+        )
     except RuntimeError as exc:
         status_code, detail = classify_provider_error(exc)
         raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
-def refresh_provider_competitions_from_provider(db, limit: int = 10):
+def refresh_provider_competitions_from_provider(db, limit: int = 10, sport: str = "football"):
     safe_limit = max(1, min(limit, 50))
+    sport = _normalize_sport(sport)
 
     provider = OddsApiIoProvider(
         bookmakers_csv=get_configured_bookmakers_csv(db),
         usage_db=db,
+        sport=sport,
     )
     first_bookmaker = provider.bookmakers.split(",")[0].strip()
     provider_events = provider.get_events(
@@ -303,23 +367,33 @@ def refresh_provider_competitions_from_provider(db, limit: int = 10):
             "name": league_name,
             "provider_league_slug": event.get("league_slug"),
             "country": "Unknown",
+            "sport": sport,
         }
 
     competitions = []
     competitions_upserted = 0
 
     for item in sorted(competitions_by_name.values(), key=lambda value: value["name"]):
-        existing = db.query(Competition).filter(Competition.name == item["name"]).first()
+        existing = (
+            db.query(Competition)
+            .filter(
+                Competition.name == item["name"],
+                Competition.sport == sport,
+            )
+            .first()
+        )
 
         if existing:
             if item["provider_league_slug"]:
                 existing.provider_league_slug = item["provider_league_slug"]
+            existing.sport = sport
             if not existing.country:
                 existing.country = "Unknown"
         else:
             existing = Competition(
                 name=item["name"],
                 country=item["country"],
+                sport=sport,
                 provider_league_slug=item["provider_league_slug"],
             )
             db.add(existing)
@@ -331,6 +405,7 @@ def refresh_provider_competitions_from_provider(db, limit: int = 10):
 
     return {
         "provider": "odds_api_io",
+        "sport": sport,
         "events_received": len(events),
         "competitions_found": len(competitions),
         "competitions_upserted": competitions_upserted,
@@ -342,9 +417,14 @@ def refresh_provider_competitions_from_provider(db, limit: int = 10):
     "/monitored-competitions",
     response_model=List[MonitoredCompetitionResponse],
 )
-def get_monitored_competitions(db: Session = Depends(get_db)):
+def get_monitored_competitions(
+    sport: str = Query(default="football"),
+    db: Session = Depends(get_db),
+):
+    sport = _normalize_sport(sport)
     return (
         db.query(MonitoredCompetition)
+        .filter(MonitoredCompetition.sport == sport)
         .order_by(MonitoredCompetition.competition_name)
         .all()
     )
@@ -358,14 +438,19 @@ def upsert_monitored_competition(
     payload: MonitoredCompetitionCreate,
     db: Session = Depends(get_db),
 ):
+    sport = _normalize_sport(payload.sport)
     existing = (
         db.query(MonitoredCompetition)
-        .filter(MonitoredCompetition.competition_name == payload.competition_name)
+        .filter(
+            MonitoredCompetition.competition_name == payload.competition_name,
+            MonitoredCompetition.sport == sport,
+        )
         .first()
     )
 
     if existing:
         existing.country = payload.country
+        existing.sport = sport
         existing.provider = payload.provider
         existing.provider_league_slug = payload.provider_league_slug
         existing.is_active = payload.is_active
@@ -376,6 +461,7 @@ def upsert_monitored_competition(
     item = MonitoredCompetition(
         competition_name=payload.competition_name,
         country=payload.country,
+        sport=sport,
         provider=payload.provider,
         provider_league_slug=payload.provider_league_slug,
         is_active=payload.is_active,
@@ -765,7 +851,7 @@ from app.services.scheduler_settings_service import (
 from app.services.odds_scheduler import odds_scheduler
 from app.services.provider_plan_settings_service import (
     estimate_provider_hourly_requests,
-    get_active_mapped_competitions_count,
+    get_active_mapped_competitions_breakdown,
     get_or_create_provider_plan_settings,
     update_provider_plan_settings,
     validate_scheduler_against_provider_plan,
@@ -853,12 +939,14 @@ def _provider_plan_recommendation(
 def _provider_plan_response(db):
     plan = get_or_create_provider_plan_settings(db)
     scheduler = get_or_create_scheduler_settings(db)
-    active_mapped_competitions_count = get_active_mapped_competitions_count(db)
+    active_mapped_breakdown = get_active_mapped_competitions_breakdown(db)
 
     estimate = estimate_provider_hourly_requests(
         poll_interval_seconds=scheduler.poll_interval_seconds,
         event_limit=scheduler.event_limit,
-        active_mapped_competitions_count=active_mapped_competitions_count,
+        active_mapped_competitions_count=active_mapped_breakdown["total"],
+        active_mapped_football_count=active_mapped_breakdown["football"],
+        active_mapped_tennis_count=active_mapped_breakdown["tennis"],
     )
 
     estimated_requests_per_hour = estimate["estimated_requests_per_hour"]
@@ -875,7 +963,9 @@ def _provider_plan_response(db):
         "max_bookmakers": plan.max_bookmakers,
         "created_at": plan.created_at,
         "usage_estimate": {
-            "active_mapped_competitions_count": active_mapped_competitions_count,
+            "active_mapped_competitions_count": active_mapped_breakdown["total"],
+            "active_mapped_football_count": active_mapped_breakdown["football"],
+            "active_mapped_tennis_count": active_mapped_breakdown["tennis"],
             "poll_interval_seconds": scheduler.poll_interval_seconds,
             "event_limit": scheduler.event_limit,
             "cycles_per_hour": estimate["cycles_per_hour"],

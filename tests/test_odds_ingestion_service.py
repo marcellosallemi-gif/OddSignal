@@ -36,10 +36,11 @@ EXPECTED_IGNORED_EVENTS_BREAKDOWN_KEYS = {
 
 
 
-def add_monitored_competition(db, competition_name="Test League"):
+def add_monitored_competition(db, competition_name="Test League", sport="football"):
     item = MonitoredCompetition(
         competition_name=competition_name,
         country="Test",
+        sport=sport,
         provider="odds_api_io",
         is_active=True,
         created_at=datetime.utcnow(),
@@ -106,6 +107,49 @@ class FakeProvider:
                     "provider_event_id": "fake-event-1",
                     "event": "Home FC vs Away FC",
                     "league_name": "Test League",
+                    "bookmaker": "Stake",
+                    "market_name": "ML",
+                    "selection": "home",
+                    "line": None,
+                    "odds_decimal": self.odds_decimal,
+                    "updated_at": "2026-08-01T10:00:00Z",
+                    "raw": {},
+                }
+            ],
+        }
+
+
+class FakeTennisProvider:
+    odds_decimal = 1.80
+
+    def get_sample(self, limit=3, league_slugs=None):
+        return {
+            "provider": "odds_api_io",
+            "sport": "tennis",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": 1,
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-tennis-event-1",
+                    "sport": "tennis",
+                    "sport_name": "Tennis",
+                    "league_name": "ATP Safe Test",
+                    "league_slug": "atp-safe-test",
+                    "home_team": "Sinner",
+                    "away_team": "Alcaraz",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-tennis-event-1",
+                    "event": "Sinner vs Alcaraz",
+                    "league_name": "ATP Safe Test",
                     "bookmaker": "Stake",
                     "market_name": "ML",
                     "selection": "home",
@@ -219,6 +263,38 @@ def test_ingestion_creates_standard_alert_on_eligible_variation(monkeypatch, tmp
         assert alert.alert_type == "standard_alert"
         assert alert.variation_percent == 10.0
         assert alert.direction == "increase"
+    finally:
+        db.close()
+
+
+def test_tennis_ingestion_stores_safe_market_without_creating_alert(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(
+            db,
+            competition_name="ATP Safe Test",
+            sport="tennis",
+        )
+        add_monitored_market(db, market_name="ML", is_active=True)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeTennisProvider(),
+        )
+
+        FakeTennisProvider.odds_decimal = 1.80
+        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        FakeTennisProvider.odds_decimal = 1.98
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["sport"] == "tennis"
+        assert result["snapshots_inserted"] == 1
+        assert result["alerts_created"] == 0
+        assert result["tennis_alerts_skipped"] == 1
+        assert db.query(OddsSnapshot).count() == 2
+        assert db.query(Alert).count() == 0
     finally:
         db.close()
 

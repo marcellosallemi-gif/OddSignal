@@ -1,10 +1,4 @@
-
-# Ensure production databases created before multi-sport support have the required columns.
-try:
-    ensure_sport_columns()
-except Exception as exc:
-    print("[runtime] sport column migration failed:", exc)
-\nimport asyncio
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -47,6 +41,13 @@ from app.services.odds_scheduler import odds_scheduler
 from app.services.telegram_notifier import sync_telegram_recipients_from_telegram
 from app.services.runtime_sport_migration import ensure_sport_columns
 
+
+
+# Ensure production databases created before multi-sport support have the required columns.
+try:
+    ensure_sport_columns()
+except Exception as exc:
+    print("[runtime] sport column migration failed:", exc)
 
 logger = logging.getLogger(__name__)
 AUTH_ENABLED_VALUES = {"1", "true", "yes", "on"}

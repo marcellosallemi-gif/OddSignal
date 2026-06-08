@@ -5,6 +5,31 @@ from app.database import engine
 
 SPORT_COLUMN_TABLES = ("competitions", "monitored_competitions", "monitored_markets")
 
+FOOTBALL_MARKETS = {
+    "1X2",
+    "Doppia chance",
+    "Double Chance",
+    "Pareggio escluso",
+    "Draw No Bet",
+    "Goal/No Goal",
+    "Handicap asiatico",
+    "Handicap europeo",
+    "European Handicap",
+    "Over/Under 0.5",
+    "Over/Under 1.5",
+    "Over/Under 2.5",
+    "Over/Under 3.5",
+    "Risultato esatto",
+    "Risultato primo tempo",
+    "Primo tempo/finale",
+    "Totale corner",
+    "Handicap corner",
+    "Totale cartellini",
+    "Marcatori",
+    "Primo marcatore",
+    "Entrambe segnano nel primo tempo",
+}
+
 TENNIS_MARKETS = [
     "Vincitore match",
     "Handicap giochi",
@@ -21,28 +46,6 @@ TENNIS_MARKETS = [
     "Handicap giochi secondo set",
 ]
 
-FOOTBALL_MARKETS = {
-    "1X2",
-    "Doppia chance",
-    "Pareggio escluso",
-    "Goal/No Goal",
-    "Handicap asiatico",
-    "Handicap europeo",
-    "Over/Under 0.5",
-    "Over/Under 1.5",
-    "Over/Under 2.5",
-    "Over/Under 3.5",
-    "Risultato esatto",
-    "Risultato primo tempo",
-    "Primo tempo/finale",
-    "Totale corner",
-    "Handicap corner",
-    "Totale cartellini",
-    "Marcatori",
-    "Primo marcatore",
-    "Entrambe segnano nel primo tempo",
-}
-
 
 def _table_exists(inspector, table_name: str) -> bool:
     return table_name in inspector.get_table_names()
@@ -50,6 +53,10 @@ def _table_exists(inspector, table_name: str) -> bool:
 
 def _column_exists(inspector, table_name: str, column_name: str) -> bool:
     return column_name in {column["name"] for column in inspector.get_columns(table_name)}
+
+
+def _is_postgresql(conn) -> bool:
+    return conn.dialect.name == "postgresql"
 
 
 def _ensure_sport_column(conn, inspector, table_name: str):
@@ -66,6 +73,14 @@ def _ensure_sport_column(conn, inspector, table_name: str):
         )
         print(f"[runtime] added {table_name}.sport")
 
+    if _is_postgresql(conn):
+        conn.execute(
+            text(
+                f"ALTER TABLE {table_name} "
+                "ALTER COLUMN sport SET DEFAULT 'football'"
+            )
+        )
+
     conn.execute(
         text(
             f"UPDATE {table_name} "
@@ -80,7 +95,6 @@ def _seed_tennis_markets(conn, inspector):
         print("[runtime] skipped tennis market seed: monitored_markets not found")
         return
 
-    # I mercati esistenti erano nati per il calcio.
     conn.execute(
         text(
             "UPDATE monitored_markets "
@@ -89,7 +103,6 @@ def _seed_tennis_markets(conn, inspector):
         )
     )
 
-    # Rafforza l'associazione dei mercati calcio noti.
     for market_name in FOOTBALL_MARKETS:
         conn.execute(
             text(
@@ -100,18 +113,21 @@ def _seed_tennis_markets(conn, inspector):
             {"market_name": market_name},
         )
 
-    # Crea mercati tennis separati. Disattivati di default:
-    # l'utente decide dalla dashboard quali attivare.
     for market_name in TENNIS_MARKETS:
         conn.execute(
             text(
-                "INSERT INTO monitored_markets (sport, market_name, is_active, created_at) "
-                "SELECT 'tennis', :market_name, 0, CURRENT_TIMESTAMP "
+                "INSERT INTO monitored_markets "
+                "(sport, market_name, is_active, created_at) "
+                "SELECT :sport, :market_name, :is_active, CURRENT_TIMESTAMP "
                 "WHERE NOT EXISTS ("
                 "  SELECT 1 FROM monitored_markets WHERE market_name = :market_name"
                 ")"
             ),
-            {"market_name": market_name},
+            {
+                "sport": "tennis",
+                "market_name": market_name,
+                "is_active": False,
+            },
         )
 
 
@@ -119,8 +135,8 @@ def ensure_sport_columns():
     """
     Migrazione runtime idempotente per supporto multi-sport.
 
-    Garantisce che database già esistenti abbiano la colonna sport e
-    crea i mercati tennis separati dai mercati calcio.
+    Garantisce sport su competizioni/campionati/mercati e crea i mercati tennis
+    separati dai mercati calcio senza attivarli automaticamente.
     """
     with engine.begin() as conn:
         inspector = inspect(conn)
@@ -128,7 +144,6 @@ def ensure_sport_columns():
         for table_name in SPORT_COLUMN_TABLES:
             _ensure_sport_column(conn, inspector, table_name)
 
-        # Re-istanzia inspector dopo eventuali ALTER TABLE.
         inspector = inspect(conn)
         _seed_tennis_markets(conn, inspector)
 

@@ -982,7 +982,17 @@ def _merge_ingestion_results(results):
     ]
 
     for key in numeric_keys:
-        base[key] = sum(result.get(key, 0) for result in results)
+        total = 0
+        for result in results:
+            value = result.get(key, 0)
+
+            # Alcuni campi diagnostici possono essere dizionari nei risultati
+            # dei singoli sport. L'aggregazione multi-sport deve sommare solo
+            # valori numerici, altrimenti lo scheduler fallisce con int + dict.
+            if isinstance(value, (int, float)):
+                total += value
+
+        base[key] = total
 
     base["sport"] = "multi"
     base["sports_processed"] = [result["sport"] for result in results]

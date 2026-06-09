@@ -697,6 +697,54 @@ def _recent_alert_exists(
     return existing_alert is not None
 
 
+def _event_display_name(event: Event) -> str:
+    return "{} vs {}".format(event.home_team.name, event.away_team.name)
+
+
+def _movement_decision(variation: Dict, alert_settings) -> str:
+    absolute_variation_percent = variation["absolute_variation_percent"]
+
+    if absolute_variation_percent < alert_settings.min_percent:
+        return "below_threshold"
+
+    if absolute_variation_percent <= alert_settings.max_percent:
+        return "within_alert_range"
+
+    if absolute_variation_percent > alert_settings.critical_percent:
+        return "above_critical"
+
+    return "above_critical"
+
+
+def _track_top_movement(
+    top_movements: list,
+    sport: str,
+    event: Event,
+    odd_data: Dict,
+    previous_odds: float,
+    current_odds: float,
+    variation_percent: float,
+    decision: str,
+) -> None:
+    top_movements.append(
+        {
+            "sport": sport,
+            "competition": event.competition.name,
+            "event": _event_display_name(event),
+            "market": _market_key(odd_data),
+            "selection": odd_data["selection"],
+            "bookmaker": odd_data.get("bookmaker"),
+            "provider": odd_data.get("provider"),
+            "previous_odds": previous_odds,
+            "current_odds": current_odds,
+            "variation_percent": variation_percent,
+            "decision": decision,
+        }
+    )
+    top_movements.sort(key=lambda item: abs(item["variation_percent"]), reverse=True)
+    del top_movements[10:]
+
+
 def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -> Dict:
     active_competitions = _get_active_monitored_competitions(db, sport=sport)
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
@@ -743,6 +791,14 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
     skipped_duplicate_alerts = 0
     notification_logs_created = 0
     created_alert_records = []
+    changed_odds_count = 0
+    unchanged_odds_count = 0
+    max_positive_variation_percent = None
+    max_negative_variation_percent = None
+    below_alert_threshold_count = 0
+    within_alert_range_count = 0
+    above_critical_threshold_count = 0
+    top_movements = []
 
     captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -827,6 +883,17 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
 
         if previous_snapshot and previous_snapshot.odds_decimal == odd_data["odds_decimal"]:
             unchanged_snapshots += 1
+            unchanged_odds_count += 1
+            _track_top_movement(
+                top_movements=top_movements,
+                sport=odd_sport,
+                event=event,
+                odd_data=odd_data,
+                previous_odds=previous_snapshot.odds_decimal,
+                current_odds=odd_data["odds_decimal"],
+                variation_percent=0,
+                decision="unchanged",
+            )
             ignored_odds_breakdown["unchanged_odds"] += 1
             continue
 
@@ -847,15 +914,49 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
         inserted_snapshots += 1
 
         if previous_snapshot:
-            if event.competition.sport != "football":
-                tennis_alerts_skipped += 1
-                ignored_odds_breakdown["outside_alert_range"] += 1
-                continue
-
+            changed_odds_count += 1
             variation = calculate_variation(
                 previous_snapshot.odds_decimal,
                 odd_data["odds_decimal"],
             )
+            diagnostic_decision = _movement_decision(variation, alert_settings)
+
+            if variation["variation_percent"] > 0:
+                if (
+                    max_positive_variation_percent is None
+                    or variation["variation_percent"] > max_positive_variation_percent
+                ):
+                    max_positive_variation_percent = variation["variation_percent"]
+
+            if variation["variation_percent"] < 0:
+                if (
+                    max_negative_variation_percent is None
+                    or variation["variation_percent"] < max_negative_variation_percent
+                ):
+                    max_negative_variation_percent = variation["variation_percent"]
+
+            if diagnostic_decision == "below_threshold":
+                below_alert_threshold_count += 1
+            elif diagnostic_decision == "within_alert_range":
+                within_alert_range_count += 1
+            elif diagnostic_decision == "above_critical":
+                above_critical_threshold_count += 1
+
+            if event.competition.sport != "football":
+                tennis_alerts_skipped += 1
+                ignored_odds_breakdown["outside_alert_range"] += 1
+                _track_top_movement(
+                    top_movements=top_movements,
+                    sport=odd_sport,
+                    event=event,
+                    odd_data=odd_data,
+                    previous_odds=variation["previous_odds"],
+                    current_odds=variation["current_odds"],
+                    variation_percent=variation["variation_percent"],
+                    decision=diagnostic_decision,
+                )
+                continue
+
             alert_result = evaluate_alert(
                 variation,
                 min_percent=alert_settings.min_percent,
@@ -872,6 +973,16 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
                     captured_at=captured_at,
                 ):
                     skipped_duplicate_alerts += 1
+                    _track_top_movement(
+                        top_movements=top_movements,
+                        sport=odd_sport,
+                        event=event,
+                        odd_data=odd_data,
+                        previous_odds=variation["previous_odds"],
+                        current_odds=variation["current_odds"],
+                        variation_percent=variation["variation_percent"],
+                        decision="duplicate",
+                    )
                     continue
 
                 alert = Alert(
@@ -893,8 +1004,28 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
                 created_alert_records.append(alert)
 
                 created_alerts += 1
+                _track_top_movement(
+                    top_movements=top_movements,
+                    sport=odd_sport,
+                    event=event,
+                    odd_data=odd_data,
+                    previous_odds=variation["previous_odds"],
+                    current_odds=variation["current_odds"],
+                    variation_percent=variation["variation_percent"],
+                    decision="alert_created",
+                )
             else:
                 ignored_odds_breakdown["below_alert_threshold"] += 1
+                _track_top_movement(
+                    top_movements=top_movements,
+                    sport=odd_sport,
+                    event=event,
+                    odd_data=odd_data,
+                    previous_odds=variation["previous_odds"],
+                    current_odds=variation["current_odds"],
+                    variation_percent=variation["variation_percent"],
+                    decision=diagnostic_decision,
+                )
         else:
             ignored_odds_breakdown["missing_previous_snapshot"] += 1
 
@@ -935,6 +1066,14 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
         "snapshots_unchanged": unchanged_snapshots,
         "alerts_created": created_alerts,
         "duplicate_alerts_skipped": skipped_duplicate_alerts,
+        "changed_odds_count": changed_odds_count,
+        "unchanged_odds_count": unchanged_odds_count,
+        "max_positive_variation_percent": max_positive_variation_percent,
+        "max_negative_variation_percent": max_negative_variation_percent,
+        "below_alert_threshold_count": below_alert_threshold_count,
+        "within_alert_range_count": within_alert_range_count,
+        "above_critical_threshold_count": above_critical_threshold_count,
+        "top_movements": top_movements,
         "notification_logs_created": notification_logs_created,
         "tennis_alerts_skipped": tennis_alerts_skipped,
         "alert_settings": {
@@ -973,6 +1112,42 @@ def _merge_counter_dicts(results, key):
     return merged
 
 
+def _merge_top_movements(results):
+    movements = []
+
+    for result in results:
+        movements.extend(result.get("top_movements", []) or [])
+
+    movements.sort(key=lambda item: abs(item.get("variation_percent", 0)), reverse=True)
+    return movements[:10]
+
+
+def _max_optional_result_value(results, key):
+    values = [
+        result.get(key)
+        for result in results
+        if result.get(key) is not None
+    ]
+
+    if not values:
+        return None
+
+    return max(values)
+
+
+def _min_optional_result_value(results, key):
+    values = [
+        result.get(key)
+        for result in results
+        if result.get(key) is not None
+    ]
+
+    if not values:
+        return None
+
+    return min(values)
+
+
 def _merge_ingestion_results(results):
     if len(results) == 1:
         result = dict(results[0])
@@ -996,6 +1171,11 @@ def _merge_ingestion_results(results):
         "snapshots_unchanged",
         "alerts_created",
         "duplicate_alerts_skipped",
+        "changed_odds_count",
+        "unchanged_odds_count",
+        "below_alert_threshold_count",
+        "within_alert_range_count",
+        "above_critical_threshold_count",
         "notification_logs_created",
         "tennis_alerts_skipped",
     ]
@@ -1016,6 +1196,15 @@ def _merge_ingestion_results(results):
     base["sport"] = "multi"
     base["sports_processed"] = [result["sport"] for result in results]
     base["sport_results"] = results
+    base["max_positive_variation_percent"] = _max_optional_result_value(
+        results,
+        "max_positive_variation_percent",
+    )
+    base["max_negative_variation_percent"] = _min_optional_result_value(
+        results,
+        "max_negative_variation_percent",
+    )
+    base["top_movements"] = _merge_top_movements(results)
     base["ignored_events_breakdown"] = _merge_counter_dicts(
         results,
         "ignored_events_breakdown",

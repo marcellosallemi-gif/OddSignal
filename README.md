@@ -98,6 +98,19 @@ Default:
 - critical_percent = 15
 - deduplication_minutes = 30
 
+La risposta del controllo quote include anche campi diagnostici per capire perché non vengono creati alert:
+
+- `changed_odds_count`
+- `unchanged_odds_count`
+- `max_positive_variation_percent`
+- `max_negative_variation_percent`
+- `below_alert_threshold_count`
+- `within_alert_range_count`
+- `above_critical_threshold_count`
+- `top_movements`
+
+`top_movements` mostra fino a 10 movimenti con sport, competizione, evento, mercato, selezione, bookmaker/provider, quote precedente/corrente, variazione percentuale e decisione.
+
 ## Mapping manuale campionati
 
 I campionati senza `provider_league_slug` risultano non monitorabili perché il software non può interrogare il provider in modo mirato.

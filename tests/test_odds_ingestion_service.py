@@ -119,6 +119,95 @@ class FakeProvider:
         }
 
 
+class FakeProviderWithDiagnosticMovements:
+    odds_by_key = {
+        "home": 1.80,
+        "draw": 3.00,
+        "away": 2.00,
+        "over": 1.80,
+    }
+
+    def get_sample(self, limit=3, league_slugs=None):
+        odds = [
+            {
+                "provider": "odds_api_io",
+                "provider_event_id": "fake-event-diagnostics",
+                "event": "Home FC vs Away FC",
+                "league_name": "Test League",
+                "bookmaker": "Stake",
+                "market_name": "ML",
+                "selection": "home",
+                "line": None,
+                "odds_decimal": self.odds_by_key["home"],
+                "updated_at": "2026-08-01T10:00:00Z",
+                "raw": {},
+            },
+            {
+                "provider": "odds_api_io",
+                "provider_event_id": "fake-event-diagnostics",
+                "event": "Home FC vs Away FC",
+                "league_name": "Test League",
+                "bookmaker": "Stake",
+                "market_name": "ML",
+                "selection": "draw",
+                "line": None,
+                "odds_decimal": self.odds_by_key["draw"],
+                "updated_at": "2026-08-01T10:00:00Z",
+                "raw": {},
+            },
+            {
+                "provider": "odds_api_io",
+                "provider_event_id": "fake-event-diagnostics",
+                "event": "Home FC vs Away FC",
+                "league_name": "Test League",
+                "bookmaker": "Stake",
+                "market_name": "ML",
+                "selection": "away",
+                "line": None,
+                "odds_decimal": self.odds_by_key["away"],
+                "updated_at": "2026-08-01T10:00:00Z",
+                "raw": {},
+            },
+            {
+                "provider": "odds_api_io",
+                "provider_event_id": "fake-event-diagnostics",
+                "event": "Home FC vs Away FC",
+                "league_name": "Test League",
+                "bookmaker": "Stake",
+                "market_name": "Totals",
+                "selection": "over",
+                "line": 2.5,
+                "odds_decimal": self.odds_by_key["over"],
+                "updated_at": "2026-08-01T10:00:00Z",
+                "raw": {},
+            },
+        ]
+
+        return {
+            "provider": "odds_api_io",
+            "sport": "football",
+            "bookmakers": ["Stake"],
+            "events_count": 1,
+            "odds_count": len(odds),
+            "events": [
+                {
+                    "provider": "odds_api_io",
+                    "provider_event_id": "fake-event-diagnostics",
+                    "sport": "football",
+                    "sport_name": "Football",
+                    "league_name": "Test League",
+                    "league_slug": "test-league",
+                    "home_team": "Home FC",
+                    "away_team": "Away FC",
+                    "event_date": "2026-08-01T20:00:00Z",
+                    "status": "pending",
+                    "raw": {},
+                }
+            ],
+            "odds": odds,
+        }
+
+
 class FakeTennisProvider:
     odds_decimal = 1.80
 
@@ -267,6 +356,59 @@ def test_ingestion_creates_standard_alert_on_eligible_variation(monkeypatch, tmp
         db.close()
 
 
+def test_ingestion_returns_diagnostic_movements(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            lambda **kwargs: FakeProviderWithDiagnosticMovements(),
+        )
+
+        FakeProviderWithDiagnosticMovements.odds_by_key = {
+            "home": 1.80,
+            "draw": 3.00,
+            "away": 2.00,
+            "over": 1.80,
+        }
+        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        FakeProviderWithDiagnosticMovements.odds_by_key = {
+            "home": 1.80,
+            "draw": 3.15,
+            "away": 2.20,
+            "over": 2.10,
+        }
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        decisions = {
+            item["selection"]: item["decision"]
+            for item in result["top_movements"]
+        }
+
+        assert result["changed_odds_count"] == 3
+        assert result["unchanged_odds_count"] == 1
+        assert result["below_alert_threshold_count"] == 1
+        assert result["within_alert_range_count"] == 1
+        assert result["above_critical_threshold_count"] == 1
+        assert result["max_positive_variation_percent"] == 16.67
+        assert result["max_negative_variation_percent"] is None
+        assert len(result["top_movements"]) == 4
+        assert decisions["home"] == "unchanged"
+        assert decisions["draw"] == "below_threshold"
+        assert decisions["away"] == "alert_created"
+        assert decisions["Over"] == "alert_created"
+        assert result["top_movements"][0]["sport"] == "football"
+        assert result["top_movements"][0]["competition"] == "Test League"
+        assert result["top_movements"][0]["event"] == "Home FC vs Away FC"
+        assert result["top_movements"][0]["bookmaker"] == "Stake"
+        assert result["top_movements"][0]["provider"] == "odds_api_io"
+    finally:
+        db.close()
+
+
 def test_tennis_ingestion_stores_safe_market_without_creating_alert(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
@@ -323,7 +465,59 @@ def test_ingestion_skips_recent_duplicate_alert(monkeypatch, tmp_path):
         assert first_alert_result["alerts_created"] == 1
         assert duplicate_result["alerts_created"] == 0
         assert duplicate_result["duplicate_alerts_skipped"] == 1
+        assert duplicate_result["changed_odds_count"] == 1
+        assert duplicate_result["within_alert_range_count"] == 1
+        assert duplicate_result["top_movements"][0]["decision"] == "duplicate"
         assert db.query(Alert).count() == 1
+    finally:
+        db.close()
+
+
+def test_ingestion_merges_diagnostics_for_multiple_sports(monkeypatch, tmp_path):
+    db = make_test_db(tmp_path)
+
+    try:
+        add_monitored_competition(db)
+        add_monitored_competition(
+            db,
+            competition_name="ATP Safe Test",
+            sport="tennis",
+        )
+        add_monitored_market(db, market_name="ML", is_active=True)
+
+        def fake_provider_factory(**kwargs):
+            if kwargs.get("sport") == "tennis":
+                return FakeTennisProvider()
+            return FakeProvider()
+
+        monkeypatch.setattr(
+            odds_ingestion_service,
+            "OddsApiIoProvider",
+            fake_provider_factory,
+        )
+
+        FakeProvider.odds_decimal = 1.80
+        FakeTennisProvider.odds_decimal = 1.80
+        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        FakeProvider.odds_decimal = 1.98
+        FakeTennisProvider.odds_decimal = 1.98
+        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+
+        assert result["sport"] == "multi"
+        assert result["sports_processed"] == ["football", "tennis"]
+        assert result["changed_odds_count"] == 2
+        assert result["unchanged_odds_count"] == 0
+        assert result["within_alert_range_count"] == 2
+        assert result["alerts_created"] == 1
+        assert result["tennis_alerts_skipped"] == 1
+        assert result["max_positive_variation_percent"] == 10.0
+        assert result["max_negative_variation_percent"] is None
+        assert {item["sport"] for item in result["top_movements"]} == {
+            "football",
+            "tennis",
+        }
+        assert len(result["sport_results"]) == 2
     finally:
         db.close()
 

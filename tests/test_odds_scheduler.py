@@ -1,4 +1,5 @@
 import asyncio
+import ast
 from datetime import datetime
 
 from fastapi.testclient import TestClient
@@ -71,26 +72,31 @@ def test_scheduler_run_once_prints_diagnostic_fields(monkeypatch, capsys):
         "odds_processed": 3,
         "snapshots_inserted": 3,
         "alerts_created": 0,
-        "changed_odds_count": 3,
-        "unchanged_odds_count": 465,
-        "max_positive_variation_percent": 4.5,
-        "max_negative_variation_percent": -3.2,
-        "below_alert_threshold_count": 3,
-        "within_alert_range_count": 0,
-        "above_critical_threshold_count": 0,
-        "top_movements": [
+        "sport_results": [
             {
                 "sport": "football",
-                "competition": "Test League",
-                "event": "Home FC vs Away FC",
-                "market": "ML",
-                "selection": "home",
-                "bookmaker": "Stake",
-                "provider": "odds_api_io",
-                "previous_odds": 1.80,
-                "current_odds": 1.88,
-                "variation_percent": 4.44,
-                "decision": "below_threshold",
+                "changed_odds_count": 3,
+                "unchanged_odds_count": 465,
+                "max_positive_variation_percent": 4.5,
+                "max_negative_variation_percent": -3.2,
+                "below_alert_threshold_count": 3,
+                "within_alert_range_count": 0,
+                "above_critical_threshold_count": 0,
+                "top_movements": [
+                    {
+                        "sport": "football",
+                        "competition": "Test League",
+                        "event": "Home FC vs Away FC",
+                        "market": "ML",
+                        "selection": "home",
+                        "bookmaker": "Stake",
+                        "provider": "odds_api_io",
+                        "previous_odds": 1.80,
+                        "current_odds": 1.88,
+                        "variation_percent": 4.44,
+                        "decision": "below_threshold",
+                    }
+                ],
             }
         ],
         "notification_logs_created": 0,
@@ -118,16 +124,17 @@ def test_scheduler_run_once_prints_diagnostic_fields(monkeypatch, capsys):
     exit_code = scheduler_module.run_once()
 
     output = capsys.readouterr().out
+    printed_result = ast.literal_eval(output.strip())
     assert exit_code == 0
-    assert "changed_odds_count" in output
-    assert "unchanged_odds_count" in output
-    assert "max_positive_variation_percent" in output
-    assert "max_negative_variation_percent" in output
-    assert "below_alert_threshold_count" in output
-    assert "within_alert_range_count" in output
-    assert "above_critical_threshold_count" in output
-    assert "top_movements" in output
-    assert "below_threshold" in output
+    assert "changed_odds_count" in printed_result
+    assert "unchanged_odds_count" in printed_result
+    assert "top_movements" in printed_result
+    assert printed_result["changed_odds_count"] == 3
+    assert printed_result["unchanged_odds_count"] == 465
+    assert printed_result["top_movements"][0]["decision"] == "below_threshold"
+    assert "changed_odds_count" in printed_result["sport_results"][0]
+    assert "unchanged_odds_count" in printed_result["sport_results"][0]
+    assert "top_movements" in printed_result["sport_results"][0]
     assert fake_db.closed is True
 
 

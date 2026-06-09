@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 from app.database import Base, SessionLocal, engine
 from app.runtime import load_environment, run_runtime_migrations
@@ -13,8 +13,110 @@ from app.services.scheduler_settings_service import get_or_create_scheduler_sett
 logger = logging.getLogger(__name__)
 
 
+DIAGNOSTIC_DEFAULTS = {
+    "changed_odds_count": 0,
+    "unchanged_odds_count": 0,
+    "max_positive_variation_percent": None,
+    "max_negative_variation_percent": None,
+    "below_alert_threshold_count": 0,
+    "within_alert_range_count": 0,
+    "above_critical_threshold_count": 0,
+    "top_movements": [],
+}
+
+
 def _utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _diagnostic_default_value(key):
+    default_value = DIAGNOSTIC_DEFAULTS[key]
+    if isinstance(default_value, list):
+        return list(default_value)
+    return default_value
+
+
+def _ensure_movement_diagnostics(result: Dict) -> Dict:
+    normalized_result = dict(result)
+    missing_top_level_keys = {
+        key
+        for key in DIAGNOSTIC_DEFAULTS
+        if key not in normalized_result
+    }
+
+    for key in DIAGNOSTIC_DEFAULTS:
+        if key not in normalized_result:
+            normalized_result[key] = _diagnostic_default_value(key)
+
+    sport_results = normalized_result.get("sport_results")
+    if isinstance(sport_results, list):
+        normalized_sport_results = []
+        for sport_result in sport_results:
+            if not isinstance(sport_result, dict):
+                normalized_sport_results.append(sport_result)
+                continue
+
+            normalized_sport_result = dict(sport_result)
+            for key in DIAGNOSTIC_DEFAULTS:
+                if key not in normalized_sport_result:
+                    normalized_sport_result[key] = _diagnostic_default_value(key)
+            normalized_sport_results.append(normalized_sport_result)
+
+        normalized_result["sport_results"] = normalized_sport_results
+
+        numeric_sum_keys = {
+            "changed_odds_count",
+            "unchanged_odds_count",
+            "below_alert_threshold_count",
+            "within_alert_range_count",
+            "above_critical_threshold_count",
+        }
+        for key in numeric_sum_keys.intersection(missing_top_level_keys):
+            normalized_result[key] = sum(
+                sport_result.get(key, 0)
+                for sport_result in normalized_sport_results
+                if isinstance(sport_result, dict)
+            )
+
+        if "max_positive_variation_percent" in missing_top_level_keys:
+            values = [
+                sport_result.get("max_positive_variation_percent")
+                for sport_result in normalized_sport_results
+                if (
+                    isinstance(sport_result, dict)
+                    and sport_result.get("max_positive_variation_percent") is not None
+                )
+            ]
+            normalized_result["max_positive_variation_percent"] = (
+                max(values) if values else None
+            )
+
+        if "max_negative_variation_percent" in missing_top_level_keys:
+            values = [
+                sport_result.get("max_negative_variation_percent")
+                for sport_result in normalized_sport_results
+                if (
+                    isinstance(sport_result, dict)
+                    and sport_result.get("max_negative_variation_percent") is not None
+                )
+            ]
+            normalized_result["max_negative_variation_percent"] = (
+                min(values) if values else None
+            )
+
+        if "top_movements" in missing_top_level_keys:
+            movements = []
+            for sport_result in normalized_sport_results:
+                if isinstance(sport_result, dict):
+                    movements.extend(sport_result.get("top_movements", []) or [])
+
+            movements.sort(
+                key=lambda item: abs(item.get("variation_percent", 0)),
+                reverse=True,
+            )
+            normalized_result["top_movements"] = movements[:10]
+
+    return normalized_result
 
 
 class OddsScheduler:
@@ -118,7 +220,9 @@ class OddsScheduler:
                 interval_seconds,
                 settings.event_limit,
             )
-            result = ingest_odds_sample(db=db, limit=settings.event_limit)
+            result = _ensure_movement_diagnostics(
+                ingest_odds_sample(db=db, limit=settings.event_limit)
+            )
             self.last_success_at = _utc_now_naive()
             self.last_error = None
             logger.info(
@@ -172,7 +276,9 @@ def run_once():
             print({"skipped": True, "reason": "scheduler_disabled"})
             return 0
 
-        result = ingest_odds_sample(db=db, limit=settings.event_limit)
+        result = _ensure_movement_diagnostics(
+            ingest_odds_sample(db=db, limit=settings.event_limit)
+        )
         logger.info(
             "Odds ingestion run-once completata: sport=%s sports_processed=%s "
             "events_received=%s odds_processed=%s snapshots_inserted=%s "
@@ -197,7 +303,7 @@ def run_once():
             result.get("top_movements"),
             result.get("notification_logs_created"),
         )
-        print(result)
+        print(result, flush=True)
         return 0
     except Exception:
         logger.exception("Odds ingestion run-once non completata.")

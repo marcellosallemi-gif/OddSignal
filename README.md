@@ -225,13 +225,19 @@ Se i bookmaker configurati superano il limite del Piano API attivo, il backend b
 ## Scheduler automatico
 
 Lo scheduler è configurabile da dashboard e API.
-Il loop scheduler parte all'avvio dell'app FastAPI e resta lato server: login, logout o browser chiuso non lo spengono. La dashboard salva solo lo stato `enabled` nel database.
-Su Render serve un piano always-on: se il servizio va in sleep, anche il processo FastAPI e lo scheduler si fermano finché Render non lo riattiva.
+Se `enabled=true`, il loop scheduler parte all'avvio dell'app FastAPI e resta lato server: login, logout o browser chiuso non lo spengono. La dashboard salva solo lo stato `enabled` nel database.
+Su Render ci sono due opzioni:
+
+- Opzione A: scheduler interno nel web service. Serve un piano always-on; se il servizio va in sleep, anche il processo FastAPI e lo scheduler si fermano finché Render non lo riattiva.
+- Opzione B consigliata: Render Cron Job ogni N minuti con comando `python -m app.services.odds_scheduler run-once`. Il comando esegue un solo ciclo di ingestion/allerta e poi termina.
+
+I servizi Render free/limitati non sono affidabili per alert h24 in produzione.
 
 Endpoint:
 
 GET /configuration/scheduler-settings
 PUT /configuration/scheduler-settings
+GET /configuration/scheduler-runtime-status
 
 Valori consigliati:
 

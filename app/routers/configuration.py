@@ -917,8 +917,14 @@ def get_scheduler_settings(db: Session = Depends(get_db)):
     return get_or_create_scheduler_settings(db)
 
 
+@router.get("/scheduler-runtime-status")
+def get_scheduler_runtime_status(db: Session = Depends(get_db)):
+    settings = get_or_create_scheduler_settings(db)
+    return odds_scheduler.runtime_status(configured_enabled=settings.enabled)
+
+
 @router.put("/scheduler-settings", response_model=SchedulerSettingResponse)
-def put_scheduler_settings(
+async def put_scheduler_settings(
     payload: SchedulerSettingUpdate,
     db: Session = Depends(get_db),
 ):
@@ -939,7 +945,11 @@ def put_scheduler_settings(
             poll_interval_seconds=payload.poll_interval_seconds,
             event_limit=payload.event_limit,
         )
-        odds_scheduler.notify_settings_changed()
+        if settings.enabled:
+            await odds_scheduler.start(configured_enabled=True)
+            odds_scheduler.notify_settings_changed()
+        else:
+            await odds_scheduler.stop()
         return settings
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

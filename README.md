@@ -298,3 +298,5 @@ Stato atteso attuale:
 - lo scheduler è configurabile da dashboard/API
 - testare prima con il pulsante UI Esegui controllo quote ora
 - il bookmaker va scritto Sbobet, non SBOBET
+
+<!-- Cron Job Render verificato per esecuzione scheduler run-once. -->

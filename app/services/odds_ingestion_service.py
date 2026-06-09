@@ -948,9 +948,28 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
 
 def _merge_counter_dicts(results, key):
     merged = {}
+
     for result in results:
-        for item_key, value in result.get(key, {}).items():
-            merged[item_key] = merged.get(item_key, 0) + value
+        counter = result.get(key, {}) or {}
+
+        if not isinstance(counter, dict):
+            continue
+
+        for item_key, value in counter.items():
+            if isinstance(value, (int, float)):
+                merged[item_key] = merged.get(item_key, 0) + value
+                continue
+
+            if isinstance(value, dict):
+                nested = merged.setdefault(item_key, {})
+                if not isinstance(nested, dict):
+                    nested = {}
+                    merged[item_key] = nested
+
+                for nested_key, nested_value in value.items():
+                    if isinstance(nested_value, (int, float)):
+                        nested[nested_key] = nested.get(nested_key, 0) + nested_value
+
     return merged
 
 

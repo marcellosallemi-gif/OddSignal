@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.models import Alert, MonitoredCompetition, MonitoredMarket, OddsSnapshot
 from app.services import odds_ingestion_service
+from app.services.odds_api_io_provider import OddsApiIoProvider
 
 
 EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS = {
@@ -265,28 +266,25 @@ class FakeTennisProvider:
 class FakeTennisProviderZeroEventsDiagnostics:
     def get_sample(self, limit=3, league_slugs=None):
         requested_leagues = league_slugs or []
+        self.last_diagnostics = {
+            "sport": "tennis",
+            "endpoint": "/events",
+            "requested_leagues": requested_leagues,
+            "league_results": [
+                {
+                    "league_slug": requested_leagues[0],
+                    "status": "ok",
+                    "events_count": 0,
+                }
+            ],
+            "empty_leagues_count": 1,
+            "errored_leagues_count": 0,
+        }
         return {
             "provider": "odds_api_io",
             "sport": "tennis",
             "bookmakers": ["Stake"],
             "league_slugs": requested_leagues,
-            "provider_diagnostics": {
-                "sport": "tennis",
-                "endpoint": "/events",
-                "requested_leagues": requested_leagues,
-                "league_results": [
-                    {
-                        "sport": "tennis",
-                        "endpoint": "/events",
-                        "league_slug": requested_leagues[0],
-                        "events_returned": 0,
-                        "status_code": 200,
-                        "error": None,
-                    }
-                ],
-                "empty_leagues_count": 1,
-                "errored_leagues_count": 0,
-            },
             "events_count": 0,
             "odds_count": 0,
             "events": [],
@@ -297,28 +295,25 @@ class FakeTennisProviderZeroEventsDiagnostics:
 class FakeTennisProviderEventDiagnostics:
     def get_sample(self, limit=3, league_slugs=None):
         requested_leagues = league_slugs or []
+        self.last_diagnostics = {
+            "sport": "tennis",
+            "endpoint": "/events",
+            "requested_leagues": requested_leagues,
+            "league_results": [
+                {
+                    "league_slug": requested_leagues[0],
+                    "status": "ok",
+                    "events_count": 1,
+                }
+            ],
+            "empty_leagues_count": 0,
+            "errored_leagues_count": 0,
+        }
         return {
             "provider": "odds_api_io",
             "sport": "tennis",
             "bookmakers": ["Stake"],
             "league_slugs": requested_leagues,
-            "provider_diagnostics": {
-                "sport": "tennis",
-                "endpoint": "/events",
-                "requested_leagues": requested_leagues,
-                "league_results": [
-                    {
-                        "sport": "tennis",
-                        "endpoint": "/events",
-                        "league_slug": requested_leagues[0],
-                        "events_returned": 1,
-                        "status_code": 200,
-                        "error": None,
-                    }
-                ],
-                "empty_leagues_count": 0,
-                "errored_leagues_count": 0,
-            },
             "events_count": 1,
             "odds_count": 1,
             "events": [
@@ -357,33 +352,58 @@ class FakeTennisProviderEventDiagnostics:
 class FakeTennisProviderErrorDiagnostics:
     def get_sample(self, limit=3, league_slugs=None):
         requested_leagues = league_slugs or []
+        self.last_diagnostics = {
+            "sport": "tennis",
+            "endpoint": "/events",
+            "requested_leagues": requested_leagues,
+            "league_results": [
+                {
+                    "league_slug": requested_leagues[0],
+                    "status": "error",
+                    "events_count": 0,
+                    "error_message": "safe provider failure",
+                }
+            ],
+            "empty_leagues_count": 0,
+            "errored_leagues_count": 1,
+        }
         return {
             "provider": "odds_api_io",
             "sport": "tennis",
             "bookmakers": ["Stake"],
             "league_slugs": requested_leagues,
-            "provider_diagnostics": {
-                "sport": "tennis",
-                "endpoint": "/events",
-                "requested_leagues": requested_leagues,
-                "league_results": [
-                    {
-                        "sport": "tennis",
-                        "endpoint": "/events",
-                        "league_slug": requested_leagues[0],
-                        "events_returned": 0,
-                        "status_code": 404,
-                        "error": "http_error_404",
-                    }
-                ],
-                "empty_leagues_count": 0,
-                "errored_leagues_count": 1,
-            },
             "events_count": 0,
             "odds_count": 0,
             "events": [],
             "odds": [],
         }
+
+
+class FakeTennisProviderUsingRealGetSample:
+    sport = "tennis"
+    bookmakers = "Stake"
+    last_diagnostics = {}
+
+    def get_sample(self, limit=3, league_slugs=None):
+        return OddsApiIoProvider.get_sample(
+            self,
+            limit=limit,
+            league_slugs=league_slugs,
+        )
+
+    def get_events(self, limit=None, bookmaker=None, league=None):
+        if league == "atp-error-test":
+            raise RuntimeError("safe provider failure")
+        return []
+
+    def get_event_odds(self, event_id):
+        return {}
+
+    def normalize_event(self, event):
+        return OddsApiIoProvider.normalize_event(self, event)
+
+    def normalize_odds(self, event_odds):
+        return OddsApiIoProvider.normalize_odds(self, event_odds)
 
 
 class FakeProviderWithTotalsLine:
@@ -604,19 +624,29 @@ def test_tennis_ingestion_surfaces_zero_event_provider_diagnostics(monkeypatch, 
             lambda **kwargs: FakeTennisProviderZeroEventsDiagnostics(),
         )
 
-        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+        result = odds_ingestion_service._ingest_odds_sample_for_sport(
+            db=db,
+            limit=1,
+            sport="tennis",
+        )
         diagnostics = result["tennis_provider_diagnostics"]
+        configuration = result["tennis_competition_configuration"]
 
         assert result["sport"] == "tennis"
         assert result["events_received"] == 0
+        assert "tennis_provider_diagnostics" in result
+        assert "tennis_competition_configuration" in result
         assert diagnostics["requested_leagues"] == ["atp-empty-test"]
+        assert "league_results" in diagnostics
         assert diagnostics["empty_leagues_count"] == 1
         assert diagnostics["errored_leagues_count"] == 0
-        assert diagnostics["league_results"][0]["events_returned"] == 0
-        assert diagnostics["configured_competitions"][0]["competition_name"] == "ATP Empty Test"
-        assert diagnostics["configured_competitions"][0]["sport"] == "tennis"
-        assert diagnostics["configured_competitions"][0]["provider_league_slug"] == "atp-empty-test"
-        assert diagnostics["configured_competitions"][0]["is_active"] is True
+        assert diagnostics["league_results"][0]["league_slug"] == "atp-empty-test"
+        assert diagnostics["league_results"][0]["status"] == "ok"
+        assert diagnostics["league_results"][0]["events_count"] == 0
+        assert configuration[0]["competition_name"] == "ATP Empty Test"
+        assert configuration[0]["sport"] == "tennis"
+        assert configuration[0]["provider_league_slug"] == "atp-empty-test"
+        assert configuration[0]["is_active"] is True
     finally:
         db.close()
 
@@ -640,7 +670,11 @@ def test_tennis_ingestion_surfaces_event_provider_diagnostics(monkeypatch, tmp_p
             lambda **kwargs: FakeTennisProviderEventDiagnostics(),
         )
 
-        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+        result = odds_ingestion_service._ingest_odds_sample_for_sport(
+            db=db,
+            limit=1,
+            sport="tennis",
+        )
         diagnostics = result["tennis_provider_diagnostics"]
 
         assert result["sport"] == "tennis"
@@ -649,8 +683,9 @@ def test_tennis_ingestion_surfaces_event_provider_diagnostics(monkeypatch, tmp_p
         assert diagnostics["requested_leagues"] == ["atp-diagnostic-test"]
         assert diagnostics["empty_leagues_count"] == 0
         assert diagnostics["errored_leagues_count"] == 0
-        assert diagnostics["league_results"][0]["events_returned"] == 1
-        assert diagnostics["league_results"][0]["endpoint"] == "/events"
+        assert diagnostics["endpoint"] == "/events"
+        assert diagnostics["league_results"][0]["status"] == "ok"
+        assert diagnostics["league_results"][0]["events_count"] == 1
     finally:
         db.close()
 
@@ -670,10 +705,14 @@ def test_tennis_ingestion_surfaces_provider_error_diagnostics(monkeypatch, tmp_p
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
-            lambda **kwargs: FakeTennisProviderErrorDiagnostics(),
+            lambda **kwargs: FakeTennisProviderUsingRealGetSample(),
         )
 
-        result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+        result = odds_ingestion_service._ingest_odds_sample_for_sport(
+            db=db,
+            limit=1,
+            sport="tennis",
+        )
         diagnostics = result["tennis_provider_diagnostics"]
 
         assert result["sport"] == "tennis"
@@ -681,8 +720,9 @@ def test_tennis_ingestion_surfaces_provider_error_diagnostics(monkeypatch, tmp_p
         assert diagnostics["requested_leagues"] == ["atp-error-test"]
         assert diagnostics["empty_leagues_count"] == 0
         assert diagnostics["errored_leagues_count"] == 1
-        assert diagnostics["league_results"][0]["status_code"] == 404
-        assert diagnostics["league_results"][0]["error"] == "http_error_404"
+        assert diagnostics["league_results"][0]["status"] == "error"
+        assert diagnostics["league_results"][0]["events_count"] == 0
+        assert diagnostics["league_results"][0]["error_message"] == "safe provider failure"
         assert "api" not in diagnostics["league_results"][0]
     finally:
         db.close()

@@ -78,6 +78,7 @@ class OddsApiIoProvider:
         self.usage_db = usage_db
         self.last_response_status = None
         self.last_provider_error = None
+        self.last_diagnostics = {}
 
     def masked_api_key(self):
         visible_prefix = self.api_key[:4] if len(self.api_key) > 4 else ""
@@ -227,7 +228,7 @@ class OddsApiIoProvider:
         first_bookmaker = self.bookmakers.split(",")[0].strip()
 
         events = []
-        provider_diagnostics = {
+        self.last_diagnostics = {
             "sport": self.sport,
             "endpoint": "/events",
             "requested_leagues": league_slugs or [],
@@ -244,26 +245,24 @@ class OddsApiIoProvider:
                         league=league_slug,
                     )
                 except RuntimeError as exc:
-                    provider_diagnostics["errored_leagues_count"] += 1
-                    provider_diagnostics["league_results"].append(
+                    self.last_diagnostics["errored_leagues_count"] += 1
+                    self.last_diagnostics["league_results"].append(
                         {
-                            "sport": self.sport,
-                            "endpoint": "/events",
                             "league_slug": league_slug,
-                            "events_returned": 0,
-                            "status_code": self.last_response_status,
-                            "error": self.last_provider_error or str(exc),
+                            "status": "error",
+                            "events_count": 0,
+                            "error_message": str(exc),
                         }
                     )
                     logger.info(
                         "Odds-API.io events diagnostics: sport=%s endpoint=%s "
-                        "league=%s events_returned=%s status_code=%s error=%s",
+                        "league=%s status=%s events_count=%s error=%s",
                         self.sport,
                         "/events",
                         league_slug,
+                        "error",
                         0,
-                        self.last_response_status,
-                        self.last_provider_error or str(exc),
+                        str(exc),
                     )
                     if self.sport != "tennis":
                         raise
@@ -271,27 +270,23 @@ class OddsApiIoProvider:
 
                 events.extend(league_events)
                 if not league_events:
-                    provider_diagnostics["empty_leagues_count"] += 1
+                    self.last_diagnostics["empty_leagues_count"] += 1
 
-                provider_diagnostics["league_results"].append(
+                self.last_diagnostics["league_results"].append(
                     {
-                        "sport": self.sport,
-                        "endpoint": "/events",
                         "league_slug": league_slug,
-                        "events_returned": len(league_events),
-                        "status_code": self.last_response_status,
-                        "error": None,
+                        "status": "ok",
+                        "events_count": len(league_events),
                     }
                 )
                 logger.info(
                     "Odds-API.io events diagnostics: sport=%s endpoint=%s "
-                    "league=%s events_returned=%s status_code=%s error=%s",
+                    "league=%s status=%s events_count=%s",
                     self.sport,
                     "/events",
                     league_slug,
+                    "ok",
                     len(league_events),
-                    self.last_response_status,
-                    None,
                 )
         else:
             events = self.get_events(limit=limit, bookmaker=first_bookmaker)
@@ -312,7 +307,6 @@ class OddsApiIoProvider:
                 if bookmaker.strip()
             ],
             "league_slugs": league_slugs or [],
-            "provider_diagnostics": provider_diagnostics,
             "events_count": len(normalized_events),
             "odds_count": len(odds),
             "events": normalized_events,

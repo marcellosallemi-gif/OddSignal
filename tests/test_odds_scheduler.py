@@ -55,6 +55,82 @@ def test_scheduler_cycle_reads_db_and_skips_polling_when_disabled(monkeypatch):
     assert fake_db.closed is True
 
 
+def test_scheduler_run_once_prints_diagnostic_fields(monkeypatch, capsys):
+    from app.services import odds_scheduler as scheduler_module
+
+    fake_db = FakeDb()
+    settings = FakeSettings(
+        enabled=True,
+        poll_interval_seconds=3,
+        event_limit=2,
+    )
+    result = {
+        "sport": "multi",
+        "sports_processed": ["football", "tennis"],
+        "events_received": 1,
+        "odds_processed": 3,
+        "snapshots_inserted": 3,
+        "alerts_created": 0,
+        "changed_odds_count": 3,
+        "unchanged_odds_count": 465,
+        "max_positive_variation_percent": 4.5,
+        "max_negative_variation_percent": -3.2,
+        "below_alert_threshold_count": 3,
+        "within_alert_range_count": 0,
+        "above_critical_threshold_count": 0,
+        "top_movements": [
+            {
+                "sport": "football",
+                "competition": "Test League",
+                "event": "Home FC vs Away FC",
+                "market": "ML",
+                "selection": "home",
+                "bookmaker": "Stake",
+                "provider": "odds_api_io",
+                "previous_odds": 1.80,
+                "current_odds": 1.88,
+                "variation_percent": 4.44,
+                "decision": "below_threshold",
+            }
+        ],
+        "notification_logs_created": 0,
+    }
+
+    monkeypatch.setattr(scheduler_module, "load_environment", lambda: None)
+    monkeypatch.setattr(
+        scheduler_module.Base.metadata,
+        "create_all",
+        lambda bind: None,
+    )
+    monkeypatch.setattr(scheduler_module, "run_runtime_migrations", lambda: None)
+    monkeypatch.setattr(scheduler_module, "SessionLocal", lambda: fake_db)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_or_create_scheduler_settings",
+        lambda db: settings,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "ingest_odds_sample",
+        lambda db, limit: result,
+    )
+
+    exit_code = scheduler_module.run_once()
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "changed_odds_count" in output
+    assert "unchanged_odds_count" in output
+    assert "max_positive_variation_percent" in output
+    assert "max_negative_variation_percent" in output
+    assert "below_alert_threshold_count" in output
+    assert "within_alert_range_count" in output
+    assert "above_critical_threshold_count" in output
+    assert "top_movements" in output
+    assert "below_threshold" in output
+    assert fake_db.closed is True
+
+
 def test_scheduler_notify_settings_changed_wakes_server_loop(monkeypatch):
     scheduler = OddsScheduler()
     cycles = []

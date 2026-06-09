@@ -33,6 +33,17 @@ EXPECTED_IGNORED_EVENTS_BREAKDOWN_KEYS = {
     "other",
 }
 
+EXPECTED_DIAGNOSTIC_RESULT_KEYS = {
+    "changed_odds_count",
+    "unchanged_odds_count",
+    "max_positive_variation_percent",
+    "max_negative_variation_percent",
+    "below_alert_threshold_count",
+    "within_alert_range_count",
+    "above_critical_threshold_count",
+    "top_movements",
+}
+
 
 
 
@@ -315,6 +326,8 @@ def test_ingestion_inserts_first_snapshot_without_alert(monkeypatch, tmp_path):
         assert "ignored_odds_breakdown" in result
         assert "ignored_market_breakdown_by_name" in result
         assert "excluded_market_breakdown_by_name" in result
+        assert EXPECTED_DIAGNOSTIC_RESULT_KEYS.issubset(result)
+        assert EXPECTED_DIAGNOSTIC_RESULT_KEYS.issubset(result["sport_results"][0])
         assert set(result["ignored_odds_breakdown"]) == EXPECTED_IGNORED_ODDS_BREAKDOWN_KEYS
         assert set(result["ignored_events_breakdown"]) == EXPECTED_IGNORED_EVENTS_BREAKDOWN_KEYS
         assert result["odds_processed"] == 1
@@ -395,7 +408,15 @@ def test_ingestion_returns_diagnostic_movements(monkeypatch, tmp_path):
         assert result["above_critical_threshold_count"] == 1
         assert result["max_positive_variation_percent"] == 16.67
         assert result["max_negative_variation_percent"] is None
+        assert result["ignored_odds_breakdown"]["below_alert_threshold"] == 1
         assert len(result["top_movements"]) == 4
+        assert len(
+            [
+                item
+                for item in result["top_movements"]
+                if item["decision"] == "below_threshold"
+            ]
+        ) == result["below_alert_threshold_count"]
         assert decisions["home"] == "unchanged"
         assert decisions["draw"] == "below_threshold"
         assert decisions["away"] == "alert_created"
@@ -513,6 +534,9 @@ def test_ingestion_merges_diagnostics_for_multiple_sports(monkeypatch, tmp_path)
         assert result["tennis_alerts_skipped"] == 1
         assert result["max_positive_variation_percent"] == 10.0
         assert result["max_negative_variation_percent"] is None
+        assert EXPECTED_DIAGNOSTIC_RESULT_KEYS.issubset(result)
+        for sport_result in result["sport_results"]:
+            assert EXPECTED_DIAGNOSTIC_RESULT_KEYS.issubset(sport_result)
         assert {item["sport"] for item in result["top_movements"]} == {
             "football",
             "tennis",

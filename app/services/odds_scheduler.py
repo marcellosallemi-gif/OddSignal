@@ -124,13 +124,25 @@ class OddsScheduler:
             logger.info(
                 "Odds scheduler tick completato: sport=%s sports_processed=%s "
                 "events_received=%s odds_processed=%s snapshots_inserted=%s "
-                "alerts_created=%s notification_logs_created=%s",
+                "alerts_created=%s changed_odds_count=%s unchanged_odds_count=%s "
+                "max_positive_variation_percent=%s max_negative_variation_percent=%s "
+                "below_alert_threshold_count=%s within_alert_range_count=%s "
+                "above_critical_threshold_count=%s top_movements=%s "
+                "notification_logs_created=%s",
                 result.get("sport"),
                 result.get("sports_processed"),
                 result.get("events_received"),
                 result.get("odds_processed"),
                 result.get("snapshots_inserted"),
                 result.get("alerts_created"),
+                result.get("changed_odds_count"),
+                result.get("unchanged_odds_count"),
+                result.get("max_positive_variation_percent"),
+                result.get("max_negative_variation_percent"),
+                result.get("below_alert_threshold_count"),
+                result.get("within_alert_range_count"),
+                result.get("above_critical_threshold_count"),
+                result.get("top_movements"),
                 result.get("notification_logs_created"),
             )
 
@@ -164,13 +176,25 @@ def run_once():
         logger.info(
             "Odds ingestion run-once completata: sport=%s sports_processed=%s "
             "events_received=%s odds_processed=%s snapshots_inserted=%s "
-            "alerts_created=%s notification_logs_created=%s",
+            "alerts_created=%s changed_odds_count=%s unchanged_odds_count=%s "
+            "max_positive_variation_percent=%s max_negative_variation_percent=%s "
+            "below_alert_threshold_count=%s within_alert_range_count=%s "
+            "above_critical_threshold_count=%s top_movements=%s "
+            "notification_logs_created=%s",
             result.get("sport"),
             result.get("sports_processed"),
             result.get("events_received"),
             result.get("odds_processed"),
             result.get("snapshots_inserted"),
             result.get("alerts_created"),
+            result.get("changed_odds_count"),
+            result.get("unchanged_odds_count"),
+            result.get("max_positive_variation_percent"),
+            result.get("max_negative_variation_percent"),
+            result.get("below_alert_threshold_count"),
+            result.get("within_alert_range_count"),
+            result.get("above_critical_threshold_count"),
+            result.get("top_movements"),
             result.get("notification_logs_created"),
         )
         print(result)

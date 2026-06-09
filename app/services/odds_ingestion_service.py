@@ -1043,6 +1043,18 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
         notification_logs_created += notification_result.get("logs_created", 0)
 
     db.commit()
+    tennis_provider_diagnostics = None
+    if sport == "tennis":
+        tennis_provider_diagnostics = dict(sample.get("provider_diagnostics") or {})
+        tennis_provider_diagnostics["configured_competitions"] = [
+            {
+                "competition_name": item.competition_name,
+                "sport": item.sport,
+                "provider_league_slug": item.provider_league_slug,
+                "is_active": item.is_active,
+            }
+            for item in active_competitions
+        ]
 
     return {
         "provider": sample["provider"],
@@ -1076,6 +1088,7 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
         "top_movements": top_movements,
         "notification_logs_created": notification_logs_created,
         "tennis_alerts_skipped": tennis_alerts_skipped,
+        "tennis_provider_diagnostics": tennis_provider_diagnostics,
         "alert_settings": {
             "min_percent": alert_settings.min_percent,
             "max_percent": alert_settings.max_percent,

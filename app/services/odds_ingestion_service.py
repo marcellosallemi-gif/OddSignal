@@ -161,6 +161,9 @@ SUPPORTED_TOTAL_MARKETS = {
 
 SUPPORTED_PROVIDER_MARKETS = {
     "ML",
+    "Moneyline",
+    "Vincitore match",
+    "Match Winner",
     "Totals",
     "Both Teams To Score",
     "Spread",
@@ -361,8 +364,9 @@ def _get_active_monitored_market_names(db, sport: str = "football"):
                 "Vincitore match" in active_market_names
                 or "ML" in active_market_names
                 or "Moneyline" in active_market_names
+                or "Match Winner" in active_market_names
             ):
-                expanded_market_names.update({"Vincitore match", "ML", "Moneyline"})
+                expanded_market_names.update({"Vincitore match", "ML", "Moneyline", "Match Winner"})
 
         return expanded_market_names
 
@@ -573,11 +577,12 @@ def _normalize_supported_odd_data(odd_data: Dict) -> Optional[Dict]:
         "2": "away",
     }
 
-    if market_name == "ML":
+    if market_name in {"ML", "Moneyline", "Vincitore match", "Match Winner"}:
         if _line_is_present(line) or selection_key not in ml_selections:
             return None
         normalized["selection"] = ml_selections[selection_key]
         normalized["line"] = None
+        normalized["market_name"] = "ML"
         return normalized
 
     if market_name == "Totals":
@@ -641,6 +646,11 @@ def _is_monitored_competition(event_data: Dict, active_competitions: set) -> boo
     return league_name in active_competitions
 
 
+def _is_monitored_tennis_competition(event_data: Dict, active_provider_league_slugs: set) -> bool:
+    league_slug = event_data.get("league_slug")
+    return bool(league_slug and league_slug in active_provider_league_slugs)
+
+
 def _sport_supports_market(sport: str, odd_data: Dict) -> bool:
     if sport != "tennis":
         return True
@@ -650,7 +660,7 @@ def _sport_supports_market(sport: str, odd_data: Dict) -> bool:
 
     # Prima versione tennis: accetta solo vincitore match.
     # ML/Moneyline sono alias provider di Vincitore match.
-    if market_name in {"ML", "Moneyline", "Vincitore match"} and not _line_is_present(line):
+    if market_name in {"ML", "Moneyline", "Vincitore match", "Match Winner"} and not _line_is_present(line):
         return True
 
     return False
@@ -749,6 +759,7 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
     active_competitions = _get_active_monitored_competitions(db, sport=sport)
     active_competition_names = _get_active_monitored_competition_names(active_competitions)
     active_provider_league_slugs = _get_active_provider_league_slugs(active_competitions)
+    active_provider_league_slug_set = set(active_provider_league_slugs)
     active_market_names = _get_active_monitored_market_names(db, sport=sport)
     configured_market_names = _get_configured_monitored_market_names(db)
 
@@ -772,7 +783,18 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
 
     for event_data in sample["events"]:
         event_data["sport"] = event_data.get("sport") or sport
-        if not _is_monitored_competition(event_data, active_competition_names):
+        if sport == "tennis":
+            is_monitored_event = _is_monitored_tennis_competition(
+                event_data,
+                active_provider_league_slug_set,
+            )
+        else:
+            is_monitored_event = _is_monitored_competition(
+                event_data,
+                active_competition_names,
+            )
+
+        if not is_monitored_event:
             ignored_events += 1
             ignored_events_breakdown["inactive_competition"] += 1
             continue
@@ -941,21 +963,6 @@ def _ingest_odds_sample_for_sport(db, limit: int = 3, sport: str = "football") -
                 within_alert_range_count += 1
             elif diagnostic_decision == "above_critical":
                 above_critical_threshold_count += 1
-
-            if event.competition.sport != "football":
-                tennis_alerts_skipped += 1
-                ignored_odds_breakdown["outside_alert_range"] += 1
-                _track_top_movement(
-                    top_movements=top_movements,
-                    sport=odd_sport,
-                    event=event,
-                    odd_data=odd_data,
-                    previous_odds=variation["previous_odds"],
-                    current_odds=variation["current_odds"],
-                    variation_percent=variation["variation_percent"],
-                    decision=diagnostic_decision,
-                )
-                continue
 
             alert_result = evaluate_alert(
                 variation,

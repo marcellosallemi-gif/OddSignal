@@ -222,6 +222,7 @@ class FakeProviderWithDiagnosticMovements:
 
 class FakeTennisProvider:
     odds_decimal = 1.80
+    market_name = "ML"
 
     def get_sample(self, limit=3, league_slugs=None):
         return {
@@ -252,7 +253,7 @@ class FakeTennisProvider:
                     "event": "Sinner vs Alcaraz",
                     "league_name": "ATP Safe Test",
                     "bookmaker": "Stake",
-                    "market_name": "ML",
+                    "market_name": self.market_name,
                     "selection": "home",
                     "line": None,
                     "odds_decimal": self.odds_decimal,
@@ -505,6 +506,8 @@ def test_ingestion_creates_standard_alert_on_eligible_variation(monkeypatch, tmp
         assert result["snapshots_inserted"] == 1
         assert result["alerts_created"] == 1
         assert result["duplicate_alerts_skipped"] == 0
+        assert result["alert_settings"]["min_percent"] == 8.0
+        assert result["alert_settings"]["max_percent"] == 15.0
         assert alert is not None
         assert alert.alert_type == "standard_alert"
         assert alert.variation_percent == 10.0
@@ -574,35 +577,44 @@ def test_ingestion_returns_diagnostic_movements(monkeypatch, tmp_path):
         db.close()
 
 
-def test_tennis_ingestion_stores_safe_market_without_creating_alert(monkeypatch, tmp_path):
+def test_tennis_ingestion_matches_competition_by_slug_and_creates_alert(monkeypatch, tmp_path):
     db = make_test_db(tmp_path)
 
     try:
         add_monitored_competition(
             db,
-            competition_name="ATP Safe Test",
+            competition_name="Saved Tennis Name",
             sport="tennis",
         )
+        monitored = db.query(MonitoredCompetition).first()
+        monitored.provider_league_slug = "atp-safe-test"
         add_monitored_market(db, market_name="ML", is_active=True)
+        db.commit()
         monkeypatch.setattr(
             odds_ingestion_service,
             "OddsApiIoProvider",
             lambda **kwargs: FakeTennisProvider(),
         )
 
+        FakeTennisProvider.market_name = "ML"
         FakeTennisProvider.odds_decimal = 1.80
-        odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
+        first_result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
 
         FakeTennisProvider.odds_decimal = 1.98
         result = odds_ingestion_service.ingest_odds_sample(db=db, limit=1)
 
         assert result["sport"] == "tennis"
+        assert first_result["events_ignored"] == 0
+        assert first_result["odds_processed"] == 1
         assert result["snapshots_inserted"] == 1
-        assert result["alerts_created"] == 0
-        assert result["tennis_alerts_skipped"] == 1
+        assert result["odds_processed"] == 1
+        assert result["alerts_created"] == 1
+        assert result["tennis_alerts_skipped"] == 0
+        assert db.query(Alert).first().alert_type == "standard_alert"
         assert db.query(OddsSnapshot).count() == 2
-        assert db.query(Alert).count() == 0
+        assert db.query(Alert).count() == 1
     finally:
+        FakeTennisProvider.market_name = "ML"
         db.close()
 
 
@@ -679,7 +691,9 @@ def test_tennis_ingestion_surfaces_event_provider_diagnostics(monkeypatch, tmp_p
 
         assert result["sport"] == "tennis"
         assert result["events_received"] == 1
+        assert result["events_ignored"] == 0
         assert result["odds_received"] == 1
+        assert result["odds_processed"] == 1
         assert diagnostics["requested_leagues"] == ["atp-diagnostic-test"]
         assert diagnostics["empty_leagues_count"] == 0
         assert diagnostics["errored_leagues_count"] == 0
@@ -770,7 +784,12 @@ def test_ingestion_merges_diagnostics_for_multiple_sports(monkeypatch, tmp_path)
             competition_name="ATP Safe Test",
             sport="tennis",
         )
+        monitored = db.query(MonitoredCompetition).filter(
+            MonitoredCompetition.sport == "tennis",
+        ).first()
+        monitored.provider_league_slug = "atp-safe-test"
         add_monitored_market(db, market_name="ML", is_active=True)
+        db.commit()
 
         def fake_provider_factory(**kwargs):
             if kwargs.get("sport") == "tennis":
@@ -796,8 +815,8 @@ def test_ingestion_merges_diagnostics_for_multiple_sports(monkeypatch, tmp_path)
         assert result["changed_odds_count"] == 2
         assert result["unchanged_odds_count"] == 0
         assert result["within_alert_range_count"] == 2
-        assert result["alerts_created"] == 1
-        assert result["tennis_alerts_skipped"] == 1
+        assert result["alerts_created"] == 2
+        assert result["tennis_alerts_skipped"] == 0
         assert result["max_positive_variation_percent"] == 10.0
         assert result["max_negative_variation_percent"] is None
         assert EXPECTED_DIAGNOSTIC_RESULT_KEYS.issubset(result)

@@ -2,7 +2,7 @@
 
 Software MVP locale per monitorare quote sportive a scopo informativo.
 
-Il sistema acquisisce quote calcio da Odds-API.io, salva storico quote, calcola variazioni percentuali, genera alert e invia notifiche Telegram. La configurazione principale avviene da dashboard web. Il tennis è supportato come configurazione tornei separata; nella prima versione gli alert tennis restano disattivati finché i mercati non sono normalizzati in modo sicuro.
+Il sistema acquisisce quote calcio da Odds-API.io, salva storico quote, calcola variazioni percentuali, genera alert e invia notifiche Telegram. La configurazione principale avviene da dashboard web. Il tennis è supportato come configurazione tornei separata e processa il mercato principale vincitore match quando monitorato.
 
 Non piazza scommesse, non automatizza betting, non usa scraping aggressivo e non interagisce con account bookmaker.
 

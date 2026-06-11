@@ -1148,12 +1148,15 @@ function humanizeSeconds(seconds) {
   return `${value} secondi`;
 }
 
-function readableMarketName(marketName) {
+function readableMarketName(marketName, sport) {
   if (!marketName) {
     return "Mercato non specificato";
   }
 
-  if (marketName === "ML") {
+  if (["ML", "Moneyline", "Vincitore match"].includes(marketName)) {
+    if (sport === "tennis") {
+      return "Vincitore match";
+    }
     return "1X2";
   }
 
@@ -2269,7 +2272,7 @@ async function loadMonitoredMarkets() {
         const active = item.is_active ? "Attivo" : "In attesa di attivazione";
         const badgeClass = item.is_active ? "badge ok" : "badge";
         return `<tr>
-          <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name))}</span></td>
+          <td><span class="market-name">${escapeHtml(readableMarketName(item.market_name, item.sport))}</span></td>
           <td>${escapeHtml(item.sport === "tennis" ? "Tennis" : "Calcio")}</td>
           <td><span class="${badgeClass}">${active}</span></td>
           <td>
@@ -2283,7 +2286,7 @@ async function loadMonitoredMarkets() {
     let missingRows = "";
     for (const marketName of missingSuggestedMarkets) {
       missingRows += `<tr>
-        <td><span class="market-name">${escapeHtml(readableMarketName(marketName))}</span></td>
+        <td><span class="market-name">${escapeHtml(readableMarketName(marketName, "football"))}</span></td>
         <td>Calcio</td>
         <td><span class="badge">Da caricare</span></td>
         <td><button class="compact" onclick="addSuggestedMarkets()">Carica mercati suggeriti</button></td>
@@ -2612,7 +2615,7 @@ function renderAlertsTable(options) {
       <td>${escapeHtml(contextLabel)}</td>
       <td>${escapeHtml(item.event_start_time ? formatDateTime(item.event_start_time) : "n/d")}</td>
       <td>${escapeHtml(item.bookmaker)}</td>
-      <td>${escapeHtml(readableMarketName(item.market))}</td>
+      <td>${escapeHtml(readableMarketName(item.market, item.sport))}</td>
       <td>${escapeHtml(item.selection)}</td>
       <td>${escapeHtml(item.previous_odds)}</td>
       <td>${escapeHtml(item.current_odds)}</td>

@@ -70,8 +70,12 @@ MARKET_CANONICAL_LABELS = {
 }
 
 
-def _canonical_market_name(market_name: str) -> str:
+def _canonical_market_name(market_name: str, sport: str = "football") -> str:
     clean_name = (market_name or "").strip()
+
+    if sport == "tennis" and clean_name in {"ML", "Moneyline", "Vincitore match"}:
+        return "Vincitore match"
+
     if clean_name.startswith("Totals "):
         return "Over/Under " + clean_name.replace("Totals ", "", 1).strip()
     if clean_name.startswith("Over/Under "):
@@ -79,7 +83,10 @@ def _canonical_market_name(market_name: str) -> str:
     return MARKET_CANONICAL_LABELS.get(clean_name, clean_name)
 
 
-def _market_aliases_for_canonical(canonical_name: str) -> List[str]:
+def _market_aliases_for_canonical(canonical_name: str, sport: str = "football") -> List[str]:
+    if sport == "tennis" and canonical_name == "Vincitore match":
+        return ["ML", "Moneyline", "Vincitore match"]
+
     aliases = [
         alias
         for alias, label in MARKET_CANONICAL_LABELS.items()
@@ -517,7 +524,7 @@ def get_monitored_markets(
     )
 
     for item in markets:
-        canonical_name = _canonical_market_name(item.market_name)
+        canonical_name = _canonical_market_name(item.market_name, sport=sport)
         group = grouped_markets.setdefault(
             canonical_name,
             {
@@ -544,8 +551,8 @@ def upsert_monitored_market(
     db: Session = Depends(get_db),
 ):
     sport = _normalize_sport(getattr(payload, "sport", "football"))
-    canonical_name = _canonical_market_name(payload.market_name)
-    aliases = _market_aliases_for_canonical(canonical_name)
+    canonical_name = _canonical_market_name(payload.market_name, sport=sport)
+    aliases = _market_aliases_for_canonical(canonical_name, sport=sport)
     existing_items = (
         db.query(MonitoredMarket)
         .filter(
@@ -601,8 +608,8 @@ def toggle_monitored_market(
         raise HTTPException(status_code=404, detail="Monitored market not found")
 
     sport = getattr(item, "sport", None) or "football"
-    canonical_name = _canonical_market_name(item.market_name)
-    aliases = _market_aliases_for_canonical(canonical_name)
+    canonical_name = _canonical_market_name(item.market_name, sport=sport)
+    aliases = _market_aliases_for_canonical(canonical_name, sport=sport)
     group_items = (
         db.query(MonitoredMarket)
         .filter(

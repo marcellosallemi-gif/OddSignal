@@ -300,6 +300,36 @@ def test_monitored_markets_are_returned_with_canonical_italian_labels():
     assert "Pareggio escluso" in market_names
 
 
+def test_moneyline_market_label_is_sport_aware():
+    with TestClient(app) as client:
+        football_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "sport": "football",
+                "market_name": "ML",
+                "is_active": True,
+            },
+        )
+        tennis_response = client.post(
+            "/configuration/monitored-markets",
+            json={
+                "sport": "tennis",
+                "market_name": "ML",
+                "is_active": True,
+            },
+        )
+        tennis_list_response = client.get("/configuration/monitored-markets?sport=tennis")
+
+    assert football_response.status_code == 200
+    assert football_response.json()["market_name"] == "1X2"
+    assert tennis_response.status_code == 200
+    assert tennis_response.json()["market_name"] == "Vincitore match"
+
+    tennis_market_names = [item["market_name"] for item in tennis_list_response.json()]
+    assert "Vincitore match" in tennis_market_names
+    assert "1X2" not in tennis_market_names
+
+
 def test_toggle_monitored_market():
     market_name = "Toggle Market " + uuid4().hex
 

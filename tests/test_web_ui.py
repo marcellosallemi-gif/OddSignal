@@ -117,6 +117,10 @@ def test_web_home_returns_html_page():
     assert "Carica mercati suggeriti" in response.text
     assert "Doppia chance" in response.text
     assert "Pareggio escluso" in response.text
+    assert "function readableMarketName(marketName, sport)" in response.text
+    assert 'readableMarketName(item.market_name, item.sport)' in response.text
+    assert 'readableMarketName(item.market, item.sport)' in response.text
+    assert 'return "Vincitore match";' in response.text
     assert "Handicap principale" not in response.text
     assert "Nome provider" not in response.text
     assert "Handicap europeo" in response.text
